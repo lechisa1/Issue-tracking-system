@@ -52,8 +52,7 @@ const login = async (req, res) => {
 // Logout (token invalidation example using a blacklist)
 const logout = async (req, res) => {
   try {
-    // If you want, you can store tokens in a blacklist to invalidate them
-    // For now, just return success
+
     res.status(200).json({ message: "Logout successful" });
   } catch (error) {
     res.status(500).json({ message: "Internal server error", error: error.message });
