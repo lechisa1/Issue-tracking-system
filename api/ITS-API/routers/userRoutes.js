@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/userController");
-const { validateCreateUser, validateUpdateUser } = require("../validators/userValidator");
+const { validateUpdateUser, validateCreateUser } = require("../validators/userValidator");
 
 /**
  * @swagger
@@ -69,7 +69,7 @@ const { validateCreateUser, validateUpdateUser } = require("../validators/userVa
  *       400:
  *         description: Validation error
  */
-router.post("/", validateCreateUser, userController.createUser);
+router.post("/", userController.createUser);
 
 /**
  * @swagger

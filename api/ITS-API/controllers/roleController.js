@@ -1,28 +1,82 @@
-const { Role } = require("../models");
+const { Role,Permission, RolePermission  } = require("../models");
 const { v4: uuidv4 } = require("uuid");
 
 // Create Role
 const createRole = async (req, res) => {
+  const t = await Role.sequelize.transaction();
   try {
-    const { name, description, role_type } = req.body;
+    const { name, description, role_type, permission_ids } = req.body; 
+    // permission_ids → array of permission UUIDs
 
-    const existingRole = await Role.findOne({ where: { name } });
+   
+    // =========Check if role name exists==========
+    
+    const existingRole = await Role.findOne({ where: { name }, transaction: t });
     if (existingRole) {
+      await t.rollback();
       return res.status(400).json({ message: "Role with this name already exists." });
     }
 
-    const role = await Role.create({
-      role_id: uuidv4(),
-      name,
-      description,
-      role_type,
+    
+    // ==========Create the Role===========
+    
+    const role = await Role.create(
+      {
+        role_id: uuidv4(),
+        name,
+        description,
+        role_type,
+      },
+      { transaction: t }
+    );
+    // ============Assign Permissions=========
+  
+    if (Array.isArray(permission_ids) && permission_ids.length > 0) {
+      // Validate permissions exist
+      const validPermissions = await Permission.findAll({
+        where: { permission_id: permission_ids },
+        transaction: t,
+      });
+
+      if (validPermissions.length !== permission_ids.length) {
+        await t.rollback();
+        return res.status(400).json({
+          message: "Some permissions are invalid or not found.",
+        });
+      }
+
+      const rolePermissions = permission_ids.map((pid) => ({
+        role_permission_id: uuidv4(),
+        role_id: role.role_id,
+        permission_id: pid,
+        assigned_at: new Date(),
+      }));
+
+      await RolePermission.bulkCreate(rolePermissions, { transaction: t });
+    }
+
+    await t.commit();
+
+    
+    //=========Return role with permissions=========
+ 
+    const createdRole = await Role.findOne({
+      where: { role_id: role.role_id },
+      include: [
+        {
+          model: Permission,
+          as: "permissions",
+          through: { attributes: [] },
+        },
+      ],
     });
 
     return res.status(201).json({
       message: "Role created successfully.",
-      data: role,
+      data: createdRole,
     });
   } catch (error) {
+    await t.rollback();
     console.error("Error creating role:", error);
     return res.status(500).json({ message: "Internal server error", error: error.message });
   }
