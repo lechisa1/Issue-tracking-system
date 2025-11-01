@@ -30,10 +30,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.UUID,
         allowNull: false,
       },
-      is_active: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true,
-      },
+      // is_active: {
+      //   type: DataTypes.BOOLEAN,
+      //   defaultValue: true,
+      // },
     },
     {
       sequelize,

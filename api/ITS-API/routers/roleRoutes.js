@@ -51,7 +51,7 @@ const {
  *       500:
  *         description: Internal server error
  */
-router.post("/", validateCreateRole, roleController.createRole);
+router.post("/", roleController.createRole);
 
 /**
  * @swagger

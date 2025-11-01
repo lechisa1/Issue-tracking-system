@@ -11,6 +11,7 @@ module.exports = (sequelize, DataTypes) => {
         otherKey: "role_id",
         as: "roles",
       });
+      
     }
   }
 
@@ -30,18 +31,18 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: true,
       },
-      created_by: {
-        type: DataTypes.STRING,
-        allowNull: true,
-      },
-      updated_by: {
-        type: DataTypes.STRING,
-        allowNull: true,
-      },
-      is_active: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true,
-      },
+      // created_by: {
+      //   type: DataTypes.STRING,
+      //   allowNull: true,
+      // },
+      // updated_by: {
+      //   type: DataTypes.STRING,
+      //   allowNull: true,
+      // },
+      // is_active: {
+      //   type: DataTypes.BOOLEAN,
+      //   defaultValue: true,
+      // },
     },
     {
       sequelize,
