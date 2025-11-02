@@ -3,10 +3,7 @@
 const { User, Role, UserRoles } = require("../models");
 const { v4: uuidv4 } = require("uuid");
 
-/**
- * Assign roles to a user
- * @param req.body { user_id: string, role_ids: array of UUIDs, assigned_by: string }
- */
+
 const assignRolesToUser = async (req, res) => {
   try {
     const { user_id, role_ids, assigned_by } = req.body;
@@ -30,7 +27,7 @@ const assignRolesToUser = async (req, res) => {
       UserRoles.create({
         user_role_id: uuidv4(),
         user_id: user.user_id,
-        user_type: user.user_type_id, // or map type from UserType
+        user_type: user.user_type_id, 
         role_id: role.role_id,
         assigned_by: assigned_by || null,
         assigned_at: new Date(),
@@ -63,10 +60,7 @@ const assignRolesToUser = async (req, res) => {
   }
 };
 
-/**
- * Remove a role from a user
- * @param req.body { user_id: string, role_id: string }
- */
+
 const removeRoleFromUser = async (req, res) => {
   try {
     const { user_id, role_id } = req.body;

@@ -9,7 +9,7 @@ const createRoleSchema = Joi.object({
     "string.empty": "Role description is required",
   }),
 
-  role_type: Joi.string()
+  level: Joi.string()
     .valid("internal", "external")
     .required()
     .messages({
@@ -28,7 +28,7 @@ const createRoleSchema = Joi.object({
 const updateRoleSchema = Joi.object({
   name: Joi.string().trim().optional(),
   description: Joi.string().trim().optional(),
-  role_type: Joi.string().valid("internal", "external").optional(),
+  level: Joi.string().valid("internal", "external").optional(),
   permissions: Joi.array()
     .items(Joi.string().guid({ version: "uuidv4" }))
     .optional(),

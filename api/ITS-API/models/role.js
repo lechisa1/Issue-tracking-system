@@ -10,6 +10,12 @@ module.exports = (sequelize, DataTypes) => {
         otherKey: "user_id",
         as: "users",
       });
+      Role.belongsToMany(models.Permission, {
+  through: "role_permissions",
+  foreignKey: "role_id",
+  otherKey: "permission_id",
+  as: "permissions",
+});
     }
   }
 
@@ -23,7 +29,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       name: { type: DataTypes.STRING, unique: true },
       description: DataTypes.TEXT,
-      role_type: DataTypes.STRING,
+      level: DataTypes.STRING,
     },
     {
       sequelize,
