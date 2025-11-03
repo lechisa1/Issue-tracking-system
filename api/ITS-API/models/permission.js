@@ -4,9 +4,9 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class Permission extends Model {
     static associate(models) {
-      // Many-to-Many relationship with Role through RolePermission
-      this.belongsToMany(models.Role, {
-        through: models.RolePermission,
+      // Permission ↔ Role (many-to-many)
+      Permission.belongsToMany(models.Role, {
+        through: models.RolePermission, 
         foreignKey: "permission_id",
         otherKey: "role_id",
         as: "roles",
@@ -30,18 +30,8 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: true,
       },
-      created_by: {
-        type: DataTypes.STRING,
-        allowNull: true,
-      },
-      updated_by: {
-        type: DataTypes.STRING,
-        allowNull: true,
-      },
-      is_active: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true,
-      },
+
+ 
     },
     {
       sequelize,

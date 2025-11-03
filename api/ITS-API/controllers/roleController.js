@@ -5,18 +5,16 @@ const { v4: uuidv4 } = require("uuid");
 const createRole = async (req, res) => {
   const t = await Role.sequelize.transaction();
   try {
-    const { name, description, role_type, permission_ids } = req.body; 
-    // =========Check if role name exists==========
-    
+    const { name, description, role_type, permission_ids } = req.body;
+
+    // Check if role exists
     const existingRole = await Role.findOne({ where: { name }, transaction: t });
     if (existingRole) {
       await t.rollback();
       return res.status(400).json({ message: "Role with this name already exists." });
     }
 
-    
-    // ==========Create the Role===========
-    
+    // Create Role
     const role = await Role.create(
       {
         role_id: uuidv4(),
@@ -26,10 +24,9 @@ const createRole = async (req, res) => {
       },
       { transaction: t }
     );
-    // ============Assign Permissions=========
-  
+
+    // Assign Permissions
     if (Array.isArray(permission_ids) && permission_ids.length > 0) {
-      // Validate permissions exist
       const validPermissions = await Permission.findAll({
         where: { permission_id: permission_ids },
         transaction: t,
@@ -52,11 +49,10 @@ const createRole = async (req, res) => {
       await RolePermission.bulkCreate(rolePermissions, { transaction: t });
     }
 
+    // ✅ Commit before fetching the created role
     await t.commit();
 
-    
-    //=========Return role with permissions=========
- 
+    // Fetch created role with permissions (outside transaction)
     const createdRole = await Role.findOne({
       where: { role_id: role.role_id },
       include: [
@@ -73,41 +69,48 @@ const createRole = async (req, res) => {
       data: createdRole,
     });
   } catch (error) {
-    await t.rollback();
+    // ✅ Only rollback if transaction is still active
+    if (!t.finished) await t.rollback();
+
     console.error("Error creating role:", error);
     return res.status(500).json({ message: "Internal server error", error: error.message });
   }
 };
 
-// Get all roles
+
 const getRoles = async (req, res) => {
+  console.log("getRoles called");
   try {
     const roles = await Role.findAll({
       include: [
         {
           model: Permission,
           as: "permissions",
-          through: { attributes: [] }, // hides pivot columns
-          attributes: ["permission_id", "name", "description"], // choose what to show
+          through: { attributes: [] },
+          attributes: ["permission_id", "name", "description"],
         },
       ],
       order: [["created_at", "DESC"]],
     });
 
+    console.log("roles fetched:", roles);
+
     return res.status(200).json({
       success: true,
-      count: roles.length,
-      data: roles,
+      count: Array.isArray(roles) ? roles.length : 0,
+      data: roles || [],
     });
   } catch (error) {
     console.error("Error fetching roles:", error);
     return res.status(500).json({
       success: false,
       message: "Internal server error",
-      error: error.message,
+      error: error.message || "Unknown error",
     });
   }
 };
+
+
 
 // Get role by ID
 const getRoleById = async (req, res) => {
