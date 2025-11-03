@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/userController");
 const { validateUpdateUser, validateCreateUser } = require("../validators/userValidator");
-
+const {authenticateToken}=require('../middlewares/authMiddleware')
 /**
  * @swagger
  * components:
@@ -87,7 +87,7 @@ router.post("/", userController.createUser);
  *               items:
  *                 $ref: '#/components/schemas/User'
  */
-router.get("/", userController.getUsers);
+router.get("/",authenticateToken, userController.getUsers);
 
 /**
  * @swagger

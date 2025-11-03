@@ -5,7 +5,7 @@ const {
   validateCreateRole,
   validateUpdateRole,
 } = require("../validators/roleValidator");
-
+const {authenticateToken}=require('../middlewares/authMiddleware')
 /**
  * @swagger
  * tags:
@@ -51,7 +51,7 @@ const {
  *       500:
  *         description: Internal server error
  */
-router.post("/", roleController.createRole);
+router.post("/",roleController.createRole);
 
 /**
  * @swagger
@@ -99,7 +99,7 @@ router.get("/", roleController.getRoles);
  *       500:
  *         description: Internal server error
  */
-router.get("/:id", roleController.getRoleById);
+router.get("/:id",roleController.getRoleById);
 
 /**
  * @swagger
@@ -140,7 +140,7 @@ router.get("/:id", roleController.getRoleById);
  *       500:
  *         description: Internal server error
  */
-router.put("/:id", validateUpdateRole, roleController.updateRole);
+router.put("/:id",authenticateToken, validateUpdateRole, roleController.updateRole);
 
 /**
  * @swagger
@@ -164,6 +164,6 @@ router.put("/:id", validateUpdateRole, roleController.updateRole);
  *       500:
  *         description: Internal server error
  */
-router.delete("/:id", roleController.deleteRole);
+router.delete("/:id",authenticateToken, roleController.deleteRole);
 
 module.exports = router;
