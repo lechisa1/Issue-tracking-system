@@ -11,14 +11,19 @@ dotenv.config();
 const { swaggerUi, swaggerSpec } = require("./swagger");
 
 // ================== Here Import Routes=================
-const userRoute=require('./routers/userRoutes')
-const roleRoute=require('./routers/roleRoutes')
-const rolePermissionRoute=require('./routers/rolePermissionRoutes');
-const userRoleRoute=require('./routers/userRoleRoutes')
+const userRoute = require("./routers/userRoutes");
+const roleRoute = require("./routers/roleRoutes");
+const rolePermissionRoute = require("./routers/rolePermissionRoutes");
+const userRoleRoute = require("./routers/userRoleRoutes");
 const authRoute = require("./routers/authRoutes");
 
-const issueCategories=require('./routers/issueCategoryRoutes')
-const issuePriorities=require('./routers/issuePriorityRoutes')
+const issueCategories = require("./routers/issueCategoryRoutes");
+const issuePriorities = require("./routers/issuePriorityRoutes");
+
+const issueRoutes = require("./routers/issueRoutes");
+const issueAssignmentRoutes = require("./routers/issueAssignmentRoutes");
+const issueEscalationRoutes = require("./routers/issueEscaltionRoute");
+
 const app = express();
 const appServer = http.createServer(app);
 
@@ -75,15 +80,18 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // ================== API Routes go here ==================
 
-app.use('/api/users',userRoute);
-app.use('/api/roles',roleRoute);
-app.use('/api/role-permission',rolePermissionRoute);
-app.use('/api/user-roles',userRoleRoute);
+app.use("/api/users", userRoute);
+app.use("/api/roles", roleRoute);
+app.use("/api/role-permission", rolePermissionRoute);
+app.use("/api/user-roles", userRoleRoute);
 
 app.use("/api/auth", authRoute);
 
-app.use("/api/issue-categories",issueCategories);
+app.use("/api/issue-categories", issueCategories);
 app.use("/api/issue-priorities", issuePriorities);
+app.use("/api/issues", issueRoutes);
+app.use("/api/assignments", issueAssignmentRoutes);
+app.use("/api/issue-escalations", issueEscalationRoutes);
 // ================== Root Endpoint ==================
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to Issue Tracking System API 🚀" });

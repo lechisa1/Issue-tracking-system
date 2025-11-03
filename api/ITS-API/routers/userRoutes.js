@@ -69,7 +69,7 @@ const {authenticateToken}=require('../middlewares/authMiddleware')
  *       400:
  *         description: Validation error
  */
-router.post("/",validateCreateUser, userController.createUser);
+router.post("/", userController.createUser);
 
 /**
  * @swagger
