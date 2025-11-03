@@ -16,6 +16,9 @@ const roleRoute=require('./routers/roleRoutes')
 const rolePermissionRoute=require('./routers/rolePermissionRoutes');
 const userRoleRoute=require('./routers/userRoleRoutes')
 const authRoute = require("./routers/authRoutes");
+
+const issueCategories=require('./routers/issueCategoryRoutes')
+const issuePriorities=require('./routers/issuePriorityRoutes')
 const app = express();
 const appServer = http.createServer(app);
 
@@ -42,6 +45,7 @@ app.use(
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:3001",
+  "http://localhost:4000",
   process.env.FRONTEND_URL,
 ];
 const corsOptions = {
@@ -77,6 +81,9 @@ app.use('/api/role-permission',rolePermissionRoute);
 app.use('/api/user-roles',userRoleRoute);
 
 app.use("/api/auth", authRoute);
+
+app.use("/api/issue-categories",issueCategories);
+app.use("/api/issue-priorities", issuePriorities);
 // ================== Root Endpoint ==================
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to Issue Tracking System API 🚀" });
