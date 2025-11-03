@@ -1,7 +1,7 @@
-const { IssueAssignment, Issue, User } = require("../models");
+const { IssueAssignment, Issue, User } = require("../../models");
 const { v4: uuidv4 } = require("uuid");
 
-// Assign issue to developer/QA
+// Assign issue to developer
 const assignIssue = async (req, res) => {
   try {
     const { issue_id, assignee_id, assigned_by, remarks } = req.body;

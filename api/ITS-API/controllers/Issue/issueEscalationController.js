@@ -1,4 +1,11 @@
-const { IssueEscalation, Issue, User, IssueTier } = require("../models");
+const {
+  IssueEscalation,
+  Issue,
+  User,
+  IssueTier,
+  IssueEscalationHistory,
+  IssueAction,
+} = require("../../models");
 const { v4: uuidv4 } = require("uuid");
 
 // Escalate issue
@@ -38,6 +45,16 @@ const escalateIssue = async (req, res) => {
       escalated_at: new Date(),
       created_at: new Date(),
       updated_at: new Date(),
+    });
+
+    // Create escalation history record
+    await IssueEscalationHistory.create({
+      issue_escalation_history_id: uuidv4(),
+      issue_id,
+      from_tier,
+      to_tier,
+      escalated_by,
+      created_at: new Date(),
     });
 
     // Update issue's current tier
@@ -108,7 +125,83 @@ const getEscalationsByIssueId = async (req, res) => {
   }
 };
 
+// Get escalation history by issue ID
+const getEscalationHistoryByIssueId = async (req, res) => {
+  try {
+    const { issue_id } = req.params;
+
+    const escalationHistory = await IssueEscalationHistory.findAll({
+      where: { issue_id },
+      include: [
+        { model: User, as: "escalator" },
+        { model: Issue, as: "issue" },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    res.status(200).json(escalationHistory);
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+};
+
+// Get escalation by ID
+const getEscalationById = async (req, res) => {
+  try {
+    const { escalation_id } = req.params;
+
+    const escalation = await IssueEscalation.findOne({
+      where: { escalation_id },
+      include: [
+        { model: Issue, as: "issue" },
+        { model: User, as: "escalator" },
+      ],
+    });
+
+    if (!escalation) {
+      return res.status(404).json({ message: "Escalation not found." });
+    }
+
+    res.status(200).json(escalation);
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+};
+
+// Delete escalation
+const deleteEscalation = async (req, res) => {
+  try {
+    const { escalation_id } = req.params;
+
+    const escalation = await IssueEscalation.findByPk(escalation_id);
+    if (!escalation) {
+      return res.status(404).json({ message: "Escalation not found." });
+    }
+
+    await IssueEscalation.destroy({
+      where: { escalation_id },
+    });
+
+    res.status(204).send();
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+};
+
+// Update module exports
 module.exports = {
   escalateIssue,
   getEscalationsByIssueId,
+  getEscalationHistoryByIssueId,
+  getEscalationById,
+  deleteEscalation,
 };

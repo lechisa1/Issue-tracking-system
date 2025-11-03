@@ -53,7 +53,7 @@ const { validateUpdateUser, validateCreateUser } = require("../validators/userVa
 
 /**
  * @swagger
- * /users:
+ * /api/users:
  *   post:
  *     summary: Create a new user
  *     tags: [Users]
@@ -69,11 +69,11 @@ const { validateUpdateUser, validateCreateUser } = require("../validators/userVa
  *       400:
  *         description: Validation error
  */
-router.post("/",validateCreateUser, userController.createUser);
+router.post("/", userController.createUser);
 
 /**
  * @swagger
- * /users:
+ * /api/users:
  *   get:
  *     summary: Get all users
  *     tags: [Users]
@@ -91,7 +91,7 @@ router.get("/", userController.getUsers);
 
 /**
  * @swagger
- * /users/{id}:
+ * /api/users/{id}:
  *   get:
  *     summary: Get user by ID
  *     tags: [Users]
@@ -112,7 +112,7 @@ router.get("/:id", userController.getUserById);
 
 /**
  * @swagger
- * /users/{id}:
+ * /api/users/{id}:
  *   put:
  *     summary: Update a user by ID
  *     tags: [Users]
@@ -141,7 +141,7 @@ router.put("/:id", validateUpdateUser, userController.updateUser);
 
 /**
  * @swagger
- * /users/{id}:
+ * /api/users/{id}:
  *   delete:
  *     summary: Delete a user by ID
  *     tags: [Users]

@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const Sequelize = require("sequelize");
 const process = require("process");
+const basename = path.basename(__filename);
 const env = process.env.NODE_ENV || "development";
 const config = require(__dirname + "/../config/config.js")[env];
 const db = {};
@@ -23,39 +24,22 @@ if (process.env.DATABASE_URL) {
   );
 }
 
-// Function to load models from a specific folder
-function loadModelsFromFolder(folderName) {
-  const folderPath = path.join(__dirname, folderName);
-
-  // Check if folder exists
-  if (!fs.existsSync(folderPath)) {
-    console.log(`Folder ${folderName} does not exist, skipping...`);
-    return;
-  }
-
-  console.log(`Loading models from ${folderName}...`);
-
-  fs.readdirSync(folderPath)
-    .filter((file) => {
-      return (
-        file.indexOf(".") !== 0 &&
-        file.slice(-3) === ".js" &&
-        file.indexOf(".test.js") === -1
-      );
-    })
-    .forEach((file) => {
-      const modelPath = path.join(folderPath, file);
-      try {
-        const model = require(modelPath)(sequelize, Sequelize.DataTypes);
-        db[model.name] = model;
-      } catch (error) {
-        console.error(`Error loading model from ${file}:`, error.message);
-      }
-    });
-}
-
-loadModelsFromFolder("."); // Root models folder (for User, Permission, etc.)
-loadModelsFromFolder("Issue"); // Issue-related models
+fs.readdirSync(__dirname)
+  .filter((file) => {
+    return (
+      file.indexOf(".") !== 0 &&
+      file !== basename &&
+      file.slice(-3) === ".js" &&
+      file.indexOf(".test.js") === -1
+    );
+  })
+  .forEach((file) => {
+    const model = require(path.join(__dirname, file))(
+      sequelize,
+      Sequelize.DataTypes
+    );
+    db[model.name] = model;
+  });
 
 Object.keys(db).forEach((modelName) => {
   if (db[modelName].associate) {
