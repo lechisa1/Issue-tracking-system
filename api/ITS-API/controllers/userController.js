@@ -6,6 +6,7 @@ const bcrypt = require("bcrypt");
 const { generateRandomPassword } = require("../utils/password");
 const { sendEmail } = require("../utils/sendEmail");
 
+const { getPagination, getPagingData } = require("../utils/pagination");
 
 const createUser = async (req, res) => {
   const t = await sequelize.transaction();
@@ -329,53 +330,68 @@ const updateUser = async (req, res) => {
 };
 
 
-
-// Get all users
+// ============Get all users=====================
 const getUsers = async (req, res) => {
   try {
-    const users = await User.findAll({
-      attributes: { 
-        exclude: ['password'] // Always exclude password
-      },
+    const { search, user_type_id, is_active, page = 1, limit = 10 } = req.query;
+    const { limit: pageLimit, offset } = getPagination(page, limit);
+
+    const where = {};
+    if (search) {
+      where[Op.or] = [
+        { full_name: { [Op.iLike]: `%${search}%` } },
+        { email: { [Op.iLike]: `%${search}%` } },
+        { position: { [Op.iLike]: `%${search}%` } },
+      ];
+    }
+    if (user_type_id) where.user_type_id = user_type_id;
+    if (is_active !== undefined) where.is_active = is_active === "true";
+
+    const data = await User.findAndCountAll({
+      where,
+      attributes: { exclude: ["password"] },
       include: [
-        { 
-          model: UserType, 
+        {
+          model: UserType,
           as: "userType",
-          attributes: ['user_type_id', 'name']
+          attributes: ["user_type_id", "name"]
         },
-        { 
-          model: Role, 
-          as: "roles", 
-          attributes: ['role_id', 'name', 'description', 'level'],
-          through: { 
+        {
+          model: Role,
+          as: "roles",
+          attributes: ["role_id", "name", "description", "level"],
+          through: {
             attributes: ["assigned_at", "assigned_by", "is_active"],
-            where: { is_active: true }
+            where: { is_active: true },
+            required: false
           }
         },
         {
           model: Institute,
           as: "institute",
-          attributes: ['institute_id', 'name', 'address']
+          attributes: ["institute_id", "name", "address"]
         }
       ],
-      order: [['created_at', 'DESC']] 
+      order: [["created_at", "DESC"]],
+      limit: pageLimit,
+      offset,
+      distinct: true
     });
+
+    const response = getPagingData(data, page, pageLimit);
 
     res.status(200).json({
       success: true,
       message: "Users retrieved successfully",
-      data: {
-        users,
-        total: users.length
-      }
+      data: response
     });
 
   } catch (error) {
     console.error("Error fetching users:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "Internal server error", 
-      error: error.message 
+      message: "Internal server error",
+      error: error.message
     });
   }
 };
