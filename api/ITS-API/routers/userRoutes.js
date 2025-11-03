@@ -53,7 +53,7 @@ const {authenticateToken}=require('../middlewares/authMiddleware')
 
 /**
  * @swagger
- * /users:
+ * /api/users:
  *   post:
  *     summary: Create a new user
  *     tags: [Users]
