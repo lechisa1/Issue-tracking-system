@@ -2,25 +2,33 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("roles", {
-      role_id: {
+    await queryInterface.createTable("institutes", {
+      institute_id: {
         type: Sequelize.UUID,
         defaultValue: Sequelize.UUIDV4,
         primaryKey: true,
         allowNull: false,
       },
       name: {
-        type: Sequelize.STRING(100),
-        unique: true,
+        type: Sequelize.STRING(255),
         allowNull: false,
+        unique: true,
       },
-      description: {
+      address: {
         type: Sequelize.TEXT,
         allowNull: true,
       },
-      level: {
+      contact_email: {
+        type: Sequelize.STRING(255),
+        allowNull: true,
+      },
+      contact_phone: {
         type: Sequelize.STRING(50),
-        allowNull: true, // 'institute' or 'EAI'
+        allowNull: true,
+      },
+      is_active: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: true,
       },
       created_at: {
         type: Sequelize.DATE,
@@ -35,7 +43,7 @@ module.exports = {
     });
   },
 
-  async down(queryInterface) {
-    await queryInterface.dropTable("roles");
+  async down(queryInterface, Sequelize) {
+    await queryInterface.dropTable("institutes");
   },
 };
