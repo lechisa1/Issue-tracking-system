@@ -2,7 +2,7 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("region", {
+    await queryInterface.createTable("sub_city", {
       sub_city_id: {
         type: Sequelize.UUID,
         defaultValue: Sequelize.literal("uuid_generate_v4()"),
@@ -14,12 +14,12 @@ module.exports = {
         allowNull: false,
         unique: true,
       },
-      city_id: {
+      region_id: {
         type: Sequelize.UUID,
         allowNull: false,
         references: {
-          model: "city",
-          key: "city_id",
+          model: "region",
+          key: "region_id",
         },
       },
       description: {
@@ -40,6 +40,6 @@ module.exports = {
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable("organizations");
+    await queryInterface.dropTable("sub_city");
   },
 };

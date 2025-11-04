@@ -4,6 +4,11 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class Branch extends Model {
     static associate(models) {
+      // Branch belongs to Organization
+      this.belongsTo(models.Organization, {
+        foreignKey: "organization_id",
+        as: "organization",
+      });
       // Branch belongs to Region
       this.belongsTo(models.Region, {
         foreignKey: "region_id",
@@ -18,6 +23,11 @@ module.exports = (sequelize, DataTypes) => {
       this.belongsTo(models.Sub_city, {
         foreignKey: "sub_city_id",
         as: "sub_city",
+      });
+      // Branch belongs to Zone
+      this.belongsTo(models.Zone, {
+        foreignKey: "zone_id",
+        as: "zone",
       });
       // Branch belongs to Woreda
       this.belongsTo(models.Woreda, {
@@ -45,12 +55,12 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         unique: true,
       },
-      region_id: {
+      organization_id: {
         type: DataTypes.UUID,
         allowNull: false,
         references: {
-          model: "region",
-          key: "region_id",
+          model: "organizations",
+          key: "organization_id",
         },
       },
       city_id: {
@@ -61,12 +71,28 @@ module.exports = (sequelize, DataTypes) => {
           key: "city_id",
         },
       },
+      region_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+          model: "region",
+          key: "region_id",
+        },
+      },
       sub_city_id: {
         type: DataTypes.UUID,
         allowNull: false,
         references: {
           model: "sub_city",
           key: "sub_city_id",
+        },
+      },
+      zone_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+          model: "zone",
+          key: "zone_id",
         },
       },
       woreda_id: {

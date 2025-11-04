@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require("uuid");
 // Create a new City
 const createCity = async (req, res) => {
   try {
-    const { name, region_id, description } = req.body;
+    const { name, description } = req.body;
 
     // Check if City exists
     const existingCity = await City.findOne({ where: { name } });
@@ -17,7 +17,6 @@ const createCity = async (req, res) => {
     const city = await City.create({
       city_id,
       name,
-      region_id,
       description,
     });
 
@@ -31,14 +30,7 @@ const createCity = async (req, res) => {
 // Get all Cities
 const getCities = async (req, res) => {
   try {
-    const cities = await City.findAll({
-      include: [
-        {
-          model: require("../models").Region,
-          as: "region",
-        },
-      ],
-    });
+    const cities = await City.findAll();
     res.status(200).json(cities);
   } catch (error) {
     console.error(error);
@@ -50,14 +42,7 @@ const getCities = async (req, res) => {
 const getCityById = async (req, res) => {
   try {
     const { id } = req.params;
-    const city = await City.findByPk(id, {
-      include: [
-        {
-          model: require("../models").Region,
-          as: "region",
-        },
-      ],
-    });
+    const city = await City.findByPk(id);
     if (!city) return res.status(404).json({ message: "City not found" });
     res.status(200).json(city);
   } catch (error) {
@@ -70,13 +55,12 @@ const getCityById = async (req, res) => {
 const updateCity = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, region_id, description } = req.body;
+    const { name, description } = req.body;
 
     const city = await City.findByPk(id);
     if (!city) return res.status(404).json({ message: "City not found" });
 
     city.name = name || city.name;
-    city.region_id = region_id || city.region_id;
     city.description = description !== undefined ? description : city.description;
 
     await city.save();

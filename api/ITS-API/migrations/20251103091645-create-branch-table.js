@@ -1,11 +1,9 @@
 "use strict";
 
-const { subscribe } = require("../routers/organizationRoutes");
-
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("region", {
-      region_id: {
+    await queryInterface.createTable("branch", {
+      branch_id: {
         type: Sequelize.UUID,
         defaultValue: Sequelize.literal("uuid_generate_v4()"),
         primaryKey: true,
@@ -18,16 +16,15 @@ module.exports = {
       },
       organization_id: {
         type: Sequelize.UUID,
-        allowNull: true,
+        allowNull: false,
         references: {
           model: "organizations",
           key: "organization_id",
         },
-
       },
-        city_id: {
+      city_id: {
         type: Sequelize.UUID,
-        allowNull: true,
+        allowNull: false,
         references: {
           model: "city",
           key: "city_id",
@@ -35,7 +32,7 @@ module.exports = {
       },
       region_id: {
         type: Sequelize.UUID,
-        allowNull: true,
+        allowNull: false,
         references: {
           model: "region",
           key: "region_id",
@@ -43,7 +40,7 @@ module.exports = {
       },
       sub_city_id: {
         type: Sequelize.UUID,
-        allowNull: true,
+        allowNull: false,
         references: {
           model: "sub_city",
           key: "sub_city_id",
@@ -59,15 +56,12 @@ module.exports = {
       },
       woreda_id: {
         type: Sequelize.UUID,
-        allowNull: true,
+        allowNull: false,
         references: {
           model: "woreda",
           key: "woreda_id",
         },
       },
-      
-
-
       description: {
         type: Sequelize.TEXT,
         allowNull: true,
@@ -82,11 +76,10 @@ module.exports = {
         allowNull: false,
         defaultValue: Sequelize.fn("NOW"),
       },
-   
+    });
   },
-) },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable("organizations");
+    await queryInterface.dropTable("branch");
   },
 };

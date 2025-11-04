@@ -7,10 +7,6 @@ const createCitySchema = Joi.object({
     "string.min": "Name must be at least 3 characters",
     "string.max": "Name cannot exceed 100 characters",
   }),
-  region_id: Joi.string().uuid().required().messages({
-    "string.guid": "Region ID must be a valid UUID",
-    "any.required": "Region ID is required",
-  }),
   description: Joi.string().max(1000).optional().messages({
     "string.max": "Description cannot exceed 1000 characters",
   }),
@@ -19,7 +15,6 @@ const createCitySchema = Joi.object({
 // Update City validation
 const updateCitySchema = Joi.object({
   name: Joi.string().min(3).max(100).optional(),
-  region_id: Joi.string().uuid().optional(),
   description: Joi.string().max(1000).optional(),
 });
 

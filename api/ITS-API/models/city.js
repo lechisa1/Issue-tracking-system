@@ -35,14 +35,6 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         unique: true,
       },
-      region_id: {
-        type: DataTypes.UUID,
-        allowNull: false,
-        references: {
-          model: "region",
-          key: "region_id",
-        },
-      },
       description: {
         type: DataTypes.TEXT,
         allowNull: true,

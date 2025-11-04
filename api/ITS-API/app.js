@@ -76,6 +76,7 @@ app.use('/api/roles',roleRoute);
 app.use('/api/role-permission',rolePermissionRoute);
 app.use('/api/user-roles',userRoleRoute);
 app.use('/api/organizations',organizationRoute);
+app.use('/api/cities', require('./routers/cityRoutes'));
 // ================== Root Endpoint ==================
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to Issue Tracking System API 🚀" });

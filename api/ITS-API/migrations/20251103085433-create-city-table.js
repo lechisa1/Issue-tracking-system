@@ -28,6 +28,17 @@ module.exports = {
         allowNull: false,
         defaultValue: Sequelize.fn("NOW"),
       },
+      deleted_at: { 
+        type: Sequelize.DATE,
+        allowNull: true,
+      },
+      deleted_by: {
+        type: Sequelize.UUID,
+        allowNull: true,  references: {
+          model: "users",
+          key: "user_id",
+        },
+      },
     });
   },
 

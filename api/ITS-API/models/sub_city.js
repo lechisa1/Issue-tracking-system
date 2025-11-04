@@ -4,15 +4,15 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class Sub_city extends Model {
     static associate(models) {
-      // Sub_city belongs to City
-      this.belongsTo(models.City, {
-        foreignKey: "city_id",
-        as: "city",
+      // Sub_city belongs to Region
+      this.belongsTo(models.Region, {
+        foreignKey: "region_id",
+        as: "region",
       });
-      // Sub_city has many Woredas
-      this.hasMany(models.Woreda, {
+      // Sub_city has many Zones
+      this.hasMany(models.Zone, {
         foreignKey: "sub_city_id",
-        as: "woredas",
+        as: "zones",
       });
       // Sub_city has many Branches
       this.hasMany(models.Branch, {
@@ -35,12 +35,12 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         unique: true,
       },
-      city_id: {
+      region_id: {
         type: DataTypes.UUID,
         allowNull: false,
         references: {
-          model: "city",
-          key: "city_id",
+          model: "region",
+          key: "region_id",
         },
       },
       description: {
