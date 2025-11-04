@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require("uuid");
 // Create a new Zone
 const createZone = async (req, res) => {
   try {
-    const { name, woreda_id, description } = req.body;
+    const { name, region_id, description } = req.body;
 
     // Check if Zone exists
     const existingZone = await Zone.findOne({ where: { name } });
@@ -17,7 +17,7 @@ const createZone = async (req, res) => {
     const zone = await Zone.create({
       zone_id,
       name,
-      woreda_id,
+      region_id,
       description,
     });
 
@@ -70,13 +70,13 @@ const getZoneById = async (req, res) => {
 const updateZone = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, woreda_id, description } = req.body;
+    const { name, region_id, description } = req.body;
 
     const zone = await Zone.findByPk(id);
     if (!zone) return res.status(404).json({ message: "Zone not found" });
 
     zone.name = name || zone.name;
-    zone.woreda_id = woreda_id || zone.woreda_id;
+    zone.region_id = region_id || zone.region_id;
     zone.description = description !== undefined ? description : zone.description;
 
     await zone.save();

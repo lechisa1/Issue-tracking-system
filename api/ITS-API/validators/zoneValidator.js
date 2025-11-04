@@ -7,9 +7,10 @@ const createZoneSchema = Joi.object({
     "string.min": "Name must be at least 3 characters",
     "string.max": "Name cannot exceed 100 characters",
   }),
-  woreda_id: Joi.string().uuid().required().messages({
-    "string.guid": "Woreda ID must be a valid UUID",
-    "any.required": "Woreda ID is required",
+  region_id
+  : Joi.string().uuid().required().messages({
+    "string.guid": "Region ID must be a valid UUID",
+    "any.required": "Region ID is required",
   }),
   description: Joi.string().max(1000).optional().messages({
     "string.max": "Description cannot exceed 1000 characters",

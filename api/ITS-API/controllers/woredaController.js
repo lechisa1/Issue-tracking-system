@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require("uuid");
 // Create a new Woreda
 const createWoreda = async (req, res) => {
   try {
-    const { name, sub_city_id, description } = req.body;
+    const { name, zone_id, description } = req.body;
 
     // Check if Woreda exists
     const existingWoreda = await Woreda.findOne({ where: { name } });
@@ -17,7 +17,7 @@ const createWoreda = async (req, res) => {
     const woreda = await Woreda.create({
       woreda_id,
       name,
-      sub_city_id,
+      zone_id,
       description,
     });
 
@@ -34,8 +34,14 @@ const getWoredas = async (req, res) => {
     const woredas = await Woreda.findAll({
       include: [
         {
-          model: require("../models").Sub_city,
-          as: "sub_city",
+          model: require("../models").Zone,
+          as: "zone",
+          include: [
+            {
+              model: require("../models").Sub_city,
+              as: "sub_city",
+            },
+          ],
         },
       ],
     });
@@ -53,8 +59,14 @@ const getWoredaById = async (req, res) => {
     const woreda = await Woreda.findByPk(id, {
       include: [
         {
-          model: require("../models").Sub_city,
-          as: "sub_city",
+          model: require("../models").Zone,
+          as: "zone",
+          include: [
+            {
+              model: require("../models").Sub_city,
+              as: "sub_city",
+            },
+          ],
         },
       ],
     });
@@ -70,13 +82,13 @@ const getWoredaById = async (req, res) => {
 const updateWoreda = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, sub_city_id, description } = req.body;
+    const { name, zone_id, description } = req.body;
 
     const woreda = await Woreda.findByPk(id);
     if (!woreda) return res.status(404).json({ message: "Woreda not found" });
 
     woreda.name = name || woreda.name;
-    woreda.sub_city_id = sub_city_id || woreda.sub_city_id;
+    woreda.zone_id = zone_id || woreda.zone_id;
     woreda.description = description !== undefined ? description : woreda.description;
 
     await woreda.save();

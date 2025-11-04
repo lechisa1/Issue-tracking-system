@@ -14,12 +14,12 @@ module.exports = {
         allowNull: false,
         unique: true,
       },
-      sub_city_id: {
+      region_id: {
         type: Sequelize.UUID,
         allowNull: false,
         references: {
-          model: "sub_city",
-          key: "sub_city_id",
+          model: "region",
+          key: "region_id",
         },
       },
       description: {

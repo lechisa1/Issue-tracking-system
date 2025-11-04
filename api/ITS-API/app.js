@@ -16,6 +16,8 @@ const roleRoute=require('./routers/roleRoutes')
 const rolePermissionRoute=require('./routers/rolePermissionRoutes');
 const userRoleRoute=require('./routers/userRoleRoutes')
 const organizationRoute=require('./routers/organizationRoutes')
+
+
 const app = express();
 const appServer = http.createServer(app);
 
@@ -77,6 +79,14 @@ app.use('/api/role-permission',rolePermissionRoute);
 app.use('/api/user-roles',userRoleRoute);
 app.use('/api/organizations',organizationRoute);
 app.use('/api/cities', require('./routers/cityRoutes'));
+app.use('/api/regions', require('./routers/regionRoutes'));
+app.use('/api/sub-cities', require('./routers/sub_cityRoutes'));
+app.use('/api/woredas', require('./routers/woredaRoutes'));
+app.use('/api/branches', require('./routers/branchRoutes '));
+app.use('/api/zones', require('./routers/zoneRoutes'));
+app.use('/api/projects', require('./routers/projectRoutes'));
+
+
 // ================== Root Endpoint ==================
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to Issue Tracking System API 🚀" });

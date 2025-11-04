@@ -5,10 +5,7 @@ module.exports = (sequelize, DataTypes) => {
   class City extends Model {
     static associate(models) {
       // City belongs to Region
-      this.belongsTo(models.Region, {
-        foreignKey: "region_id",
-        as: "region",
-      });
+     
       // City has many Sub_cities
       this.hasMany(models.Sub_city, {
         foreignKey: "city_id",

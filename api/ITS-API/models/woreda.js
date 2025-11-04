@@ -4,6 +4,11 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class Woreda extends Model {
     static associate(models) {
+      // Woreda belongs to Sub_city
+      this.belongsTo(models.Sub_city, {
+        foreignKey: "sub_city_id",
+        as: "sub_city",
+      });
       // Woreda belongs to Zone
       this.belongsTo(models.Zone, {
         foreignKey: "zone_id",
@@ -11,7 +16,7 @@ module.exports = (sequelize, DataTypes) => {
       });
       // Woreda has many Branches
       this.hasMany(models.Branch, {
-        foreignKey: "woreda_id",
+        foreignKey: "branch_id",
         as: "branches",
       });
     }
@@ -30,9 +35,17 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         unique: true,
       },
-      zone_id: {
+      sub_city_id: {
         type: DataTypes.UUID,
         allowNull: false,
+        references: {
+          model: "sub_city",
+          key: "sub_city_id",
+        },
+      },
+      zone_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
         references: {
           model: "zone",
           key: "zone_id",

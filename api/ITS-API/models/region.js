@@ -4,10 +4,10 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class Region extends Model {
     static associate(models) {
-      // Region has many Sub_cities
-      this.hasMany(models.Sub_city, {
+      // Region has many Zones
+      this.hasMany(models.Zone, {
         foreignKey: "region_id",
-        as: "sub_cities",
+        as: "zones",
       });
       // Region has many Branches
       this.hasMany(models.Branch, {
