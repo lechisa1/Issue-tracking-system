@@ -1,21 +1,33 @@
+// ...existing code...
 "use strict";
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-  class Project extends Model {
+  class Zone extends Model {
     static associate(models) {
-      // Project belongs to Branch
-      this.belongsTo(models.Branch, {
-        foreignKey: "branch_id",
-        as: "branch",
+      // Zone belongs to Region
+      this.belongsTo(models.Region, {
+        foreignKey: "region_id",
+        as: "region",
       });
-      // Project has many other relations if needed, e.g., tasks, but not specified
+
+      // Zone has many Woredas
+      this.hasMany(models.Woreda, {
+        foreignKey: "zone_id",
+        as: "woredas",
+      });
+
+      // Zone has many Branches (if Branch model exists)
+      this.hasMany(models.Branch, {
+        foreignKey: "zone_id",
+        as: "branches",
+      });
     }
   }
 
-  Project.init(
+  Zone.init(
     {
-      project_id: {
+      zone_id: {
         type: DataTypes.UUID,
         primaryKey: true,
         allowNull: false,
@@ -26,12 +38,12 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         unique: true,
       },
-      branch_id: {
+      region_id: {
         type: DataTypes.UUID,
         allowNull: false,
         references: {
-          model: "branch",
-          key: "branch_id",
+          model: "region",
+          key: "region_id",
         },
       },
       description: {
@@ -41,13 +53,13 @@ module.exports = (sequelize, DataTypes) => {
     },
     {
       sequelize,
-      modelName: "Project",
-      tableName: "project",
+      modelName: "Zone",
+      tableName: "zone",
       timestamps: true,
       createdAt: "created_at",
       updatedAt: "updated_at",
     }
   );
 
-  return Project;
+  return Zone;
 };

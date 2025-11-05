@@ -2,20 +2,20 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-  class Project extends Model {
+  class Organization extends Model {
     static associate(models) {
-      // Project belongs to Branch
-      this.belongsTo(models.Branch, {
-        foreignKey: "branch_id",
-        as: "branch",
-      });
-      // Project has many other relations if needed, e.g., tasks, but not specified
+      // Define associations here if needed
+      // For example, Organization hasMany Users if users belong to organizations
+      // this.hasMany(models.User, {
+      //   foreignKey: "organization_id",
+      //   as: "users",
+      // });
     }
   }
 
-  Project.init(
+  Organization.init(
     {
-      project_id: {
+      organization_id: {
         type: DataTypes.UUID,
         primaryKey: true,
         allowNull: false,
@@ -26,13 +26,10 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         unique: true,
       },
-      branch_id: {
-        type: DataTypes.UUID,
+      has_branch: {
+        type: DataTypes.BOOLEAN,
         allowNull: false,
-        references: {
-          model: "branch",
-          key: "branch_id",
-        },
+        defaultValue: false,
       },
       description: {
         type: DataTypes.TEXT,
@@ -41,13 +38,13 @@ module.exports = (sequelize, DataTypes) => {
     },
     {
       sequelize,
-      modelName: "Project",
-      tableName: "project",
+      modelName: "Organization",
+      tableName: "organizations",
       timestamps: true,
       createdAt: "created_at",
       updatedAt: "updated_at",
     }
   );
 
-  return Project;
+  return Organization;
 };
