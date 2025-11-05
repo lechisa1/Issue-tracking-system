@@ -2,20 +2,24 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-  class Project extends Model {
+  class Region extends Model {
     static associate(models) {
-      // Project belongs to Branch
-      this.belongsTo(models.Branch, {
-        foreignKey: "branch_id",
-        as: "branch",
+      // Region has many Zones
+      this.hasMany(models.Zone, {
+        foreignKey: "region_id",
+        as: "zones",
       });
-      // Project has many other relations if needed, e.g., tasks, but not specified
+      // Region has many Branches
+      this.hasMany(models.Branch, {
+        foreignKey: "region_id",
+        as: "branches",
+      });
     }
   }
 
-  Project.init(
+  Region.init(
     {
-      project_id: {
+      region_id: {
         type: DataTypes.UUID,
         primaryKey: true,
         allowNull: false,
@@ -26,14 +30,6 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         unique: true,
       },
-      branch_id: {
-        type: DataTypes.UUID,
-        allowNull: false,
-        references: {
-          model: "branch",
-          key: "branch_id",
-        },
-      },
       description: {
         type: DataTypes.TEXT,
         allowNull: true,
@@ -41,13 +37,13 @@ module.exports = (sequelize, DataTypes) => {
     },
     {
       sequelize,
-      modelName: "Project",
-      tableName: "project",
+      modelName: "Region",
+      tableName: "region",
       timestamps: true,
       createdAt: "created_at",
       updatedAt: "updated_at",
     }
   );
 
-  return Project;
+  return Region;
 };
