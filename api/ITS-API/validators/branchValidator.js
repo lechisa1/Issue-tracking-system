@@ -15,6 +15,10 @@ const createBranchSchema = Joi.object({
     "string.guid": "City ID must be a valid UUID",
     "any.required": "City ID is required",
   }),
+  zone_id: Joi.string().uuid().required().messages({
+    "string.guid": "Zone ID must be a valid UUID",
+    "any.required": "Zone ID is required",
+  }),
   sub_city_id: Joi.string().uuid().required().messages({
     "string.guid": "Sub-city ID must be a valid UUID",
     "any.required": "Sub-city ID is required",
@@ -23,6 +27,11 @@ const createBranchSchema = Joi.object({
     "string.guid": "Woreda ID must be a valid UUID",
     "any.required": "Woreda ID is required",
   }),
+  organization_id: Joi.string().uuid().required().messages({
+    "string.guid": "Organization ID must be a valid UUID",
+    "any.required": "Organization ID is required",
+  }),
+  
   description: Joi.string().max(1000).optional().messages({
     "string.max": "Description cannot exceed 1000 characters",
   }),

@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require("uuid");
 // Create a new Branch
 const createBranch = async (req, res) => {
   try {
-    const { name, region_id, city_id, sub_city_id, woreda_id, description } = req.body;
+    const { name, region_id, city_id,organization_id, sub_city_id, woreda_id, description } = req.body;
 
     // Check if Branch exists
     const existingBranch = await Branch.findOne({ where: { name } });
@@ -19,6 +19,7 @@ const createBranch = async (req, res) => {
       name,
       region_id,
       city_id,
+      organization_id,
       sub_city_id,
       woreda_id,
       description,
