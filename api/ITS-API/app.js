@@ -11,11 +11,23 @@ dotenv.config();
 const { swaggerUi, swaggerSpec } = require("./swagger");
 
 // ================== Here Import Routes=================
-const userRoute=require('./routers/userRoutes')
-const roleRoute=require('./routers/roleRoutes')
-const rolePermissionRoute=require('./routers/rolePermissionRoutes');
-const userRoleRoute=require('./routers/userRoleRoutes')
+
+
 const organizationRoute=require('./routers/organizationRoutes')
+
+
+const userRoute = require("./routers/userRoutes");
+const roleRoute = require("./routers/roleRoutes");
+const rolePermissionRoute = require("./routers/rolePermissionRoutes");
+const userRoleRoute = require("./routers/userRoleRoutes");
+const authRoute = require("./routers/authRoutes");
+
+const issueCategories = require("./routers/issueCategoryRoutes");
+const issuePriorities = require("./routers/issuePriorityRoutes");
+
+const issueRoutes = require("./routers/issueRoutes");
+const issueAssignmentRoutes = require("./routers/issueAssignmentRoutes");
+const issueEscalationRoutes = require("./routers/issueEscaltionRoute");
 
 
 const app = express();
@@ -44,6 +56,7 @@ app.use(
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:3001",
+  "http://localhost:4000",
   process.env.FRONTEND_URL,
 ];
 const corsOptions = {
@@ -73,10 +86,7 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // ================== API Routes go here ==================
 
-app.use('/api/users',userRoute);
-app.use('/api/roles',roleRoute);
-app.use('/api/role-permission',rolePermissionRoute);
-app.use('/api/user-roles',userRoleRoute);
+
 app.use('/api/organizations',organizationRoute);
 app.use('/api/cities', require('./routers/cityRoutes'));
 app.use('/api/regions', require('./routers/regionRoutes'));
@@ -86,6 +96,18 @@ app.use('/api/branches', require('./routers/branchRoutes '));
 app.use('/api/zones', require('./routers/zoneRoutes'));
 app.use('/api/projects', require('./routers/projectRoutes'));
 
+app.use("/api/users", userRoute);
+app.use("/api/roles", roleRoute);
+app.use("/api/role-permission", rolePermissionRoute);
+app.use("/api/user-roles", userRoleRoute);
+
+app.use("/api/auth", authRoute);
+
+app.use("/api/issue-categories", issueCategories);
+app.use("/api/issue-priorities", issuePriorities);
+app.use("/api/issues", issueRoutes);
+app.use("/api/assignments", issueAssignmentRoutes);
+app.use("/api/issue-escalations", issueEscalationRoutes);
 
 // ================== Root Endpoint ==================
 app.get("/", (req, res) => {

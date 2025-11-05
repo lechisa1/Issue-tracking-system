@@ -1,37 +1,41 @@
-'use strict';
+"use strict";
+
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('roles', {
+    await queryInterface.createTable("roles", {
       role_id: {
         type: Sequelize.UUID,
         defaultValue: Sequelize.UUIDV4,
         primaryKey: true,
-        allowNull: false
+        allowNull: false,
       },
       name: {
-        type: Sequelize.STRING,
+        type: Sequelize.STRING(100),
+        unique: true,
         allowNull: false,
-        unique: true
       },
       description: {
-        type: Sequelize.TEXT
+        type: Sequelize.TEXT,
+        allowNull: true,
       },
-      role_type: {
-        type: Sequelize.ENUM('internal', 'external'),
-        allowNull: false
+      level: {
+        type: Sequelize.STRING(50),
+        allowNull: true, // 'institute' or 'EAI'
       },
       created_at: {
+        type: Sequelize.DATE,
         allowNull: false,
-        type: Sequelize.DATE
+        defaultValue: Sequelize.fn("NOW"),
       },
       updated_at: {
+        type: Sequelize.DATE,
         allowNull: false,
-        type: Sequelize.DATE
-      }
+        defaultValue: Sequelize.fn("NOW"),
+      },
     });
   },
 
-  async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('roles');
-  }
+  async down(queryInterface) {
+    await queryInterface.dropTable("roles");
+  },
 };
