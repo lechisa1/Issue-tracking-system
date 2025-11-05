@@ -30,7 +30,20 @@ const createRegion = async (req, res) => {
 // Get all Regions
 const getRegions = async (req, res) => {
   try {
-    const regions = await Region.findAll();
+    const regions = await Region.findAll({
+      include: [
+        {
+          model: require("../models").Zone,
+          as: "zones",
+          include: [
+            {
+              model: require("../models").Woreda,
+              as: "woredas",
+            },
+          ],
+        },
+      ],
+    });
     res.status(200).json(regions);
   } catch (error) {
     console.error(error);
@@ -42,7 +55,20 @@ const getRegions = async (req, res) => {
 const getRegionById = async (req, res) => {
   try {
     const { id } = req.params;
-    const region = await Region.findByPk(id);
+    const region = await Region.findByPk(id, {
+      include: [
+        {
+          model: require("../models").Zone,
+          as: "zones",
+          include: [
+            {
+              model: require("../models").Woreda,
+              as: "woredas",
+            },
+          ],
+        },
+      ],
+    });
     if (!region) return res.status(404).json({ message: "Region not found" });
     res.status(200).json(region);
   } catch (error) {

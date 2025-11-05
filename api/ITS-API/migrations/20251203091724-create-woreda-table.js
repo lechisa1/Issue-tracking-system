@@ -25,7 +25,7 @@ module.exports = {
 
       sub_city_id: {
         type: Sequelize.UUID,
-        allowNull: false,
+        allowNull: true,
         references: {
           model: "sub_city",
           key: "sub_city_id",

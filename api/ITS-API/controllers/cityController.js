@@ -30,7 +30,20 @@ const createCity = async (req, res) => {
 // Get all Cities
 const getCities = async (req, res) => {
   try {
-    const cities = await City.findAll();
+    const cities = await City.findAll({
+      include: [
+        {
+          model: require("../models").Sub_city,
+          as: "sub_cities",
+          include: [
+            {
+              model: require("../models").Woreda,
+              as: "woredas",
+            },
+          ],
+        },
+      ],
+    });
     res.status(200).json(cities);
   } catch (error) {
     console.error(error);
@@ -42,7 +55,20 @@ const getCities = async (req, res) => {
 const getCityById = async (req, res) => {
   try {
     const { id } = req.params;
-    const city = await City.findByPk(id);
+    const city = await City.findByPk(id, {
+      include: [
+        {
+          model: require("../models").Sub_city,
+          as: "sub_cities",
+          include: [
+            {
+              model: require("../models").Woreda,
+              as: "woredas",
+            },
+          ],
+        },
+      ],
+    });
     if (!city) return res.status(404).json({ message: "City not found" });
     res.status(200).json(city);
   } catch (error) {

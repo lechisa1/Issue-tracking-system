@@ -37,6 +37,10 @@ const getSub_citys = async (req, res) => {
           model: require("../models").City,
           as: "city",
         },
+        {
+          model: require("../models").Woreda,
+          as: "woredas",
+        },
       ],
     });
     res.status(200).json(sub_citys);
@@ -55,6 +59,10 @@ const getSub_cityById = async (req, res) => {
         {
           model: require("../models").City,
           as: "city",
+        },
+        {
+          model: require("../models").Woreda,
+          as: "woredas",
         },
       ],
     });

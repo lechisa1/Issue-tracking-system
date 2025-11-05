@@ -16,7 +16,7 @@ module.exports = (sequelize, DataTypes) => {
       });
       // Woreda has many Branches
       this.hasMany(models.Branch, {
-        foreignKey: "branch_id",
+        foreignKey: "woreda_id",
         as: "branches",
       });
     }
@@ -37,7 +37,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       sub_city_id: {
         type: DataTypes.UUID,
-        allowNull: false,
+        allowNull: true,
         references: {
           model: "sub_city",
           key: "sub_city_id",

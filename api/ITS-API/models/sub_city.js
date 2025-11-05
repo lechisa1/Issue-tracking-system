@@ -9,11 +9,12 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "city_id",
         as: "city",
       });
-       this.hasMany(models.Woreda, {
-        foreignKey: "woreda_id",
-        as: "woreda",
+      // Sub_city has many Woredas
+      this.hasMany(models.Woreda, {
+        foreignKey: "sub_city_id",
+        as: "woredas",
       });
-    
+
     }
   }
 

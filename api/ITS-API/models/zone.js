@@ -1,3 +1,4 @@
+// ...existing code...
 "use strict";
 const { Model } = require("sequelize");
 
@@ -9,13 +10,18 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "region_id",
         as: "region",
       });
+
       // Zone has many Woredas
       this.hasMany(models.Woreda, {
-        foreignKey: "woreda_id",
-        as: "woreda",
+        foreignKey: "zone_id",
+        as: "woredas",
       });
-      // Zone has many Branches
-     
+
+      // Zone has many Branches (if Branch model exists)
+      this.hasMany(models.Branch, {
+        foreignKey: "zone_id",
+        as: "branches",
+      });
     }
   }
 

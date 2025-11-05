@@ -34,8 +34,12 @@ const getZones = async (req, res) => {
     const zones = await Zone.findAll({
       include: [
         {
+          model: require("../models").Region,
+          as: "region",
+        },
+        {
           model: require("../models").Woreda,
-          as: "woreda",
+          as: "woredas",
         },
       ],
     });
@@ -53,8 +57,12 @@ const getZoneById = async (req, res) => {
     const zone = await Zone.findByPk(id, {
       include: [
         {
+          model: require("../models").Region,
+          as: "region",
+        },
+        {
           model: require("../models").Woreda,
-          as: "woreda",
+          as: "woredas",
         },
       ],
     });

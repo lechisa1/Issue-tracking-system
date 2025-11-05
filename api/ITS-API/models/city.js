@@ -4,8 +4,6 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class City extends Model {
     static associate(models) {
-      // City belongs to Region
-     
       // City has many Sub_cities
       this.hasMany(models.Sub_city, {
         foreignKey: "city_id",

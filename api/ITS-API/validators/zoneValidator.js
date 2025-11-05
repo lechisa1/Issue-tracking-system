@@ -20,7 +20,7 @@ const createZoneSchema = Joi.object({
 // Update Zone validation
 const updateZoneSchema = Joi.object({
   name: Joi.string().min(3).max(100).optional(),
-  woreda_id: Joi.string().uuid().optional(),
+  region_id: Joi.string().uuid().optional(),
   description: Joi.string().max(1000).optional(),
 });
 
