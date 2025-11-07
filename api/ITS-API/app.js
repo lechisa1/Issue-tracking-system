@@ -19,7 +19,7 @@ const instituteRoute=require('./routers/instituteRoutes')
 const instituteProjectsRoute=require('./routers/instituteProjectRoutes')
 const hierarchyRoute=require('./routers/hierarchyRoutes')
 const hierarchyNodeRoute=require('./routers/hierarchyNodeRoutes')
-
+const hierarchyNodeOrganizationRoute=require('./routers/hierarchyNodeOrganizationRoutes')
 
 const app = express();
 const appServer = http.createServer(app);
@@ -88,6 +88,7 @@ app.use('/api/institute-projects',instituteProjectsRoute);
 app.use('/api/hierarchies',hierarchyRoute);
 app.use('/api/hierarchy-nodes',hierarchyNodeRoute);
 app.use('/api/projects', require('./routers/projectRoutes'));
+app.use('/api/hierarchy-node-organizations',hierarchyNodeOrganizationRoute);
 
 
 // ================== Root Endpoint ==================
