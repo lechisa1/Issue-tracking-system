@@ -2,27 +2,31 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-        await queryInterface.sequelize.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";');
-    await queryInterface.createTable("organizations", {
-      organization_id: {
+    await queryInterface.createTable("projects", {
+      project_id: {
         type: Sequelize.UUID,
-        defaultValue: Sequelize.literal("uuid_generate_v4()"),
+        defaultValue: Sequelize.UUIDV4,
         primaryKey: true,
         allowNull: false,
       },
       name: {
-        type: Sequelize.STRING(100),
+        type: Sequelize.STRING(255),
         allowNull: false,
         unique: true,
-      },
-      has_branch: {
-        type: Sequelize.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
       },
       description: {
         type: Sequelize.TEXT,
         allowNull: true,
+      },
+      is_active: {
+        type: Sequelize.BOOLEAN,
+<<<<<<<< HEAD:api/ITS-API/migrations/20251107090252-create-projects.js
+        allowNull: false,
+        defaultValue: true,
+========
+        defaultValue: true,
+        allowNull: false,
+>>>>>>>> 5d280705be4ef03218f1229173928a4841a15d50:api/ITS-API/migrations/20241101000001-create-projects-table.js
       },
       created_at: {
         type: Sequelize.DATE,
@@ -38,14 +42,10 @@ module.exports = {
         type: Sequelize.DATE,
         allowNull: true,
       },
-      deleted_by: {
-        type: Sequelize.UUID,
-        allowNull: true,
-      },
     });
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable("organizations");
+    await queryInterface.dropTable("projects");
   },
 };

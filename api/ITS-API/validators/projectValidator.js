@@ -31,9 +31,8 @@ exports.validateCreateProject = (req, res, next) => {
   next();
 };
 
-exports.validateUpdateProject = (req, res, next) => {
-  const { error } = updateProjectSchema.validate(req.body);
-  if (error)
-    return res.status(400).json({ error: error.details[0].message });
-  next();
+module.exports = {
+  validateProject,
+  validateProjectId,
+  handleValidationErrors,
 };

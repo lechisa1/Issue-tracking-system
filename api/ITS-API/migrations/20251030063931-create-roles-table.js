@@ -38,4 +38,8 @@ module.exports = {
   async down(queryInterface) {
     await queryInterface.dropTable("roles");
   },
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 5d280705be4ef03218f1229173928a4841a15d50

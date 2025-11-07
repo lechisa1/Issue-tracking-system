@@ -2,29 +2,36 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("project", {
-      project_id: {
+    await queryInterface.createTable("hierarchy", {
+      hierarchy_id: {
         type: Sequelize.UUID,
-        defaultValue: Sequelize.literal("uuid_generate_v4()"),
+        defaultValue: Sequelize.UUIDV4,
         primaryKey: true,
         allowNull: false,
       },
       name: {
-        type: Sequelize.STRING(100),
+        type: Sequelize.STRING(255),
         allowNull: false,
         unique: true,
+      },
+      project_id: {
+        type: Sequelize.UUID,
+        allowNull: false,
+        references: {
+          model: "projects",
+          key: "project_id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "CASCADE",
       },
       description: {
         type: Sequelize.TEXT,
         allowNull: true,
       },
-      organization_id: {
-        type: Sequelize.UUID,
+      is_active: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: true,
         allowNull: false,
-        references: {
-          model: "organizations",
-          key: "organization_id",
-        },
       },
       created_at: {
         type: Sequelize.DATE,
@@ -36,11 +43,11 @@ module.exports = {
         allowNull: false,
         defaultValue: Sequelize.fn("NOW"),
       },
-
       deleted_at: {
         type: Sequelize.DATE,
         allowNull: true,
       },
+<<<<<<< HEAD:api/ITS-API/migrations/20251103091745-create-project-table.js
       deleted_by: {
         type: Sequelize.UUID,
         allowNull: true,
@@ -55,10 +62,12 @@ module.exports = {
         allowNull: false,
         defaultValue: true,
       },
+=======
+>>>>>>> 5d280705be4ef03218f1229173928a4841a15d50:api/ITS-API/migrations/20241101000003-create-hierarchy-table.js
     });
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable("project");
+    await queryInterface.dropTable("hierarchy");
   },
 };

@@ -4,10 +4,17 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class Project extends Model {
     static associate(models) {
-      // Project ↔ InstituteProject
-      Project.hasMany(models.InstituteProject, {
+      // Many-to-Many relationship with Institute through InstituteProject
+      this.belongsToMany(models.Institute, {
+        through: models.InstituteProject,
         foreignKey: "project_id",
-        as: "instituteProjects",
+        otherKey: "institute_id",
+        as: "institutes",
+      });
+      // One-to-Many relationship with Hierarchy
+      this.hasMany(models.Hierarchy, {
+        foreignKey: "project_id",
+        as: "hierarchies",
       });
     }
   }
@@ -16,9 +23,8 @@ module.exports = (sequelize, DataTypes) => {
     {
       projects_id: {
         type: DataTypes.UUID,
-        primaryKey: true,
-        allowNull: false,
         defaultValue: DataTypes.UUIDV4,
+        primaryKey: true,
       },
       name: {
         type: DataTypes.STRING(255),
@@ -32,9 +38,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
       },
-      created_at: DataTypes.DATE,
-      updated_at: DataTypes.DATE,
-      deleted_at: DataTypes.DATE,
+      is_active: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
+      },
     },
     {
       sequelize,
@@ -45,6 +52,7 @@ module.exports = (sequelize, DataTypes) => {
       createdAt: "created_at",
       updatedAt: "updated_at",
       deletedAt: "deleted_at",
+      paranoid: true,
     }
   );
 

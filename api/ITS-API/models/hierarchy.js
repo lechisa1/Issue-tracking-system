@@ -4,14 +4,13 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class Hierarchy extends Model {
     static associate(models) {
-      // Hierarchy ↔ Project
-      Hierarchy.belongsTo(models.Project, {
+      // Belongs to Project
+      this.belongsTo(models.Project, {
         foreignKey: "project_id",
         as: "project",
       });
-
-      // Hierarchy ↔ HierarchyNode
-      Hierarchy.hasMany(models.HierarchyNode, {
+      // One-to-Many relationship with HierarchyNode
+      this.hasMany(models.HierarchyNode, {
         foreignKey: "hierarchy_id",
         as: "nodes",
       });
@@ -22,39 +21,44 @@ module.exports = (sequelize, DataTypes) => {
     {
       hierarchy_id: {
         type: DataTypes.UUID,
-        primaryKey: true,
-        allowNull: false,
         defaultValue: DataTypes.UUIDV4,
+        primaryKey: true,
       },
       name: {
         type: DataTypes.STRING(255),
-        unique: true,
         allowNull: false,
       },
       project_id: {
         type: DataTypes.UUID,
         allowNull: false,
       },
+      parent_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
       description: {
         type: DataTypes.TEXT,
+        allowNull: true,
+      },
+      levels: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        defaultValue: null,
       },
       is_active: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
       },
-      created_at: DataTypes.DATE,
-      updated_at: DataTypes.DATE,
-      deleted_at: DataTypes.DATE,
     },
     {
       sequelize,
       modelName: "Hierarchy",
       tableName: "hierarchy",
       timestamps: true,
-      paranoid: true, // enables soft delete using deleted_at
       createdAt: "created_at",
       updatedAt: "updated_at",
       deletedAt: "deleted_at",
+      paranoid: true,
     }
   );
 

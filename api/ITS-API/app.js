@@ -34,7 +34,16 @@ const app = express();
 const appServer = http.createServer(app);
 
 // ================== Middleware ==================
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    try {
+      JSON.parse(buf);
+    } catch (e) {
+      res.status(400).json({ message: "Invalid JSON format. Please ensure all property names are double-quoted and JSON is valid." });
+      throw e;
+    }
+  }
+}));
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -60,13 +69,7 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
 ];
 const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
+  origin: true, // Allow all origins for development
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   credentials: true,
   optionsSuccessStatus: 204,

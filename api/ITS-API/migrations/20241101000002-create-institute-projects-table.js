@@ -2,31 +2,37 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("projects", {
-      project_id: {
+    await queryInterface.createTable("institute_projects", {
+      institute_project_id: {
         type: Sequelize.UUID,
         defaultValue: Sequelize.UUIDV4,
         primaryKey: true,
         allowNull: false,
       },
-      name: {
-        type: Sequelize.STRING(255),
+      institute_id: {
+        type: Sequelize.UUID,
         allowNull: false,
-        unique: true,
+        references: {
+          model: "institutes",
+          key: "institute_id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "CASCADE",
       },
-      description: {
-        type: Sequelize.TEXT,
-        allowNull: true,
+      project_id: {
+        type: Sequelize.UUID,
+        allowNull: false,
+        references: {
+          model: "projects",
+          key: "project_id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "CASCADE",
       },
       is_active: {
         type: Sequelize.BOOLEAN,
-<<<<<<<< HEAD:api/ITS-API/migrations/20251107090252-create-projects.js
-        allowNull: false,
-        defaultValue: true,
-========
         defaultValue: true,
         allowNull: false,
->>>>>>>> 5d280705be4ef03218f1229173928a4841a15d50:api/ITS-API/migrations/20241101000001-create-projects-table.js
       },
       created_at: {
         type: Sequelize.DATE,
@@ -46,6 +52,6 @@ module.exports = {
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable("projects");
+    await queryInterface.dropTable("institute_projects");
   },
 };
