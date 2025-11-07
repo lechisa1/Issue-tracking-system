@@ -15,14 +15,26 @@ const userRoute=require('./routers/userRoutes')
 const roleRoute=require('./routers/roleRoutes')
 const rolePermissionRoute=require('./routers/rolePermissionRoutes');
 const userRoleRoute=require('./routers/userRoleRoutes')
-const organizationRoute=require('./routers/organizationRoutes')
+const instituteRoute=require('./routers/instituteRoutes')
+const instituteProjectsRoute=require('./routers/instituteProjectRoutes')
+const hierarchyRoute=require('./routers/hierarchyRoutes')
+const hierarchyNodeRoute=require('./routers/hierarchyNodeRoutes')
 
 
 const app = express();
 const appServer = http.createServer(app);
 
 // ================== Middleware ==================
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    try {
+      JSON.parse(buf);
+    } catch (e) {
+      res.status(400).json({ message: "Invalid JSON format. Please ensure all property names are double-quoted and JSON is valid." });
+      throw e;
+    }
+  }
+}));
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -47,13 +59,7 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
 ];
 const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
+  origin: true, // Allow all origins for development
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   credentials: true,
   optionsSuccessStatus: 204,
@@ -77,13 +83,10 @@ app.use('/api/users',userRoute);
 app.use('/api/roles',roleRoute);
 app.use('/api/role-permission',rolePermissionRoute);
 app.use('/api/user-roles',userRoleRoute);
-app.use('/api/organizations',organizationRoute);
-app.use('/api/cities', require('./routers/cityRoutes'));
-app.use('/api/regions', require('./routers/regionRoutes'));
-app.use('/api/sub-cities', require('./routers/sub_cityRoutes'));
-app.use('/api/woredas', require('./routers/woredaRoutes'));
-app.use('/api/branches', require('./routers/branchRoutes '));
-app.use('/api/zones', require('./routers/zoneRoutes'));
+app.use('/api/institutes',instituteRoute);
+app.use('/api/institute-projects',instituteProjectsRoute);
+app.use('/api/hierarchies',hierarchyRoute);
+app.use('/api/hierarchy-nodes',hierarchyNodeRoute);
 app.use('/api/projects', require('./routers/projectRoutes'));
 
 

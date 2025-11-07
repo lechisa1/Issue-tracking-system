@@ -2,26 +2,24 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-  class Project extends Model {
+  class Hierarchy extends Model {
     static associate(models) {
-      // Many-to-Many relationship with Institute through InstituteProject
-      this.belongsToMany(models.Institute, {
-        through: models.InstituteProject,
+      // Belongs to Project
+      this.belongsTo(models.Project, {
         foreignKey: "project_id",
-        otherKey: "institute_id",
-        as: "institutes",
+        as: "project",
       });
-      // One-to-Many relationship with Hierarchy
-      this.hasMany(models.Hierarchy, {
-        foreignKey: "project_id",
-        as: "hierarchies",
+      // One-to-Many relationship with HierarchyNode
+      this.hasMany(models.HierarchyNode, {
+        foreignKey: "hierarchy_id",
+        as: "nodes",
       });
     }
   }
 
-  Project.init(
+  Hierarchy.init(
     {
-      project_id: {
+      hierarchy_id: {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
@@ -29,11 +27,23 @@ module.exports = (sequelize, DataTypes) => {
       name: {
         type: DataTypes.STRING(255),
         allowNull: false,
-        unique: true,
+      },
+      project_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+      },
+      parent_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
       },
       description: {
         type: DataTypes.TEXT,
         allowNull: true,
+      },
+      levels: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        defaultValue: null,
       },
       is_active: {
         type: DataTypes.BOOLEAN,
@@ -42,8 +52,8 @@ module.exports = (sequelize, DataTypes) => {
     },
     {
       sequelize,
-      modelName: "Project",
-      tableName: "projects",
+      modelName: "Hierarchy",
+      tableName: "hierarchy",
       timestamps: true,
       createdAt: "created_at",
       updatedAt: "updated_at",
@@ -52,5 +62,5 @@ module.exports = (sequelize, DataTypes) => {
     }
   );
 
-  return Project;
+  return Hierarchy;
 };

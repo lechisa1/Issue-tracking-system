@@ -1,6 +1,13 @@
 const { body, param, validationResult } = require('express-validator');
 
-const validateProject = [
+const validateHierarchyNode = [
+  body('hierarchy_id')
+    .isUUID()
+    .withMessage('Hierarchy ID must be a valid UUID'),
+  body('parent_id')
+    .optional()
+    .isUUID()
+    .withMessage('Parent ID must be a valid UUID'),
   body('name')
     .isLength({ min: 1, max: 255 })
     .withMessage('Name must be between 1 and 255 characters')
@@ -14,16 +21,12 @@ const validateProject = [
     .optional()
     .isBoolean()
     .withMessage('Is active must be a boolean'),
-  body('institute_id')
-    .optional()
-    .isUUID()
-    .withMessage('Institute ID must be a valid UUID'),
 ];
 
-const validateProjectId = [
+const validateHierarchyNodeId = [
   param('id')
     .isUUID()
-    .withMessage('Project ID must be a valid UUID'),
+    .withMessage('Hierarchy Node ID must be a valid UUID'),
 ];
 
 const handleValidationErrors = (req, res, next) => {
@@ -35,7 +38,7 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 module.exports = {
-  validateProject,
-  validateProjectId,
+  validateHierarchyNode,
+  validateHierarchyNodeId,
   handleValidationErrors,
 };

@@ -22,6 +22,10 @@ module.exports = {
         type: Sequelize.STRING(255),
         allowNull: false,
       },
+      phone_number: {
+        type: Sequelize.STRING(255),
+        allowNull: true,
+      },
       user_type_id: {
         type: Sequelize.UUID,
         allowNull: false,
@@ -32,13 +36,35 @@ module.exports = {
         onUpdate: "CASCADE",
         onDelete: "RESTRICT",
       },
+      institute_id: {
+        type: Sequelize.UUID,
+        allowNull: true,
+        references: {
+          model: "institutes",
+          key: "institute_id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "SET NULL",
+      },
       position: {
+        type: Sequelize.STRING(100),
+        allowNull: true,
+      },
+      profile_image: {
         type: Sequelize.STRING(100),
         allowNull: true,
       },
       is_first_logged_in: {
         type: Sequelize.BOOLEAN,
         defaultValue: true,
+      },
+      last_login_at: {
+        type: Sequelize.DATE,
+        allowNull: true,
+      },
+      password_changed_at: {
+        type: Sequelize.DATE,
+        allowNull: true,
       },
       is_active: {
         type: Sequelize.BOOLEAN,

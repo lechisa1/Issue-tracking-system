@@ -2,26 +2,21 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-  class Project extends Model {
+  class Institute extends Model {
     static associate(models) {
-      // Many-to-Many relationship with Institute through InstituteProject
-      this.belongsToMany(models.Institute, {
+      // Many-to-Many relationship with Project through InstituteProject
+      this.belongsToMany(models.Project, {
         through: models.InstituteProject,
-        foreignKey: "project_id",
-        otherKey: "institute_id",
-        as: "institutes",
-      });
-      // One-to-Many relationship with Hierarchy
-      this.hasMany(models.Hierarchy, {
-        foreignKey: "project_id",
-        as: "hierarchies",
+        foreignKey: "institute_id",
+        otherKey: "project_id",
+        as: "projects",
       });
     }
   }
 
-  Project.init(
+  Institute.init(
     {
-      project_id: {
+      institute_id: {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
@@ -35,6 +30,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: true,
       },
+      has_branch: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
       is_active: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
@@ -42,8 +41,8 @@ module.exports = (sequelize, DataTypes) => {
     },
     {
       sequelize,
-      modelName: "Project",
-      tableName: "projects",
+      modelName: "Institute",
+      tableName: "institutes",
       timestamps: true,
       createdAt: "created_at",
       updatedAt: "updated_at",
@@ -52,5 +51,5 @@ module.exports = (sequelize, DataTypes) => {
     }
   );
 
-  return Project;
+  return Institute;
 };
