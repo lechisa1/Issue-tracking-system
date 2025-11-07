@@ -2,19 +2,25 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-  class Institute extends Model {
+  class Hierarchy extends Model {
     static associate(models) {
-      // Institute ↔ InstituteProjects (junction)
-      Institute.hasMany(models.InstituteProject, {
-        foreignKey: "institute_id",
-        as: "institute_projects",
+      // Hierarchy ↔ Project
+      Hierarchy.belongsTo(models.Project, {
+        foreignKey: "project_id",
+        as: "project",
+      });
+
+      // Hierarchy ↔ HierarchyNode
+      Hierarchy.hasMany(models.HierarchyNode, {
+        foreignKey: "hierarchy_id",
+        as: "nodes",
       });
     }
   }
 
-  Institute.init(
+  Hierarchy.init(
     {
-      institute_id: {
+      hierarchy_id: {
         type: DataTypes.UUID,
         primaryKey: true,
         allowNull: false,
@@ -25,7 +31,13 @@ module.exports = (sequelize, DataTypes) => {
         unique: true,
         allowNull: false,
       },
-      description: DataTypes.TEXT,
+      project_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+      },
+      description: {
+        type: DataTypes.TEXT,
+      },
       is_active: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
@@ -36,15 +48,15 @@ module.exports = (sequelize, DataTypes) => {
     },
     {
       sequelize,
-      modelName: "Institute",
-      tableName: "institutes",
+      modelName: "Hierarchy",
+      tableName: "hierarchy",
       timestamps: true,
-      paranoid: true, // enables deleted_at soft delete
+      paranoid: true, // enables soft delete using deleted_at
       createdAt: "created_at",
       updatedAt: "updated_at",
       deletedAt: "deleted_at",
     }
   );
 
-  return Institute;
+  return Hierarchy;
 };

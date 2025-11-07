@@ -1,6 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const issueController = require("../controllers/Issue/issueController");
+const {
+  validateCreateIssue,
+  validateUpdateIssue,
+  validateGetIssuesQuery,
+  validateIssueIdParam,
+} = require("../validators/issueValidator");
 
 /**
  * @swagger
@@ -55,7 +61,7 @@ const issueController = require("../controllers/Issue/issueController");
  *       400:
  *         description: Bad request
  */
-router.post("/", issueController.createIssue);
+router.post("/", validateCreateIssue, issueController.createIssue);
 
 /**
  * @swagger
@@ -67,7 +73,7 @@ router.post("/", issueController.createIssue);
  *       200:
  *         description: List of issues
  */
-router.get("/", issueController.getIssues);
+router.get("/", validateGetIssuesQuery, issueController.getIssues);
 
 /**
  * @swagger
@@ -89,7 +95,7 @@ router.get("/", issueController.getIssues);
  *       404:
  *         description: Issue not found
  */
-router.get("/:id", issueController.getIssueById);
+router.get("/:id", validateIssueIdParam, issueController.getIssueById);
 
 /**
  * @swagger
@@ -131,7 +137,12 @@ router.get("/:id", issueController.getIssueById);
  *       404:
  *         description: Issue not found
  */
-router.put("/:id", issueController.updateIssue);
+router.put(
+  "/:id",
+  validateIssueIdParam,
+  validateUpdateIssue,
+  issueController.updateIssue
+);
 
 /**
  * @swagger
@@ -153,6 +164,6 @@ router.put("/:id", issueController.updateIssue);
  *       404:
  *         description: Issue not found
  */
-router.delete("/:id", issueController.deleteIssue);
+router.delete("/:id", validateIssueIdParam, issueController.deleteIssue);
 
 module.exports = router;

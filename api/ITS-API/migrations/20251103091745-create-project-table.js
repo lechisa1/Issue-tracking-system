@@ -44,10 +44,16 @@ module.exports = {
       deleted_by: {
         type: Sequelize.UUID,
         allowNull: true,
-        allowNull: true,  references: {
+        allowNull: true,
+        references: {
           model: "users",
           key: "user_id",
         },
+      },
+      is_active: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: true,
       },
     });
   },

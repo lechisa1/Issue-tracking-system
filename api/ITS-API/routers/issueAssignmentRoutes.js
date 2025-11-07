@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const assignmentController = require("../controllers/Issue/issueAssignmentController");
+const { validateAssignIssue, validateUpdateAssignmentStatus } = require("../validators/issueAssignmentValidation");
 
 /**
  * @swagger
@@ -49,7 +50,7 @@ const assignmentController = require("../controllers/Issue/issueAssignmentContro
  *       404:
  *         description: Issue or user not found
  */
-router.post("/", assignmentController.assignIssue);
+router.post("/", validateAssignIssue,  assignmentController.assignIssue);
 
 /**
  * @swagger
@@ -109,6 +110,6 @@ router.get("/issue/:issue_id", assignmentController.getAssignmentsByIssueId);
  *       400:
  *         description: Invalid request data
  */
-router.put("/:id", assignmentController.updateAssignmentStatus);
+router.put("/:id", validateUpdateAssignmentStatus, assignmentController.updateAssignmentStatus);
 
 module.exports = router;

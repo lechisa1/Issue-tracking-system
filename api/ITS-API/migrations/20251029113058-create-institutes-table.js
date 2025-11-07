@@ -14,16 +14,8 @@ module.exports = {
         allowNull: false,
         unique: true,
       },
-      address: {
+      description: {
         type: Sequelize.TEXT,
-        allowNull: true,
-      },
-      contact_email: {
-        type: Sequelize.STRING(255),
-        allowNull: true,
-      },
-      contact_phone: {
-        type: Sequelize.STRING(50),
         allowNull: true,
       },
       is_active: {
@@ -40,10 +32,14 @@ module.exports = {
         allowNull: false,
         defaultValue: Sequelize.fn("NOW"),
       },
+      deleted_at: {
+        type: Sequelize.DATE,
+        allowNull: true,
+      },
     });
   },
 
-  async down(queryInterface, Sequelize) {
+  async down(queryInterface) {
     await queryInterface.dropTable("institutes");
   },
 };

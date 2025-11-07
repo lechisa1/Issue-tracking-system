@@ -13,13 +13,6 @@ const escalateIssue = async (req, res) => {
   try {
     const { issue_id, from_tier, to_tier, reason, escalated_by } = req.body;
 
-    // Check if required fields are provided
-    if (!issue_id || !from_tier || !to_tier || !escalated_by) {
-      return res.status(400).json({
-        message: "Issue ID, from_tier, to_tier, and escalated_by are required.",
-      });
-    }
-
     // Verify issue exists
     const issue = await Issue.findByPk(issue_id);
     if (!issue) {

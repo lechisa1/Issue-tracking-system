@@ -57,6 +57,11 @@ module.exports = {
         allowNull: false,
         defaultValue: Sequelize.fn("NOW"),
       },
+      is_active: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: true,
+      },
     });
   },
 

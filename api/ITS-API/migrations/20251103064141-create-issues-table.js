@@ -9,27 +9,31 @@ module.exports = {
         primaryKey: true,
         allowNull: false,
       },
-      project_id: {
+
+      institute_project_id: {
         type: Sequelize.UUID,
-        allowNull: false,
+        allowNull: true, // nullable for EAI users
         references: {
-          model: "projects",
-          key: "project_id",
+          model: "institute_projects",
+          key: "institue_project_id",
         },
         onUpdate: "CASCADE",
-        onDelete: "CASCADE",
+        onDelete: "SET NULL",
       },
+
       title: {
         type: Sequelize.STRING(255),
         allowNull: false,
       },
+
       description: {
         type: Sequelize.TEXT,
         allowNull: true,
       },
+
       issue_category_id: {
         type: Sequelize.UUID,
-        allowNull: false,
+        allowNull: true,
         references: {
           model: "issue_categories",
           key: "category_id",
@@ -37,9 +41,21 @@ module.exports = {
         onUpdate: "CASCADE",
         onDelete: "SET NULL",
       },
+
+      hierarchy_node_id: {
+        type: Sequelize.UUID,
+        allowNull: true,
+        references: {
+          model: "hierarchy_node",
+          key: "hierarchy_node_id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "SET NULL",
+      },
+
       priority_id: {
         type: Sequelize.UUID,
-        allowNull: false,
+        allowNull: true,
         references: {
           model: "issue_priorities",
           key: "priority_id",
@@ -47,14 +63,16 @@ module.exports = {
         onUpdate: "CASCADE",
         onDelete: "SET NULL",
       },
+
       status: {
         type: Sequelize.STRING(50),
         allowNull: false,
         defaultValue: "pending", // pending, in_progress, resolved, closed, escalated
       },
+
       reported_by: {
         type: Sequelize.UUID,
-        allowNull: false,
+        allowNull: true,
         references: {
           model: "users",
           key: "user_id",
@@ -62,10 +80,7 @@ module.exports = {
         onUpdate: "CASCADE",
         onDelete: "SET NULL",
       },
-      current_tier: {
-        type: Sequelize.STRING(50),
-        allowNull: true, // ICT, Central, QA, Developer
-      },
+
       assigned_to: {
         type: Sequelize.UUID,
         allowNull: true,
@@ -76,20 +91,44 @@ module.exports = {
         onUpdate: "CASCADE",
         onDelete: "SET NULL",
       },
+
+      action_taken: {
+        type: Sequelize.STRING(255),
+        allowNull: true,
+      },
+
+      url_path: {
+        type: Sequelize.STRING(255),
+        allowNull: true,
+      },
+
+      issue_description: {
+        type: Sequelize.STRING(255),
+        allowNull: true,
+      },
+
+      issue_occured_time: {
+        type: Sequelize.DATE,
+        allowNull: true,
+      },
+
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,
         defaultValue: Sequelize.fn("NOW"),
       },
+
       updated_at: {
         type: Sequelize.DATE,
         allowNull: false,
         defaultValue: Sequelize.fn("NOW"),
       },
+
       resolved_at: {
         type: Sequelize.DATE,
         allowNull: true,
       },
+
       closed_at: {
         type: Sequelize.DATE,
         allowNull: true,

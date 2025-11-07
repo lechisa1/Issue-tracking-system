@@ -14,6 +14,7 @@ const createProjectSchema = Joi.object({
   description: Joi.string().max(1000).optional().messages({
     "string.max": "Description cannot exceed 1000 characters",
   }),
+  
 });
 
 // Update Project validation

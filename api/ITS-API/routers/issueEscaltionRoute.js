@@ -1,6 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const controller = require("../controllers/Issue/issueEscalationController");
+const {
+  validateEscalateIssue,
+} = require("../validators/issueEscalationValidator");
 
 /**
  * @swagger
@@ -235,7 +238,7 @@ const controller = require("../controllers/Issue/issueEscalationController");
  */
 
 // Routes
-router.post("/", controller.escalateIssue);
+router.post("/", validateEscalateIssue, controller.escalateIssue);
 router.get("/:issue_id", controller.getEscalationsByIssueId);
 router.get("/history/:issue_id", controller.getEscalationHistoryByIssueId);
 router.get("/:escalation_id", controller.getEscalationById);

@@ -6,13 +6,6 @@ const assignIssue = async (req, res) => {
   try {
     const { issue_id, assignee_id, assigned_by, remarks } = req.body;
 
-    // Check if required fields are provided
-    if (!issue_id || !assignee_id || !assigned_by) {
-      return res.status(400).json({
-        message: "Issue ID, assignee ID, and assigned_by are required.",
-      });
-    }
-
     // Verify issue exists
     const issue = await Issue.findByPk(issue_id);
     if (!issue) {
