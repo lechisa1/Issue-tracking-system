@@ -4,13 +4,11 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class IssueAttachment extends Model {
     static associate(models) {
-      // IssueAttachment ↔ Issue
       IssueAttachment.belongsTo(models.Issue, {
         foreignKey: "issue_id",
         as: "issue",
       });
 
-      // IssueAttachment ↔ User (uploaded by)
       IssueAttachment.belongsTo(models.User, {
         foreignKey: "uploaded_by",
         as: "uploader",
@@ -22,24 +20,40 @@ module.exports = (sequelize, DataTypes) => {
     {
       attachment_id: {
         type: DataTypes.UUID,
-        primaryKey: true,
-        allowNull: false,
         defaultValue: DataTypes.UUIDV4,
+        primaryKey: true,
       },
-      issue_id: DataTypes.UUID,
-      file_name: DataTypes.STRING(255),
-      file_path: DataTypes.STRING(500),
-      uploaded_by: DataTypes.UUID,
-      created_at: DataTypes.DATE,
-      updated_at: DataTypes.DATE,
+      issue_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+      },
+      file_name: {
+        type: DataTypes.STRING(255),
+        allowNull: false,
+      },
+      file_path: {
+        type: DataTypes.STRING(500),
+        allowNull: false,
+      },
+      uploaded_by: {
+        type: DataTypes.UUID,
+        allowNull: false,
+      },
+      created_at: {
+        type: DataTypes.DATE,
+        defaultValue: DataTypes.NOW,
+      },
+      updated_at: {
+        type: DataTypes.DATE,
+        defaultValue: DataTypes.NOW,
+      },
     },
     {
       sequelize,
       modelName: "IssueAttachment",
       tableName: "issue_attachments",
-      timestamps: true,
-      createdAt: "created_at",
-      updatedAt: "updated_at",
+      timestamps: false,
+      underscored: true,
     }
   );
 
