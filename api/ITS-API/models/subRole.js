@@ -1,14 +1,20 @@
+// models/subrole.js
 "use strict";
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
   class SubRole extends Model {
     static associate(models) {
-      // Optional: if you want to associate SubRole with ProjectUser
-      SubRole.hasMany(models.ProjectUser, {
-        foreignKey: "sub_role",
-        sourceKey: "name", // Assuming in ProjectUser you store sub_role as string
-        as: "projectUsers",
+      // SubRole has many RoleSubRoles
+      SubRole.hasMany(models.RoleSubRole, {
+        foreignKey: "sub_role_id",
+        as: "roleSubRoles",
+      });
+
+      // SubRole can be used in ProjectUserRoles
+      SubRole.hasMany(models.ProjectUserRole, {
+        foreignKey: "sub_role_id",
+        as: "projectUserRoles",
       });
     }
   }
@@ -21,14 +27,17 @@ module.exports = (sequelize, DataTypes) => {
         primaryKey: true,
       },
       name: {
-        type: DataTypes.STRING(50),
+        type: DataTypes.STRING(100),
         allowNull: false,
         unique: true,
-        comment: "Sub-role name: Frontend, Backend, Technical Manager, QA Head, QA Member",
       },
       description: {
         type: DataTypes.TEXT,
         allowNull: true,
+      },
+      is_active: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
       },
       created_at: {
         type: DataTypes.DATE,
@@ -38,13 +47,19 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
       },
+      deleted_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
     },
     {
       sequelize,
       modelName: "SubRole",
       tableName: "sub_roles",
-      underscored: true,
       timestamps: false,
+      underscored: true,
+      paranoid: true,
+      deletedAt: 'deleted_at',
     }
   );
 

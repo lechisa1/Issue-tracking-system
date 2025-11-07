@@ -1,23 +1,20 @@
+// models/role.js
 "use strict";
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
   class Role extends Model {
     static associate(models) {
-      // Role ↔ User (many-to-many)
-      Role.belongsToMany(models.User, {
-        through: models.UserRoles,
+      // Role has many RoleSubRoles
+      Role.hasMany(models.RoleSubRole, {
         foreignKey: "role_id",
-        otherKey: "user_id",
-        as: "users",
+        as: "roleSubRoles",
       });
 
-      // Role ↔ Permission (many-to-many)
-      Role.belongsToMany(models.Permission, {
-        through: models.RolePermission,
+      // Role can be used in ProjectUserRoles
+      Role.hasMany(models.ProjectUserRole, {
         foreignKey: "role_id",
-        otherKey: "permission_id",
-        as: "permissions",
+        as: "projectUserRoles",
       });
     }
   }
@@ -26,21 +23,43 @@ module.exports = (sequelize, DataTypes) => {
     {
       role_id: {
         type: DataTypes.UUID,
-        primaryKey: true,
-        allowNull: false,
         defaultValue: DataTypes.UUIDV4,
+        primaryKey: true,
       },
-      name: { type: DataTypes.STRING, unique: true },
-      description: DataTypes.TEXT,
-      level: DataTypes.STRING,
+      name: {
+        type: DataTypes.STRING(100),
+        allowNull: false,
+        unique: true,
+      },
+      description: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+      is_active: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
+      },
+      created_at: {
+        type: DataTypes.DATE,
+        defaultValue: DataTypes.NOW,
+      },
+      updated_at: {
+        type: DataTypes.DATE,
+        defaultValue: DataTypes.NOW,
+      },
+      deleted_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
     },
     {
       sequelize,
       modelName: "Role",
       tableName: "roles",
-      timestamps: true,
-      createdAt: "created_at",
-      updatedAt: "updated_at",
+      timestamps: false,
+      underscored: true,
+      paranoid: true,
+      deletedAt: 'deleted_at',
     }
   );
 

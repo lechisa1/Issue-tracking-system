@@ -1,3 +1,4 @@
+
 "use strict";
 const { Model } = require("sequelize");
 
@@ -24,6 +25,7 @@ module.exports = (sequelize, DataTypes) => {
       projects_id: {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
+        primaryKey: true,
         primaryKey: true,
       },
       name: {

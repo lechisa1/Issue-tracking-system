@@ -40,34 +40,35 @@ const createUserSchema = Joi.object({
     "string.max": "Position cannot exceed 100 characters.",
   }),
 
-  role_ids: Joi.array()
-    .items(Joi.string().guid({ version: "uuidv4" }))
+  role_sub_roles: Joi.array()
+    .items(
+      Joi.object({
+        role_id: Joi.string().guid({ version: "uuidv4" }).required().messages({
+          "string.guid": "Role ID must be a valid UUID.",
+          "any.required": "Role ID is required.",
+        }),
+        sub_role_ids: Joi.array()
+          .items(Joi.string().guid({ version: "uuidv4" }))
+          .optional()
+          .messages({
+            "string.guid": "Each sub-role ID must be a valid UUID.",
+            "array.includes": "sub_role_ids must be an array of valid UUIDs.",
+          }),
+      })
+    )
     .optional()
     .messages({
-      "string.guid": "Each role ID must be a valid UUID.",
-      "array.includes": "Role IDs must be an array of valid UUIDs.",
+      "array.base": "role_sub_roles must be an array of role-sub-role objects.",
     }),
 
-  assigned_by: Joi.string()
-    .guid({ version: "uuidv4" })
-    .allow(null)
-    .optional()
-    .messages({
-      "string.guid": "Assigned by must be a valid UUID.",
-    }),
-
-  // =================== Projects ===================
   projects: Joi.array()
     .items(
       Joi.object({
-        project_id: Joi.string().guid({ version: "uuidv4" }).required()
-          .messages({
-            "string.guid": "Project ID must be a valid UUID.",
-            "any.required": "Project ID is required.",
-          }),
-        main_role: Joi.string().optional(),
-        sub_role: Joi.string().optional(),
-        role_id: Joi.string().guid({ version: "uuidv4" }).optional(),
+        project_id: Joi.string().guid({ version: "uuidv4" }).required().messages({
+          "string.guid": "Project ID must be a valid UUID.",
+          "any.required": "Project ID is required.",
+        }),
+        main_role_id: Joi.string().guid({ version: "uuidv4" }).optional(),
         sub_role_id: Joi.string().guid({ version: "uuidv4" }).optional(),
       })
     )
@@ -86,15 +87,21 @@ const updateUserSchema = Joi.object({
   institute_id: Joi.string().guid({ version: "uuidv4" }).allow(null).optional(),
   position: Joi.string().max(100).optional(),
   is_active: Joi.boolean().optional(),
-  role_ids: Joi.array().items(Joi.string().guid({ version: "uuidv4" })).optional(),
-  assigned_by: Joi.string().guid({ version: "uuidv4" }).allow(null).optional(),
+
+  role_sub_roles: Joi.array()
+    .items(
+      Joi.object({
+        role_id: Joi.string().guid({ version: "uuidv4" }).required(),
+        sub_role_ids: Joi.array().items(Joi.string().guid({ version: "uuidv4" })).optional(),
+      })
+    )
+    .optional(),
+
   projects: Joi.array()
     .items(
       Joi.object({
         project_id: Joi.string().guid({ version: "uuidv4" }).required(),
-        main_role: Joi.string().optional(),
-        sub_role: Joi.string().optional(),
-        role_id: Joi.string().guid({ version: "uuidv4" }).optional(),
+        main_role_id: Joi.string().guid({ version: "uuidv4" }).optional(),
         sub_role_id: Joi.string().guid({ version: "uuidv4" }).optional(),
       })
     )

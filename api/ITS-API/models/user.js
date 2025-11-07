@@ -1,10 +1,10 @@
+// models/user.js
 "use strict";
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
   class User extends Model {
     static associate(models) {
-      // Associations
       User.belongsTo(models.UserType, {
         foreignKey: "user_type_id",
         as: "userType",
@@ -15,23 +15,17 @@ module.exports = (sequelize, DataTypes) => {
         as: "institute",
       });
 
-      // Many-to-Many with Role through UserRoles
-      User.belongsToMany(models.Role, {
-        through: models.UserRoles,
+      // Project roles association
+      User.hasMany(models.ProjectUserRole, {
         foreignKey: "user_id",
-        otherKey: "role_id",
-        as: "roles",
+        as: "projectRoles",
       });
 
-      // Optional: direct access to UserRoles
-      User.hasMany(models.UserRoles, {
-        foreignKey: "user_id",
-        as: "userRoles",
+      // Issues reported by user
+      User.hasMany(models.Issue, {
+        foreignKey: "reported_by",
+        as: "reportedIssues",
       });
-      User.hasMany(models.ProjectUser, {
-  foreignKey: "user_id",
-  as: "projects", // Must match what you use in your include
-})
     }
   }
 
@@ -41,7 +35,6 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
-        allowNull: false,
       },
       full_name: {
         type: DataTypes.STRING(100),
@@ -51,16 +44,14 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(255),
         allowNull: false,
         unique: true,
-        validate: {
-          isEmail: true,
-        },
+        validate: { isEmail: true },
       },
       password: {
         type: DataTypes.STRING(255),
         allowNull: false,
       },
       phone_number: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.STRING(50),
         allowNull: true,
       },
       user_type_id: {
@@ -76,7 +67,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
       },
       profile_image: {
-        type: DataTypes.STRING(100),
+        type: DataTypes.STRING(255),
         allowNull: true,
       },
       is_first_logged_in: {
@@ -97,12 +88,10 @@ module.exports = (sequelize, DataTypes) => {
       },
       created_at: {
         type: DataTypes.DATE,
-        allowNull: false,
         defaultValue: DataTypes.NOW,
       },
       updated_at: {
         type: DataTypes.DATE,
-        allowNull: false,
         defaultValue: DataTypes.NOW,
       },
     },
@@ -110,8 +99,8 @@ module.exports = (sequelize, DataTypes) => {
       sequelize,
       modelName: "User",
       tableName: "users",
-      timestamps: false, 
-      underscored: true, 
+      timestamps: false,
+      underscored: true,
     }
   );
 
