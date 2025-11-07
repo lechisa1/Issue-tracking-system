@@ -3,58 +3,86 @@ const { v4: uuidv4 } = require("uuid");
 
 module.exports = {
   async up(queryInterface, Sequelize) {
+    const now = new Date();
+
     const permissions = [
       // User Management
-      { permission_id: uuidv4(), name: "user:create", description: "Create new users", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "user:read", description: "View users", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "user:update", description: "Update user details", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "user:delete", description: "Delete users", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "user:assign_role", description: "Assign roles to users", created_at: new Date(), updated_at: new Date() },
+      { resource: "users", action: "create" },
+      { resource: "users", action: "read" },
+      { resource: "users", action: "update" },
+      { resource: "users", action: "delete" },
+      { resource: "users", action: "assign_role" },
 
-      // Role & Permission Management
-      { permission_id: uuidv4(), name: "role:create", description: "Create new roles", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "role:read", description: "View roles", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "role:update", description: "Update role details", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "role:delete", description: "Delete roles", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "permission:assign", description: "Assign permissions to roles", created_at: new Date(), updated_at: new Date() },
+      // Role Management
+      { resource: "roles", action: "create" },
+      { resource: "roles", action: "read" },
+      { resource: "roles", action: "update" },
+      { resource: "roles", action: "delete" },
+      { resource: "roles", action: "assign_permission" },
 
       // Project Management
-      { permission_id: uuidv4(), name: "project:create", description: "Create new projects", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "project:read", description: "View project details", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "project:update", description: "Update project details", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "project:delete", description: "Delete projects", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "project:assign_users", description: "Assign users to project", created_at: new Date(), updated_at: new Date() },
+      { resource: "projects", action: "create" },
+      { resource: "projects", action: "read" },
+      { resource: "projects", action: "update" },
+      { resource: "projects", action: "delete" },
+      { resource: "projects", action: "assign_users" },
 
       // Issue Management
-      { permission_id: uuidv4(), name: "issue:create", description: "Create new issues", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "issue:read", description: "View issues", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "issue:update", description: "Update issue details", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "issue:delete", description: "Delete issues", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "issue:assign", description: "Assign issues to developers/QA", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "issue:change_status", description: "Update issue status", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "issue:add_comment", description: "Add comments to issues", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "issue:view_comments", description: "View comments on issues", created_at: new Date(), updated_at: new Date() },
+      { resource: "issues", action: "create" },
+      { resource: "issues", action: "read" },
+      { resource: "issues", action: "update" },
+      { resource: "issues", action: "delete" },
+      { resource: "issues", action: "assign" },
+      { resource: "issues", action: "change_status" },
+      { resource: "issues", action: "add_comment" },
+      { resource: "issues", action: "view_comments" },
 
-      // Notifications
-      { permission_id: uuidv4(), name: "notification:send", description: "Send notifications to users", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "notification:read", description: "Mark notifications as read", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "notification:view", description: "View notifications", created_at: new Date(), updated_at: new Date() },
+      // Institute Management
+      { resource: "institutes", action: "create" },
+      { resource: "institutes", action: "read" },
+      { resource: "institutes", action: "update" },
+      { resource: "institutes", action: "delete" },
 
-      // Attachments
-      { permission_id: uuidv4(), name: "attachment:add", description: "Upload attachments to issues or projects", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "attachment:read", description: "View/download attachments", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "attachment:delete", description: "Delete attachments", created_at: new Date(), updated_at: new Date() },
+      // Notification Management
+      { resource: "notifications", action: "send" },
+      { resource: "notifications", action: "read" },
+      { resource: "notifications", action: "view" },
+
+      // Attachment Management
+      { resource: "attachments", action: "upload" },
+      { resource: "attachments", action: "download" },
+      { resource: "attachments", action: "delete" },
 
       // Reports & Analytics
-      { permission_id: uuidv4(), name: "report:view", description: "View issue/project reports", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "report:export", description: "Export reports to PDF/Excel", created_at: new Date(), updated_at: new Date() },
+      { resource: "reports", action: "view" },
+      { resource: "reports", action: "export" },
 
-      // Audit & Logs
-      { permission_id: uuidv4(), name: "audit:view", description: "View system activity logs", created_at: new Date(), updated_at: new Date() },
-      { permission_id: uuidv4(), name: "audit:export", description: "Export logs for compliance", created_at: new Date(), updated_at: new Date() },
+      // System Management
+      { resource: "system", action: "manage" },
+      { resource: "audit", action: "view" },
     ];
 
-    await queryInterface.bulkInsert("permissions", permissions, {});
+    // Insert permissions one by one, ignoring duplicates
+    for (const perm of permissions) {
+      try {
+        await queryInterface.bulkInsert("permissions", [{
+          permission_id: uuidv4(),
+          resource: perm.resource,
+          action: perm.action,
+          created_at: now,
+          updated_at: now,
+        }], {
+          ignoreDuplicates: true // This will ignore duplicate key errors
+        });
+      } catch (error) {
+        // If duplicate error, just continue
+        if (error.name === 'SequelizeUniqueConstraintError') {
+          console.log(`Permission ${perm.resource}:${perm.action} already exists, skipping...`);
+          continue;
+        }
+        throw error; // Re-throw other errors
+      }
+    }
   },
 
   async down(queryInterface, Sequelize) {

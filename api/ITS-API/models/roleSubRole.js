@@ -1,39 +1,42 @@
-// models/role.js
+// models/rolesubrole.js
 "use strict";
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-  class Role extends Model {
+  class RoleSubRole extends Model {
     static associate(models) {
-      // Role has many RoleSubRoles
-      Role.hasMany(models.RoleSubRole, {
+      RoleSubRole.belongsTo(models.Role, {
         foreignKey: "role_id",
-        as: "roleSubRoles",
+        as: "role",
       });
 
-      // Role can be used in ProjectUserRoles
-      Role.hasMany(models.ProjectUserRole, {
-        foreignKey: "role_id",
-        as: "projectUserRoles",
+      RoleSubRole.belongsTo(models.SubRole, {
+        foreignKey: "sub_role_id",
+        as: "subRole",
+      });
+
+      // RoleSubRole has many RoleSubRolePermissions
+      RoleSubRole.hasMany(models.RoleSubRolePermission, {
+        foreignKey: "roles_sub_roles_id",
+        as: "permissions",
       });
     }
   }
 
-  Role.init(
+  RoleSubRole.init(
     {
-      role_id: {
+      roles_sub_roles_id: {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
-      name: {
-        type: DataTypes.STRING(100),
+      role_id: {
+        type: DataTypes.UUID,
         allowNull: false,
-        unique: true,
       },
-      description: {
-        type: DataTypes.TEXT,
-        allowNull: true,
+      sub_role_id: {
+        type: DataTypes.UUID,
+        allowNull: true, // Nullable as per schema
       },
       is_active: {
         type: DataTypes.BOOLEAN,
@@ -54,14 +57,20 @@ module.exports = (sequelize, DataTypes) => {
     },
     {
       sequelize,
-      modelName: "Role",
-      tableName: "roles",
+      modelName: "RoleSubRole",
+      tableName: "role_sub_roles",
       timestamps: false,
       underscored: true,
       paranoid: true,
       deletedAt: 'deleted_at',
+      indexes: [
+        {
+          unique: true,
+          fields: ['role_id', 'sub_role_id']
+        }
+      ]
     }
   );
 
-  return Role;
+  return RoleSubRole;
 };

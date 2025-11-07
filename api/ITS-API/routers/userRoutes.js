@@ -1,8 +1,26 @@
 const express = require("express");
 const router = express.Router();
-const userController = require("../controllers/userController");
+
 const { validateUpdateUser, validateCreateUser } = require("../validators/userValidator");
 const {authenticateToken}=require('../middlewares/authMiddleware')
+
+const {
+  createUser,
+  updateUser,
+  getUsers,
+  getUserById,
+  deleteUser,
+  toggleUserActiveStatus,
+  resetUserPassword
+} = require("../controllers/userController");
+
+/**
+ * @swagger
+ * tags:
+ *   name: Users
+ *   description: User management APIs
+ */
+
 /**
  * @swagger
  * components:
@@ -13,29 +31,22 @@ const {authenticateToken}=require('../middlewares/authMiddleware')
  *         user_id:
  *           type: string
  *           format: uuid
- *           description: Unique identifier for the user
  *         full_name:
  *           type: string
- *           example: Lechisa Bedasa
  *         email:
  *           type: string
- *           example: lechisa@example.com
+ *         phone_number:
+ *           type: string
+ *         position:
+ *           type: string
+ *         is_active:
+ *           type: boolean
  *         user_type_id:
  *           type: string
  *           format: uuid
- *           description: UUID of the user type
- *         position:
+ *         institute_id:
  *           type: string
- *           example: Developer
- *         password:
- *           type: string
- *           example: secret123
- *         is_first_logged_in:
- *           type: boolean
- *           default: true
- *         is_active:
- *           type: boolean
- *           default: true
+ *           format: uuid
  *         created_at:
  *           type: string
  *           format: date-time
@@ -46,54 +57,86 @@ const {authenticateToken}=require('../middlewares/authMiddleware')
 
 /**
  * @swagger
- * tags:
- *   - name: Users
- *     description: API endpoints for managing users
- */
-
-/**
- * @swagger
  * /api/users:
  *   post:
- *     summary: Create a new user
+ *     summary: Register a new user
  *     tags: [Users]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/User'
+ *             type: object
+ *             required: [full_name, email, user_type_id]
+ *             properties:
+ *               full_name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               user_type_id:
+ *                 type: string
+ *               institute_id:
+ *                 type: string
+ *               position:
+ *                 type: string
+ *               phone_number:
+ *                 type: string
  *     responses:
  *       201:
- *         description: User created successfully
+ *         description: User registered successfully
  *       400:
- *         description: Validation error
+ *         description: Invalid input
+ *       500:
+ *         description: Server error
  */
-router.post("/", userController.createUser);
+router.post("/",validateCreateUser, createUser);
 
 /**
  * @swagger
  * /api/users:
  *   get:
- *     summary: Get all users
+ *     summary: Retrieve all users (with filters and pagination)
  *     tags: [Users]
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by name, email, or position
+ *       - in: query
+ *         name: user_type_id
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filter by user type
+ *       - in: query
+ *         name: is_active
+ *         schema:
+ *           type: boolean
+ *         description: Filter by active status
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
  *     responses:
  *       200:
  *         description: List of users
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/User'
+ *       500:
+ *         description: Server error
  */
-router.get("/",authenticateToken, userController.getUsers);
+router.get("/", getUsers);
 
 /**
  * @swagger
  * /api/users/{id}:
  *   get:
- *     summary: Get user by ID
+ *     summary: Retrieve user by ID
  *     tags: [Users]
  *     parameters:
  *       - in: path
@@ -104,17 +147,19 @@ router.get("/",authenticateToken, userController.getUsers);
  *           format: uuid
  *     responses:
  *       200:
- *         description: User details
+ *         description: User retrieved successfully
+ *       400:
+ *         description: Invalid user ID
  *       404:
  *         description: User not found
  */
-router.get("/:id", userController.getUserById);
+router.get("/:id",authenticateToken, getUserById);
 
 /**
  * @swagger
  * /api/users/{id}:
  *   put:
- *     summary: Update a user by ID
+ *     summary: Update user details
  *     tags: [Users]
  *     parameters:
  *       - in: path
@@ -128,22 +173,37 @@ router.get("/:id", userController.getUserById);
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/User'
+ *             type: object
+ *             properties:
+ *               full_name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               phone_number:
+ *                 type: string
+ *               position:
+ *                 type: string
+ *               user_type_id:
+ *                 type: string
+ *               institute_id:
+ *                 type: string
+ *               is_active:
+ *                 type: boolean
  *     responses:
  *       200:
  *         description: User updated successfully
- *       400:
- *         description: Validation error
  *       404:
  *         description: User not found
+ *       500:
+ *         description: Server error
  */
-router.put("/:id", validateUpdateUser, userController.updateUser);
+router.put("/:id",authenticateToken,validateUpdateUser, updateUser);
 
 /**
  * @swagger
  * /api/users/{id}:
  *   delete:
- *     summary: Delete a user by ID
+ *     summary: Soft delete (deactivate) a user
  *     tags: [Users]
  *     parameters:
  *       - in: path
@@ -154,10 +214,64 @@ router.put("/:id", validateUpdateUser, userController.updateUser);
  *           format: uuid
  *     responses:
  *       200:
- *         description: User deleted successfully
+ *         description: User deactivated successfully
  *       404:
  *         description: User not found
  */
-router.delete("/:id", userController.deleteUser);
+router.delete("/:id",authenticateToken, deleteUser);
+
+/**
+ * @swagger
+ * /api/users/{id}/toggle-status:
+ *   patch:
+ *     summary: Activate or deactivate a user
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [is_active]
+ *             properties:
+ *               is_active:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: User status updated successfully
+ *       404:
+ *         description: User not found
+ */
+router.patch("/:id/toggle-status",authenticateToken, toggleUserActiveStatus);
+
+/**
+ * @swagger
+ * /api/users/{id}/reset-password:
+ *   post:
+ *     summary: Reset user password and send via email
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/:id/reset-password", resetUserPassword);
 
 module.exports = router;

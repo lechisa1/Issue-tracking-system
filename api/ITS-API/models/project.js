@@ -1,15 +1,26 @@
+
 "use strict";
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
   class Project extends Model {
     static associate(models) {
-      // Project belongs to Branch
-      this.belongsTo(models.Branch, {
-        foreignKey: "branch_id",
-        as: "branch",
+      Project.belongsTo(models.Institute, {
+        foreignKey: "institute_id",
+        as: "institute",
       });
-      // Project has many other relations if needed, e.g., tasks, but not specified
+
+      Project.belongsTo(models.User, {
+        foreignKey: "created_by",
+        as: "creator",
+      });
+
+
+      // Project issues
+      Project.hasMany(models.Issue, {
+        foreignKey: "project_id",
+        as: "issues",
+      });
     }
   }
 
@@ -17,35 +28,49 @@ module.exports = (sequelize, DataTypes) => {
     {
       project_id: {
         type: DataTypes.UUID,
-        primaryKey: true,
-        allowNull: false,
         defaultValue: DataTypes.UUIDV4,
+        primaryKey: true,
       },
       name: {
+        type: DataTypes.STRING(255),
+        allowNull: false,
+      },
+      code: {
         type: DataTypes.STRING(100),
         allowNull: false,
         unique: true,
-      },
-      branch_id: {
-        type: DataTypes.UUID,
-        allowNull: false,
-        references: {
-          model: "branch",
-          key: "branch_id",
-        },
       },
       description: {
         type: DataTypes.TEXT,
         allowNull: true,
       },
+      status: {
+        type: DataTypes.STRING(50),
+        defaultValue: "active",
+      },
+      institute_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
+      created_by: {
+        type: DataTypes.UUID,
+        allowNull: false,
+      },
+      created_at: {
+        type: DataTypes.DATE,
+        defaultValue: DataTypes.NOW,
+      },
+      updated_at: {
+        type: DataTypes.DATE,
+        defaultValue: DataTypes.NOW,
+      },
     },
     {
       sequelize,
       modelName: "Project",
-      tableName: "project",
-      timestamps: true,
-      createdAt: "created_at",
-      updatedAt: "updated_at",
+      tableName: "projects",
+      timestamps: false,
+      underscored: true,
     }
   );
 
