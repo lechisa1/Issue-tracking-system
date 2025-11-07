@@ -40,11 +40,6 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: true,
       },
-      levels: {
-        type: DataTypes.JSON,
-        allowNull: true,
-        defaultValue: null,
-      },
       is_active: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,

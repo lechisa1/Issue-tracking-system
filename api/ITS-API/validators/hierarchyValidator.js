@@ -17,10 +17,6 @@ const validateHierarchy = [
     .optional()
     .isString()
     .withMessage('Description must be a string'),
-  body('levels')
-    .optional()
-    .isObject()
-    .withMessage('Levels must be a valid JSON object'),
   body('is_active')
     .optional()
     .isBoolean()

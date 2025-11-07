@@ -36,9 +36,6 @@ const {
  *         description:
  *           type: string
  *           description: Description of the hierarchy
- *         levels:
- *           type: object
- *           description: JSON object defining the levels in the hierarchy (e.g., {"1": "city", "2": "sub_city", "3": "woreda"})
  *         is_active:
  *           type: boolean
  *           default: true
@@ -87,9 +84,6 @@ const {
  *                   description:
  *                     type: string
  *                     description: Description of the hierarchy
- *                   levels:
- *                     type: object
- *                     description: JSON object defining the levels in the hierarchy
  *                   is_active:
  *                     type: boolean
  *                     default: true
@@ -116,9 +110,6 @@ const {
  *                     description:
  *                       type: string
  *                       description: Description of the hierarchy
- *                     levels:
- *                       type: object
- *                       description: JSON object defining the levels in the hierarchy
  *                     is_active:
  *                       type: boolean
  *                       default: true

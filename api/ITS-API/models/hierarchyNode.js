@@ -42,11 +42,6 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: true,
       },
-      level: {
-        type: DataTypes.INTEGER,
-        defaultValue: 1,
-        allowNull: false,
-      },
       is_active: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,

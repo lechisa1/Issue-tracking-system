@@ -11,7 +11,7 @@ const createHierarchy = async (req, res) => {
       // Handle multiple hierarchies
       const createdHierarchies = [];
       for (const hierarchyData of input) {
-        const { name, project_id, parent_id, description, levels, is_active } = hierarchyData;
+        const { name, project_id, parent_id, description, is_active } = hierarchyData;
 
         // Check if hierarchy exists
         const existingHierarchy = await Hierarchy.findOne({ where: { name } });
@@ -28,7 +28,6 @@ const createHierarchy = async (req, res) => {
           project_id,
           parent_id,
           description,
-          levels,
           is_active,
         });
 
@@ -38,7 +37,7 @@ const createHierarchy = async (req, res) => {
       res.status(201).json(createdHierarchies);
     } else {
       // Handle single hierarchy
-      const { name, project_id, parent_id, description, levels, is_active } = input;
+      const { name, project_id, parent_id, description,  is_active } = input;
 
       // Check if hierarchy exists
       const existingHierarchy = await Hierarchy.findOne({ where: { name } });
@@ -54,7 +53,6 @@ const createHierarchy = async (req, res) => {
         project_id,
         parent_id,
         description,
-        levels,
         is_active,
       });
 
@@ -104,7 +102,7 @@ const getHierarchyById = async (req, res) => {
 const updateHierarchy = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, project_id, parent_id, description, levels, is_active } = req.body;
+    const { name, project_id, parent_id, description , is_active } = req.body;
 
     const hierarchy = await Hierarchy.findByPk(id);
     if (!hierarchy) return res.status(404).json({ message: "Hierarchy not found" });
@@ -113,7 +111,6 @@ const updateHierarchy = async (req, res) => {
     hierarchy.project_id = project_id || hierarchy.project_id;
     hierarchy.parent_id = parent_id !== undefined ? parent_id : hierarchy.parent_id;
     hierarchy.description = description || hierarchy.description;
-    hierarchy.levels = levels || hierarchy.levels;
     if (is_active !== undefined) hierarchy.is_active = is_active;
 
     await hierarchy.save();

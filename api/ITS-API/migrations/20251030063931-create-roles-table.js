@@ -18,10 +18,6 @@ module.exports = {
         type: Sequelize.TEXT,
         allowNull: true,
       },
-      level: {
-        type: Sequelize.STRING(50),
-        allowNull: true, // 'institute' or 'EAI'
-      },
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,
