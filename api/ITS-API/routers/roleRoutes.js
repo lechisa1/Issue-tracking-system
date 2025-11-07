@@ -17,15 +17,18 @@ const {
 } = require('../controllers/roleController');
 
 // Role CRUD routes
-router.post('/', createRole);
-router.get('/', getRoles);
-router.get('/:id', getRoleById);
-router.put('/:id', updateRole);
-router.delete('/:id', deleteRole);
+router.post('/',authenticateToken,validateCreateRole, createRole);
+router.get('/',authenticateToken, getRoles);
+router.get('/:id',authenticateToken, getRoleById);
+router.put("/:id", authenticateToken, validateUpdateRole,updateRole);
+router.delete('/:id',authenticateToken, deleteRole);
 
 // Additional role-related routes
-router.get('/:id/sub-roles', getSubRolesByRole);
-router.get('/:roleId/sub-roles/:subRoleId/permissions', getPermissionsByRoleSubRole);
+router.get("/:id/sub-roles", authenticateToken,getSubRolesByRole);
+router.get(
+  "/:roleId/sub-roles/:subRoleId/permissions",
+  authenticateToken,getPermissionsByRoleSubRole
+);
 /**
  * @swagger
  * tags:

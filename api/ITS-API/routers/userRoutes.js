@@ -89,7 +89,7 @@ const {
  *       500:
  *         description: Server error
  */
-router.post("/",validateCreateUser, createUser);
+router.post("/",validateCreateUser,authenticateToken, createUser);
 
 /**
  * @swagger
@@ -130,7 +130,7 @@ router.post("/",validateCreateUser, createUser);
  *       500:
  *         description: Server error
  */
-router.get("/", getUsers);
+router.get("/",authenticateToken, getUsers);
 
 /**
  * @swagger
