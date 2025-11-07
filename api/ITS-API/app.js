@@ -12,10 +12,6 @@ const { swaggerUi, swaggerSpec } = require("./swagger");
 
 // ================== Here Import Routes=================
 
-
-const organizationRoute=require('./routers/organizationRoutes')
-
-
 const userRoute = require("./routers/userRoutes");
 const roleRoute = require("./routers/roleRoutes");
 const rolePermissionRoute = require("./routers/rolePermissionRoutes");
@@ -29,21 +25,33 @@ const issueRoutes = require("./routers/issueRoutes");
 const issueAssignmentRoutes = require("./routers/issueAssignmentRoutes");
 const issueEscalationRoutes = require("./routers/issueEscaltionRoute");
 
+const instituteRoute = require("./routers/instituteRoutes");
+const instituteProjectsRoute = require("./routers/instituteProjectRoutes");
+const hierarchyRoute = require("./routers/hierarchyRoutes");
+const hierarchyNodeRoute = require("./routers/hierarchyNodeRoutes");
+const hierarchyNodeOrganizationRoute = require("./routers/hierarchyNodeOrganizationRoutes");
 
 const app = express();
 const appServer = http.createServer(app);
 
 // ================== Middleware ==================
-app.use(express.json({
-  verify: (req, res, buf) => {
-    try {
-      JSON.parse(buf);
-    } catch (e) {
-      res.status(400).json({ message: "Invalid JSON format. Please ensure all property names are double-quoted and JSON is valid." });
-      throw e;
-    }
-  }
-}));
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      try {
+        JSON.parse(buf);
+      } catch (e) {
+        res
+          .status(400)
+          .json({
+            message:
+              "Invalid JSON format. Please ensure all property names are double-quoted and JSON is valid.",
+          });
+        throw e;
+      }
+    },
+  })
+);
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -90,14 +98,7 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // ================== API Routes go here ==================
 
 
-app.use('/api/organizations',organizationRoute);
-app.use('/api/cities', require('./routers/cityRoutes'));
-app.use('/api/regions', require('./routers/regionRoutes'));
-app.use('/api/sub-cities', require('./routers/sub_cityRoutes'));
-app.use('/api/woredas', require('./routers/woredaRoutes'));
-app.use('/api/branches', require('./routers/branchRoutes '));
-app.use('/api/zones', require('./routers/zoneRoutes'));
-app.use('/api/projects', require('./routers/projectRoutes'));
+
 
 app.use("/api/users", userRoute);
 app.use("/api/roles", roleRoute);
@@ -105,6 +106,14 @@ app.use("/api/role-permission", rolePermissionRoute);
 app.use("/api/user-roles", userRoleRoute);
 
 app.use("/api/auth", authRoute);
+
+app.use("/api/projects", require("./routers/projectRoutes"));
+app.use('/api/institutes',instituteRoute);
+app.use('/api/institute-projects',instituteProjectsRoute);
+
+app.use('/api/hierarchies',hierarchyRoute);
+app.use('/api/hierarchy-nodes',hierarchyNodeRoute);
+app.use('/api/hierarchy-node-organizations',hierarchyNodeOrganizationRoute);
 
 app.use("/api/issue-categories", issueCategories);
 app.use("/api/issue-priorities", issuePriorities);

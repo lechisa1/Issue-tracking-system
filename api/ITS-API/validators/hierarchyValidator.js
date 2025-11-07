@@ -1,48 +1,68 @@
-const { body, param, validationResult } = require('express-validator');
+const Joi = require("joi");
 
-const validateHierarchy = [
-  body('name')
-    .isLength({ min: 1, max: 255 })
-    .withMessage('Name must be between 1 and 255 characters')
-    .isString()
-    .withMessage('Name must be a string'),
-  body('project_id')
-    .isUUID()
-    .withMessage('Project ID must be a valid UUID'),
-  body('parent_id')
-    .optional()
-    .isUUID()
-    .withMessage('Parent ID must be a valid UUID'),
-  body('description')
-    .optional()
-    .isString()
-    .withMessage('Description must be a string'),
-  body('levels')
-    .optional()
-    .isObject()
-    .withMessage('Levels must be a valid JSON object'),
-  body('is_active')
-    .optional()
-    .isBoolean()
-    .withMessage('Is active must be a boolean'),
-];
+// Schema for creating a hierarchy
+const createHierarchySchema = Joi.object({
+  name: Joi.string().trim().max(255).required().messages({
+    "string.empty": "Hierarchy name is required",
+    "string.max": "Name must be at most 255 characters",
+  }),
 
-const validateHierarchyId = [
-  param('id')
-    .isUUID()
-    .withMessage('Hierarchy ID must be a valid UUID'),
-];
+  project_id: Joi.string().guid({ version: "uuidv4" }).required().messages({
+    "string.guid": "Project ID must be a valid UUID",
+    "string.empty": "Project ID is required",
+  }),
 
-const handleValidationErrors = (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
+  parent_id: Joi.string().guid({ version: "uuidv4" }).optional().messages({
+    "string.guid": "Parent ID must be a valid UUID",
+  }),
+
+  description: Joi.string().trim().optional().messages({
+    "string.base": "Description must be a string",
+  }),
+
+  levels: Joi.object().optional().messages({
+    "object.base": "Levels must be a valid JSON object",
+  }),
+
+  is_active: Joi.boolean().optional().messages({
+    "boolean.base": "Is active must be a boolean",
+  }),
+});
+
+// Schema for updating a hierarchy
+const updateHierarchySchema = Joi.object({
+  name: Joi.string().trim().max(255).optional(),
+  project_id: Joi.string().guid({ version: "uuidv4" }).optional(),
+  parent_id: Joi.string().guid({ version: "uuidv4" }).optional(),
+  description: Joi.string().trim().optional(),
+  levels: Joi.object().optional(),
+  is_active: Joi.boolean().optional(),
+});
+
+// Validate create request
+exports.validateCreateHierarchy = (req, res, next) => {
+  const { error } = createHierarchySchema.validate(req.body);
+  if (error) return res.status(400).json({ error: error.details[0].message });
   next();
 };
 
-module.exports = {
-  validateHierarchy,
-  validateHierarchyId,
-  handleValidationErrors,
+// Validate update request
+exports.validateUpdateHierarchy = (req, res, next) => {
+  const { error } = updateHierarchySchema.validate(req.body);
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  next();
+};
+
+// Validate hierarchy ID param
+exports.validateHierarchyId = (req, res, next) => {
+  const schema = Joi.object({
+    id: Joi.string().guid({ version: "uuidv4" }).required().messages({
+      "string.guid": "Hierarchy ID must be a valid UUID",
+      "string.empty": "Hierarchy ID is required",
+    }),
+  });
+
+  const { error } = schema.validate(req.params);
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  next();
 };

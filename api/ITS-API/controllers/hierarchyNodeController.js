@@ -29,7 +29,11 @@ const createNodeRecursive = async (nodeData, parent_id = null, level = 1) => {
   // Recursively create children
   if (children && Array.isArray(children)) {
     for (const child of children) {
-      const childNodes = await createNodeRecursive(child, hierarchy_node_id, level + 1);
+      const childNodes = await createNodeRecursive(
+        child,
+        hierarchy_node_id,
+        level + 1
+      );
       createdNodes.push(...childNodes);
     }
   }
@@ -48,9 +52,13 @@ const createHierarchyNode = async (req, res) => {
       const allCreatedNodes = [];
 
       for (const rootNodeData of input) {
-        const { hierarchy_id, name, description, is_active, children } = rootNodeData;
+        const { hierarchy_id, name, description, is_active, children } =
+          rootNodeData;
 
-        const createdNodes = await createNodeRecursive({ name, description, is_active, children }, hierarchy_id);
+        const createdNodes = await createNodeRecursive(
+          { name, description, is_active, children },
+          hierarchy_id
+        );
         allCreatedNodes.push(...createdNodes);
       }
 
@@ -59,13 +67,18 @@ const createHierarchyNode = async (req, res) => {
       // Handle single root node
       const { hierarchy_id, name, description, is_active, children } = input;
 
-      const createdNodes = await createNodeRecursive({ name, description, is_active, children }, hierarchy_id);
+      const createdNodes = await createNodeRecursive(
+        { name, description, is_active, children },
+        hierarchy_id
+      );
 
       res.status(201).json(createdNodes);
     }
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Internal server error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
 };
 
@@ -82,7 +95,9 @@ const getHierarchyNodes = async (req, res) => {
     res.status(200).json(nodes);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Internal server error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
 };
 
@@ -97,11 +112,14 @@ const getHierarchyNodeById = async (req, res) => {
         { model: HierarchyNode, as: "children" },
       ],
     });
-    if (!node) return res.status(404).json({ message: "Hierarchy node not found" });
+    if (!node)
+      return res.status(404).json({ message: "Hierarchy node not found" });
     res.status(200).json(node);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Internal server error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
 };
 
@@ -112,7 +130,8 @@ const updateHierarchyNode = async (req, res) => {
     const { hierarchy_id, parent_id, name, description, is_active } = req.body;
 
     const node = await HierarchyNode.findByPk(id);
-    if (!node) return res.status(404).json({ message: "Hierarchy node not found" });
+    if (!node)
+      return res.status(404).json({ message: "Hierarchy node not found" });
 
     // Recalculate level if parent_id is being updated
     let level = node.level;
@@ -139,7 +158,9 @@ const updateHierarchyNode = async (req, res) => {
     res.status(200).json(node);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Internal server error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
 };
 
@@ -148,12 +169,23 @@ const deleteHierarchyNode = async (req, res) => {
   try {
     const { id } = req.params;
     const node = await HierarchyNode.findByPk(id);
-    if (!node) return res.status(404).json({ message: "Hierarchy node not found" });
+    if (!node)
+      return res.status(404).json({ message: "Hierarchy node not found" });
 
     await node.destroy();
     res.status(200).json({ message: "Hierarchy node deleted successfully" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Internal server error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
+};
+
+module.exports = {
+  createHierarchyNode,
+  getHierarchyNodes,
+  getHierarchyNodeById,
+  updateHierarchyNode,
+  deleteHierarchyNode,
 };

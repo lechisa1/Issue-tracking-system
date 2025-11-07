@@ -17,9 +17,10 @@ module.exports = (sequelize, DataTypes) => {
   Institute.init(
     {
       institute_id: {
-        type: DataTypes.UUID,
+        type: DataTypes.CHAR(36),
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
+        allowNull: false,
       },
       name: {
         type: DataTypes.STRING(255),
@@ -29,10 +30,6 @@ module.exports = (sequelize, DataTypes) => {
       description: {
         type: DataTypes.TEXT,
         allowNull: true,
-      },
-      has_branch: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false,
       },
       is_active: {
         type: DataTypes.BOOLEAN,
@@ -47,7 +44,7 @@ module.exports = (sequelize, DataTypes) => {
       createdAt: "created_at",
       updatedAt: "updated_at",
       deletedAt: "deleted_at",
-      paranoid: true,
+      paranoid: true, // Enables soft delete
     }
   );
 

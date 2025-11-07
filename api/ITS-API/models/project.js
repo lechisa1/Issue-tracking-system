@@ -33,10 +33,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       description: {
         type: DataTypes.TEXT,
-      },
-      is_active: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true,
+        allowNull: true,
       },
       is_active: {
         type: DataTypes.BOOLEAN,
@@ -48,11 +45,10 @@ module.exports = (sequelize, DataTypes) => {
       modelName: "Project",
       tableName: "projects",
       timestamps: true,
-      paranoid: true, // soft delete via deleted_at
       createdAt: "created_at",
       updatedAt: "updated_at",
       deletedAt: "deleted_at",
-      paranoid: true,
+      paranoid: true, // enables soft delete
     }
   );
 

@@ -1,10 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const hierarchyNodeController = require("../controllers/hierarchyNodeController");
+
+const { authenticateToken } = require("../middlewares/authMiddleware");
 const {
-  validateHierarchyNode,
+  validateCreateHierarchyNode,
   validateHierarchyNodeId,
-  handleValidationErrors,
+  validateUpdateHierarchyNode,
 } = require("../validators/hierarchyNodeValidator");
 
 /**
@@ -13,9 +15,6 @@ const {
  *   schemas:
  *     HierarchyNode:
  *       type: object
- *       required:
- *         - hierarchy_id
- *         - name
  *       properties:
  *         hierarchy_node_id:
  *           type: string
@@ -24,42 +23,44 @@ const {
  *         hierarchy_id:
  *           type: string
  *           format: uuid
- *           description: ID of the hierarchy this node belongs to
+ *           description: UUID of the hierarchy this node belongs to
  *         parent_id:
  *           type: string
  *           format: uuid
  *           nullable: true
- *           description: ID of the parent node (null for root nodes)
+ *           description: UUID of the parent node (if any)
  *         name:
  *           type: string
- *           maxLength: 255
- *           description: Name of the hierarchy node
+ *           example: Department A
  *         description:
  *           type: string
- *           description: Description of the hierarchy node
+ *           example: This is the department node
  *         level:
  *           type: integer
- *           default: 1
- *           description: Level of the hierarchy node (1 for root, 2 for children, etc.)
+ *           example: 2
  *         is_active:
  *           type: boolean
  *           default: true
- *           description: Whether the hierarchy node is active
  *         created_at:
  *           type: string
  *           format: date-time
  *         updated_at:
  *           type: string
  *           format: date-time
- *         deleted_at:
+ */
+
+/**
+ * @swagger
+ * tags:
+ *   - name: Hierarchy Nodes
+ *     description: API endpoints for managing hierarchy nodes
  */
 
 /**
  * @swagger
  * /api/hierarchy-nodes:
  *   post:
- *     summary: Create a new hierarchy node
- *     description: Creates a new node in the hierarchy structure (supports dynamic depth)
+ *     summary: Create one or more hierarchy nodes (supports nested children)
  *     tags: [Hierarchy Nodes]
  *     requestBody:
  *       required: true
@@ -67,104 +68,28 @@ const {
  *         application/json:
  *           schema:
  *             oneOf:
- *               - type: object
- *                 required:
- *                   - hierarchy_id
- *                   - name
- *                   properties:
- *                     hierarchy_id:
- *                       type: string
- *                       format: uuid
- *                       description: ID of the hierarchy this node belongs to
- *                     name:
- *                       type: string
- *                       maxLength: 255
- *                       description: Name of the hierarchy node
- *                     description:
- *                       type: string
- *                       description: Description of the hierarchy node
- *                     is_active:
- *                       type: boolean
- *                       default: true
- *                       description: Whether the hierarchy node is active
- *                     children:
- *                       type: array
- *                       items:
- *                         type: object
- *                         required:
- *                           - hierarchy_id
- *                           - name
- *                         properties:
- *                           hierarchy_id:
- *                             type: string
- *                             format: uuid
- *                             description: ID of the hierarchy this node belongs to
- *                           name:
- *                             type: string
- *                             maxLength: 255
- *                             description: Name of the hierarchy node
- *                           description:
- *                             type: string
- *                             description: Description of the hierarchy node
- *                           is_active:
- *                             type: boolean
- *                             default: true
- *                             description: Whether the hierarchy node is active
- *                           children:
- *                             type: array
- *                             items:
- *                               $ref: '#/components/schemas/HierarchyNode'
- *                             description: Nested children nodes (recursive structure)
- *                       description: Nested children nodes (recursive structure)
+ *               - $ref: '#/components/schemas/HierarchyNode'
  *               - type: array
  *                 items:
- *                   type: object
- *                   required:
- *                     - hierarchy_id
- *                     - name
- *                   properties:
- *                     hierarchy_id:
- *                       type: string
- *                       format: uuid
- *                       description: ID of the hierarchy this node belongs to
- *                     name:
- *                       type: string
- *                       maxLength: 255
- *                       description: Name of the hierarchy node
- *                     description:
- *                       type: string
- *                       description: Description of the hierarchy node
- *                     is_active:
- *                       type: boolean
- *                       default: true
- *                       description: Whether the hierarchy node is active
- *                     children:
- *                       type: array
- *                       items:
- *                         $ref: '#/components/schemas/HierarchyNode'
- *                       description: Nested children nodes (recursive structure)
+ *                   $ref: '#/components/schemas/HierarchyNode'
  *     responses:
  *       201:
- *         description: Hierarchy node created successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/HierarchyNode'
+ *         description: Hierarchy node(s) created successfully
  *       400:
- *         description: Bad request - validation error or node already exists
- *       404:
- *         description: Hierarchy or parent node not found
- *       500:
- *         description: Internal server error
+ *         description: Validation error
  */
-router.post("/", validateHierarchyNode, handleValidationErrors, hierarchyNodeController.createHierarchyNode);
+router.post(
+  "/",
+  authenticateToken,
+  validateCreateHierarchyNode,
+  hierarchyNodeController.createHierarchyNode
+);
 
 /**
  * @swagger
  * /api/hierarchy-nodes:
  *   get:
  *     summary: Get all hierarchy nodes
- *     description: Retrieves all hierarchy nodes with their hierarchical structure
  *     tags: [Hierarchy Nodes]
  *     responses:
  *       200:
@@ -175,17 +100,14 @@ router.post("/", validateHierarchyNode, handleValidationErrors, hierarchyNodeCon
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/HierarchyNode'
- *       500:
- *         description: Internal server error
  */
-router.get("/", hierarchyNodeController.getHierarchyNodes);
+router.get("/", authenticateToken, hierarchyNodeController.getHierarchyNodes);
 
 /**
  * @swagger
  * /api/hierarchy-nodes/{id}:
  *   get:
  *     summary: Get hierarchy node by ID
- *     description: Retrieves a specific hierarchy node by its ID
  *     tags: [Hierarchy Nodes]
  *     parameters:
  *       - in: path
@@ -194,27 +116,24 @@ router.get("/", hierarchyNodeController.getHierarchyNodes);
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Hierarchy Node ID
  *     responses:
  *       200:
  *         description: Hierarchy node details
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/HierarchyNode'
  *       404:
  *         description: Hierarchy node not found
- *       500:
- *         description: Internal server error
  */
-router.get("/:id", validateHierarchyNodeId, handleValidationErrors, hierarchyNodeController.getHierarchyNodeById);
+router.get(
+  "/:id",
+  authenticateToken,
+  validateHierarchyNodeId,
+  hierarchyNodeController.getHierarchyNodeById
+);
 
 /**
  * @swagger
  * /api/hierarchy-nodes/{id}:
  *   put:
- *     summary: Update hierarchy node
- *     description: Updates an existing hierarchy node
+ *     summary: Update a hierarchy node by ID
  *     tags: [Hierarchy Nodes]
  *     parameters:
  *       - in: path
@@ -223,53 +142,33 @@ router.get("/:id", validateHierarchyNodeId, handleValidationErrors, hierarchyNod
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Hierarchy Node ID
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               hierarchy_id:
- *                 type: string
- *                 format: uuid
- *                 description: ID of the hierarchy this node belongs to
- *               parent_id:
- *                 type: string
- *                 format: uuid
- *                 nullable: true
- *                 description: ID of the parent node (null for root nodes)
- *               name:
- *                 type: string
- *                 maxLength: 255
- *                 description: Name of the hierarchy node
- *               description:
- *                 type: string
- *                 description: Description of the hierarchy node
- *               is_active:
- *                 type: boolean
- *                 description: Whether the hierarchy node is active
+ *             $ref: '#/components/schemas/HierarchyNode'
  *     responses:
  *       200:
  *         description: Hierarchy node updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/HierarchyNode'
+ *       400:
+ *         description: Validation error
  *       404:
- *         description: Hierarchy node not found
- *       500:
- *         description: Internal server error
+ *         description: Node not found
  */
-router.put("/:id", validateHierarchyNode, handleValidationErrors, hierarchyNodeController.updateHierarchyNode);
+router.put(
+  "/:id",
+  authenticateToken,
+  validateHierarchyNodeId,
+  validateUpdateHierarchyNode,
+  hierarchyNodeController.updateHierarchyNode
+);
 
 /**
  * @swagger
  * /api/hierarchy-nodes/{id}:
  *   delete:
- *     summary: Delete hierarchy node
- *     description: Deletes a hierarchy node (soft delete)
+ *     summary: Delete a hierarchy node by ID
  *     tags: [Hierarchy Nodes]
  *     parameters:
  *       - in: path
@@ -278,15 +177,17 @@ router.put("/:id", validateHierarchyNode, handleValidationErrors, hierarchyNodeC
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Hierarchy Node ID
  *     responses:
  *       200:
  *         description: Hierarchy node deleted successfully
  *       404:
- *         description: Hierarchy node not found
- *       500:
- *         description: Internal server error
+ *         description: Node not found
  */
-router.delete("/:id", validateHierarchyNodeId, handleValidationErrors, hierarchyNodeController.deleteHierarchyNode);
+router.delete(
+  "/:id",
+  authenticateToken,
+  validateHierarchyNodeId,
+  hierarchyNodeController.deleteHierarchyNode
+);
 
 module.exports = router;

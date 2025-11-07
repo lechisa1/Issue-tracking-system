@@ -1,4 +1,9 @@
-const { Project, Institute, Hierarchy, InstituteProject } = require("../models");
+const {
+  Project,
+  Institute,
+  Hierarchy,
+  InstituteProject,
+} = require("../models");
 const { v4: uuidv4 } = require("uuid");
 
 // Create a new project
@@ -9,13 +14,15 @@ const createProject = async (req, res) => {
     // Check if project exists
     const existingProject = await Project.findOne({ where: { name } });
     if (existingProject)
-      return res.status(400).json({ message: "Project with this name already exists." });
+      return res
+        .status(400)
+        .json({ message: "Project with this name already exists." });
 
-    const project_id = uuidv4();
+    const projects_id = uuidv4();
 
     // Create project
     const project = await Project.create({
-      project_id,
+      projects_id,
       name,
       description,
       is_active,
@@ -30,17 +37,19 @@ const createProject = async (req, res) => {
 
       // Check if association already exists
       const existingAssociation = await InstituteProject.findOne({
-        where: { institute_id, project_id }
+        where: { institute_id, project_id: projects_id },
       });
       if (existingAssociation) {
-        return res.status(400).json({ message: "Project is already assigned to this institute" });
+        return res
+          .status(400)
+          .json({ message: "Project is already assigned to this institute" });
       }
 
       // Create association
       await InstituteProject.create({
         institute_project_id: uuidv4(),
         institute_id,
-        project_id,
+        project_id: projects_id,
         is_active: true,
       });
     }
@@ -48,7 +57,9 @@ const createProject = async (req, res) => {
     res.status(201).json(project);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Internal server error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
 };
 
@@ -71,7 +82,9 @@ const getProjects = async (req, res) => {
     res.status(200).json(projects);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Internal server error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
 };
 
@@ -96,7 +109,9 @@ const getProjectById = async (req, res) => {
     res.status(200).json(project);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Internal server error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
 };
 
@@ -117,7 +132,9 @@ const updateProject = async (req, res) => {
     res.status(200).json(project);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Internal server error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
 };
 
@@ -132,7 +149,9 @@ const deleteProject = async (req, res) => {
     res.status(200).json({ message: "Project deleted successfully" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Internal server error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
 };
 

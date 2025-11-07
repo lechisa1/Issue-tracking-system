@@ -1,41 +1,51 @@
-const { body, param, validationResult } = require('express-validator');
+const Joi = require("joi");
 
-const validateInstitute = [
-  body('name')
-    .isLength({ min: 1, max: 255 })
-    .withMessage('Name must be between 1 and 255 characters')
-    .isString()
-    .withMessage('Name must be a string'),
-  body('description')
-    .optional()
-    .isString()
-    .withMessage('Description must be a string'),
-  body('has_branch')
-    .optional()
-    .isBoolean()
-    .withMessage('Has branch must be a boolean'),
-  body('is_active')
-    .optional()
-    .isBoolean()
-    .withMessage('Is active must be a boolean'),
-];
+// Schema for creating a new institute
+const createInstituteSchema = Joi.object({
+  name: Joi.string().trim().max(255).required().messages({
+    "string.empty": "Institute name is required",
+    "string.max": "Name must be at most 255 characters",
+  }),
+  description: Joi.string().trim().optional().messages({
+    "string.base": "Description must be a string",
+  }),
+  is_active: Joi.boolean().optional().messages({
+    "boolean.base": "Is active must be a boolean",
+  }),
+});
 
-const validateInstituteId = [
-  param('id')
-    .isUUID()
-    .withMessage('Institute ID must be a valid UUID'),
-];
+// Schema for updating an institute (all optional)
+const updateInstituteSchema = Joi.object({
+  name: Joi.string().trim().max(255).optional(),
+  description: Joi.string().trim().optional(),
+  is_active: Joi.boolean().optional(),
+});
 
-const handleValidationErrors = (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
+// Schema for validating institute ID
+const instituteIdSchema = Joi.object({
+  id: Joi.string().guid({ version: "uuidv4" }).required().messages({
+    "string.guid": "Institute ID must be a valid UUID",
+    "string.empty": "Institute ID is required",
+  }),
+});
+
+// Middleware to validate create request
+exports.validateCreateInstitute = (req, res, next) => {
+  const { error } = createInstituteSchema.validate(req.body);
+  if (error) return res.status(400).json({ error: error.details[0].message });
   next();
 };
 
-module.exports = {
-  validateInstitute,
-  validateInstituteId,
-  handleValidationErrors,
+// Middleware to validate update request
+exports.validateUpdateInstitute = (req, res, next) => {
+  const { error } = updateInstituteSchema.validate(req.body);
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  next();
+};
+
+// Middleware to validate institute ID param
+exports.validateInstituteId = (req, res, next) => {
+  const { error } = instituteIdSchema.validate(req.params);
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  next();
 };

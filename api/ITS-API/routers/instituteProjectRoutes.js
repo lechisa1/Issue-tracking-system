@@ -4,7 +4,6 @@ const instituteProjectController = require("../controllers/instituteProjectContr
 const {
   validateInstituteProject,
   validateInstituteProjectId,
-  handleValidationErrors,
 } = require("../validators/instituteProjectValidator");
 
 /**
@@ -48,7 +47,7 @@ const {
  * @swagger
  * /api/institute-projects:
  *   post:
- *     summary: Create institute-project association
+ *     summary: Create a new institute-project association
  *     description: Creates an association between an institute and a project
  *     tags: [Institute Projects]
  *     requestBody:
@@ -56,23 +55,7 @@ const {
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - institute_id
- *               - project_id
- *             properties:
- *               institute_id:
- *                 type: string
- *                 format: uuid
- *                 description: ID of the institute
- *               project_id:
- *                 type: string
- *                 format: uuid
- *                 description: ID of the project
- *               is_active:
- *                 type: boolean
- *                 default: true
- *                 description: Whether the association is active
+ *             $ref: '#/components/schemas/InstituteProject'
  *     responses:
  *       201:
  *         description: Association created successfully
@@ -81,13 +64,17 @@ const {
  *             schema:
  *               $ref: '#/components/schemas/InstituteProject'
  *       400:
- *         description: Bad request - validation error or association already exists
+ *         description: Validation error
  *       404:
  *         description: Institute or project not found
  *       500:
  *         description: Internal server error
  */
-router.post("/", validateInstituteProject, handleValidationErrors, instituteProjectController.createInstituteProject);
+router.post(
+  "/",
+  validateInstituteProject,
+  instituteProjectController.createInstituteProject
+);
 
 /**
  * @swagger
@@ -132,12 +119,18 @@ router.get("/", instituteProjectController.getInstituteProjects);
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/InstituteProject'
+ *       400:
+ *         description: Validation error
  *       404:
  *         description: Association not found
  *       500:
  *         description: Internal server error
  */
-router.get("/:id", validateInstituteProjectId, handleValidationErrors, instituteProjectController.getInstituteProjectById);
+router.get(
+  "/:id",
+  validateInstituteProjectId,
+  instituteProjectController.getInstituteProjectById
+);
 
 /**
  * @swagger
@@ -159,19 +152,7 @@ router.get("/:id", validateInstituteProjectId, handleValidationErrors, institute
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               institute_id:
- *                 type: string
- *                 format: uuid
- *                 description: ID of the institute
- *               project_id:
- *                 type: string
- *                 format: uuid
- *                 description: ID of the project
- *               is_active:
- *                 type: boolean
- *                 description: Whether the association is active
+ *             $ref: '#/components/schemas/InstituteProject'
  *     responses:
  *       200:
  *         description: Association updated successfully
@@ -179,12 +160,19 @@ router.get("/:id", validateInstituteProjectId, handleValidationErrors, institute
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/InstituteProject'
+ *       400:
+ *         description: Validation error
  *       404:
  *         description: Association not found
  *       500:
  *         description: Internal server error
  */
-router.put("/:id", validateInstituteProject, handleValidationErrors, instituteProjectController.updateInstituteProject);
+router.put(
+  "/:id",
+  validateInstituteProjectId,
+  validateInstituteProject,
+  instituteProjectController.updateInstituteProject
+);
 
 /**
  * @swagger
@@ -204,11 +192,17 @@ router.put("/:id", validateInstituteProject, handleValidationErrors, institutePr
  *     responses:
  *       200:
  *         description: Association deleted successfully
+ *       400:
+ *         description: Validation error
  *       404:
  *         description: Association not found
  *       500:
  *         description: Internal server error
  */
-router.delete("/:id", validateInstituteProjectId, handleValidationErrors, instituteProjectController.deleteInstituteProject);
+router.delete(
+  "/:id",
+  validateInstituteProjectId,
+  instituteProjectController.deleteInstituteProject
+);
 
 module.exports = router;

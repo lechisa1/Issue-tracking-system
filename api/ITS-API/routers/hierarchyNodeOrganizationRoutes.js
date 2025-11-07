@@ -4,7 +4,6 @@ const hierarchyNodeOrganizationController = require("../controllers/hierarchyNod
 const {
   validateHierarchyNodeOrganization,
   validateHierarchyNodeOrganizationId,
-  handleValidationErrors,
 } = require("../validators/hierarchyNodeOrganizationValidator");
 
 /**
@@ -51,77 +50,62 @@ const {
 
 /**
  * @swagger
+ * tags:
+ *   - name: HierarchyNodeOrganizations
+ *     description: API endpoints for managing hierarchy node - institute associations
+ */
+
+/**
+ * @swagger
  * /api/hierarchy-node-organizations:
  *   post:
  *     summary: Create a new hierarchy node organization association
- *     description: Creates an association between a hierarchy node and an institute
- *     tags: [Hierarchy Node Organizations]
+ *     tags: [HierarchyNodeOrganizations]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - hierarchy_node_id
- *               - institute_id
- *             properties:
- *               hierarchy_node_id:
- *                 type: string
- *                 format: uuid
- *                 description: ID of the hierarchy node
- *               institute_id:
- *                 type: string
- *                 format: uuid
- *                 description: ID of the institute
- *               is_active:
- *                 type: boolean
- *                 default: true
- *                 description: Whether the association is active
+ *             $ref: '#/components/schemas/HierarchyNodeOrganization'
  *     responses:
  *       201:
  *         description: Hierarchy node organization association created successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/HierarchyNodeOrganization'
  *       400:
- *         description: Bad request - validation error or association already exists
+ *         description: Validation error or duplicate association
  *       404:
  *         description: Hierarchy node or institute not found
  *       500:
  *         description: Internal server error
  */
-router.post("/", validateHierarchyNodeOrganization, handleValidationErrors, hierarchyNodeOrganizationController.createHierarchyNodeOrganization);
+router.post(
+  "/",
+  validateHierarchyNodeOrganization,
+  hierarchyNodeOrganizationController.createHierarchyNodeOrganization
+);
 
 /**
  * @swagger
  * /api/hierarchy-node-organizations:
  *   get:
  *     summary: Get all hierarchy node organization associations
- *     description: Retrieves all associations between hierarchy nodes and institutes
- *     tags: [Hierarchy Node Organizations]
+ *     tags: [HierarchyNodeOrganizations]
  *     responses:
  *       200:
  *         description: List of hierarchy node organization associations
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/HierarchyNodeOrganization'
  *       500:
  *         description: Internal server error
  */
-router.get("/", hierarchyNodeOrganizationController.getHierarchyNodeOrganizations);
+router.get(
+  "/",
+  hierarchyNodeOrganizationController.getHierarchyNodeOrganizations
+);
 
 /**
  * @swagger
  * /api/hierarchy-node-organizations/{id}:
  *   get:
- *     summary: Get hierarchy node organization association by ID
- *     description: Retrieves a specific association by its ID
- *     tags: [Hierarchy Node Organizations]
+ *     summary: Get a hierarchy node organization association by ID
+ *     tags: [HierarchyNodeOrganizations]
  *     parameters:
  *       - in: path
  *         name: id
@@ -129,28 +113,27 @@ router.get("/", hierarchyNodeOrganizationController.getHierarchyNodeOrganization
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Hierarchy Node Organization Association ID
+ *         description: Hierarchy node organization association ID
  *     responses:
  *       200:
  *         description: Hierarchy node organization association details
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/HierarchyNodeOrganization'
  *       404:
  *         description: Association not found
  *       500:
  *         description: Internal server error
  */
-router.get("/:id", validateHierarchyNodeOrganizationId, handleValidationErrors, hierarchyNodeOrganizationController.getHierarchyNodeOrganizationById);
+router.get(
+  "/:id",
+  validateHierarchyNodeOrganizationId,
+  hierarchyNodeOrganizationController.getHierarchyNodeOrganizationById
+);
 
 /**
  * @swagger
  * /api/hierarchy-node-organizations/{id}:
  *   put:
- *     summary: Update hierarchy node organization association
- *     description: Updates an existing association between hierarchy node and institute
- *     tags: [Hierarchy Node Organizations]
+ *     summary: Update a hierarchy node organization association
+ *     tags: [HierarchyNodeOrganizations]
  *     parameters:
  *       - in: path
  *         name: id
@@ -158,48 +141,36 @@ router.get("/:id", validateHierarchyNodeOrganizationId, handleValidationErrors, 
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Hierarchy Node Organization Association ID
+ *         description: Hierarchy node organization association ID
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               hierarchy_node_id:
- *                 type: string
- *                 format: uuid
- *                 description: ID of the hierarchy node
- *               institute_id:
- *                 type: string
- *                 format: uuid
- *                 description: ID of the institute
- *               is_active:
- *                 type: boolean
- *                 description: Whether the association is active
+ *             $ref: '#/components/schemas/HierarchyNodeOrganization'
  *     responses:
  *       200:
  *         description: Hierarchy node organization association updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/HierarchyNodeOrganization'
  *       400:
- *         description: Bad request - validation error or duplicate association
+ *         description: Validation error or duplicate association
  *       404:
  *         description: Association, hierarchy node, or institute not found
  *       500:
  *         description: Internal server error
  */
-router.put("/:id", validateHierarchyNodeOrganization, handleValidationErrors, hierarchyNodeOrganizationController.updateHierarchyNodeOrganization);
+router.put(
+  "/:id",
+  validateHierarchyNodeOrganizationId,
+  validateHierarchyNodeOrganization,
+  hierarchyNodeOrganizationController.updateHierarchyNodeOrganization
+);
 
 /**
  * @swagger
  * /api/hierarchy-node-organizations/{id}:
  *   delete:
- *     summary: Delete hierarchy node organization association
- *     description: Deletes an association between hierarchy node and institute (soft delete)
- *     tags: [Hierarchy Node Organizations]
+ *     summary: Delete a hierarchy node organization association
+ *     tags: [HierarchyNodeOrganizations]
  *     parameters:
  *       - in: path
  *         name: id
@@ -207,7 +178,7 @@ router.put("/:id", validateHierarchyNodeOrganization, handleValidationErrors, hi
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Hierarchy Node Organization Association ID
+ *         description: Hierarchy node organization association ID
  *     responses:
  *       200:
  *         description: Hierarchy node organization association deleted successfully
@@ -216,6 +187,10 @@ router.put("/:id", validateHierarchyNodeOrganization, handleValidationErrors, hi
  *       500:
  *         description: Internal server error
  */
-router.delete("/:id", validateHierarchyNodeOrganizationId, handleValidationErrors, hierarchyNodeOrganizationController.deleteHierarchyNodeOrganization);
+router.delete(
+  "/:id",
+  validateHierarchyNodeOrganizationId,
+  hierarchyNodeOrganizationController.deleteHierarchyNodeOrganization
+);
 
 module.exports = router;

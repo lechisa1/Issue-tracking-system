@@ -2,9 +2,9 @@ const express = require("express");
 const router = express.Router();
 const hierarchyController = require("../controllers/hierarchyController");
 const {
-  validateHierarchy,
+  validateCreateHierarchy,
+  validateUpdateHierarchy,
   validateHierarchyId,
-  handleValidationErrors,
 } = require("../validators/hierarchyValidator");
 
 /**
@@ -13,9 +13,6 @@ const {
  *   schemas:
  *     Hierarchy:
  *       type: object
- *       required:
- *         - name
- *         - project_id
  *       properties:
  *         hierarchy_id:
  *           type: string
@@ -23,8 +20,7 @@ const {
  *           description: Unique identifier for the hierarchy
  *         name:
  *           type: string
- *           maxLength: 255
- *           description: Name of the hierarchy
+ *           example: City Hierarchy
  *         project_id:
  *           type: string
  *           format: uuid
@@ -32,34 +28,38 @@ const {
  *         parent_id:
  *           type: string
  *           format: uuid
- *           description: ID of the parent hierarchy (null for root hierarchies)
+ *           nullable: true
+ *           description: Parent hierarchy ID (if any)
  *         description:
  *           type: string
- *           description: Description of the hierarchy
+ *           example: Defines city-level hierarchy with sub-city and woreda
  *         levels:
  *           type: object
- *           description: JSON object defining the levels in the hierarchy (e.g., {"1": "city", "2": "sub_city", "3": "woreda"})
+ *           example: { "1": "city", "2": "sub_city", "3": "woreda" }
  *         is_active:
  *           type: boolean
  *           default: true
- *           description: Whether the hierarchy is active
  *         created_at:
  *           type: string
  *           format: date-time
  *         updated_at:
  *           type: string
  *           format: date-time
- *         deleted_at:
- *           type: string
- *           format: date-time
+ */
+
+/**
+ * @swagger
+ * tags:
+ *   - name: Hierarchies
+ *     description: API endpoints for managing hierarchy structures
  */
 
 /**
  * @swagger
  * /api/hierarchies:
  *   post:
- *     summary: Create a new hierarchy
- *     description: Creates a new hierarchy structure for a project
+ *     summary: Create a new hierarchy or multiple hierarchies
+ *     description: Supports both single and bulk hierarchy creation
  *     tags: [Hierarchies]
  *     requestBody:
  *       required: true
@@ -67,84 +67,25 @@ const {
  *         application/json:
  *           schema:
  *             oneOf:
- *               - type: object
- *                 required:
- *                   - name
- *                   - project_id
- *                 properties:
- *                   name:
- *                     type: string
- *                     maxLength: 255
- *                     description: Name of the hierarchy
- *                   project_id:
- *                     type: string
- *                     format: uuid
- *                     description: ID of the project this hierarchy belongs to
- *                   parent_id:
- *                     type: string
- *                     format: uuid
- *                     description: ID of the parent hierarchy (null for root hierarchies)
- *                   description:
- *                     type: string
- *                     description: Description of the hierarchy
- *                   levels:
- *                     type: object
- *                     description: JSON object defining the levels in the hierarchy
- *                   is_active:
- *                     type: boolean
- *                     default: true
- *                     description: Whether the hierarchy is active
+ *               - $ref: '#/components/schemas/Hierarchy'
  *               - type: array
  *                 items:
- *                   type: object
- *                   required:
- *                     - name
- *                     - project_id
- *                   properties:
- *                     name:
- *                       type: string
- *                       maxLength: 255
- *                       description: Name of the hierarchy
- *                     project_id:
- *                       type: string
- *                       format: uuid
- *                       description: ID of the project this hierarchy belongs to
- *                     parent_id:
- *                       type: string
- *                       format: uuid
- *                       description: ID of the parent hierarchy (null for root hierarchies)
- *                     description:
- *                       type: string
- *                       description: Description of the hierarchy
- *                     levels:
- *                       type: object
- *                       description: JSON object defining the levels in the hierarchy
- *                     is_active:
- *                       type: boolean
- *                       default: true
- *                       description: Whether the hierarchy is active
+ *                   $ref: '#/components/schemas/Hierarchy'
  *     responses:
  *       201:
- *         description: Hierarchy created successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Hierarchy'
+ *         description: Hierarchy/Hierarchies created successfully
  *       400:
- *         description: Bad request - validation error or hierarchy already exists
- *       404:
- *         description: Project not found
+ *         description: Validation error or duplicate hierarchy name
  *       500:
  *         description: Internal server error
  */
-router.post("/", validateHierarchy, handleValidationErrors, hierarchyController.createHierarchy);
+router.post("/", validateCreateHierarchy, hierarchyController.createHierarchy);
 
 /**
  * @swagger
  * /api/hierarchies:
  *   get:
  *     summary: Get all hierarchies
- *     description: Retrieves all hierarchies with their associated projects and nodes
  *     tags: [Hierarchies]
  *     responses:
  *       200:
@@ -165,7 +106,6 @@ router.get("/", hierarchyController.getHierarchies);
  * /api/hierarchies/{id}:
  *   get:
  *     summary: Get hierarchy by ID
- *     description: Retrieves a specific hierarchy by its ID
  *     tags: [Hierarchies]
  *     parameters:
  *       - in: path
@@ -178,23 +118,18 @@ router.get("/", hierarchyController.getHierarchies);
  *     responses:
  *       200:
  *         description: Hierarchy details
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Hierarchy'
  *       404:
  *         description: Hierarchy not found
  *       500:
  *         description: Internal server error
  */
-router.get("/:id", validateHierarchyId, handleValidationErrors, hierarchyController.getHierarchyById);
+router.get("/:id", validateHierarchyId, hierarchyController.getHierarchyById);
 
 /**
  * @swagger
  * /api/hierarchies/{id}:
  *   put:
- *     summary: Update hierarchy
- *     description: Updates an existing hierarchy
+ *     summary: Update an existing hierarchy
  *     tags: [Hierarchies]
  *     parameters:
  *       - in: path
@@ -209,42 +144,29 @@ router.get("/:id", validateHierarchyId, handleValidationErrors, hierarchyControl
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *                 maxLength: 255
- *                 description: Name of the hierarchy
- *               project_id:
- *                 type: string
- *                 format: uuid
- *                 description: ID of the project this hierarchy belongs to
- *               description:
- *                 type: string
- *                 description: Description of the hierarchy
- *               is_active:
- *                 type: boolean
- *                 description: Whether the hierarchy is active
+ *             $ref: '#/components/schemas/Hierarchy'
  *     responses:
  *       200:
  *         description: Hierarchy updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Hierarchy'
+ *       400:
+ *         description: Validation error
  *       404:
  *         description: Hierarchy not found
  *       500:
  *         description: Internal server error
  */
-router.put("/:id", validateHierarchy, handleValidationErrors, hierarchyController.updateHierarchy);
+router.put(
+  "/:id",
+  validateHierarchyId,
+  validateUpdateHierarchy,
+  hierarchyController.updateHierarchy
+);
 
 /**
  * @swagger
  * /api/hierarchies/{id}:
  *   delete:
- *     summary: Delete hierarchy
- *     description: Deletes a hierarchy (soft delete)
+ *     summary: Delete a hierarchy by ID
  *     tags: [Hierarchies]
  *     parameters:
  *       - in: path
@@ -262,6 +184,6 @@ router.put("/:id", validateHierarchy, handleValidationErrors, hierarchyControlle
  *       500:
  *         description: Internal server error
  */
-router.delete("/:id", validateHierarchyId, handleValidationErrors, hierarchyController.deleteHierarchy);
+router.delete("/:id", validateHierarchyId, hierarchyController.deleteHierarchy);
 
 module.exports = router;
