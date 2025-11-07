@@ -30,6 +30,8 @@ const issueAssignmentRoutes = require("./routers/issueAssignmentRoutes");
 const issueEscalationRoutes = require("./routers/issueEscaltionRoute");
 
 
+const changePasswordRoutes=require('./routers/passwordChangeRoutes')
+
 const app = express();
 const appServer = http.createServer(app);
 
@@ -109,6 +111,8 @@ app.use("/api/issues", issueRoutes);
 app.use("/api/assignments", issueAssignmentRoutes);
 app.use("/api/issue-escalations", issueEscalationRoutes);
 
+
+app.use('/api/change-password',changePasswordRoutes);
 // ================== Root Endpoint ==================
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to Issue Tracking System API 🚀" });

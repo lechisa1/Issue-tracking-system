@@ -1,15 +1,16 @@
+// models/permission.js
 "use strict";
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
   class Permission extends Model {
     static associate(models) {
-      // Permission ↔ Role (many-to-many)
-      Permission.belongsToMany(models.Role, {
-        through: models.RolePermission, 
+      // Permission belongs to many RoleSubRole through RoleSubRolePermission
+      Permission.belongsToMany(models.RoleSubRole, {
+        through: models.RoleSubRolePermission,
         foreignKey: "permission_id",
-        otherKey: "role_id",
-        as: "roles",
+        otherKey: "roles_sub_roles_id",
+        as: "roleSubRoles",
       });
     }
   }
@@ -21,25 +22,30 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
-      name: {
+      resource: {
         type: DataTypes.STRING(100),
         allowNull: false,
         unique: true,
       },
-      description: {
-        type: DataTypes.TEXT,
-        allowNull: true,
+      action: {
+        type: DataTypes.STRING(100),
+        allowNull: false,
       },
-
- 
+      created_at: {
+        type: DataTypes.DATE,
+        defaultValue: DataTypes.NOW,
+      },
+      updated_at: {
+        type: DataTypes.DATE,
+        defaultValue: DataTypes.NOW,
+      },
     },
     {
       sequelize,
       modelName: "Permission",
       tableName: "permissions",
-      timestamps: true,
-      createdAt: "created_at",
-      updatedAt: "updated_at",
+      timestamps: false,
+      underscored: true,
     }
   );
 
