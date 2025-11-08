@@ -1,8 +1,11 @@
 const express = require("express");
 const router = express.Router();
 
-const { validateUpdateUser, validateCreateUser } = require("../validators/userValidator");
-const {authenticateToken}=require('../middlewares/authMiddleware')
+const {
+  validateUpdateUser,
+  validateCreateUser,
+} = require("../validators/userValidator");
+const { authenticateToken } = require("../middlewares/authMiddleware");
 
 const {
   createUser,
@@ -11,7 +14,7 @@ const {
   getUserById,
   deleteUser,
   toggleUserActiveStatus,
-  resetUserPassword
+  resetUserPassword,
 } = require("../controllers/userController");
 
 /**
@@ -24,6 +27,12 @@ const {
 /**
  * @swagger
  * components:
+ *   securitySchemes:
+ *     BearerAuth:
+ *       type: http
+ *       scheme: bearer
+ *       bearerFormat: JWT
+ *
  *   schemas:
  *     User:
  *       type: object
@@ -53,14 +62,28 @@ const {
  *         updated_at:
  *           type: string
  *           format: date-time
+ *     UserRole:
+ *       type: object
+ *       properties:
+ *         role_id:
+ *           type: string
+ *           format: uuid
+ *         assigned_by:
+ *           type: string
+ *           format: uuid
+ *         assigned_at:
+ *           type: string
+ *           format: date-time
  */
 
 /**
  * @swagger
  * /api/users:
  *   post:
- *     summary: Register a new user
+ *     summary: Register a new user (with optional role assignment)
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -71,25 +94,43 @@ const {
  *             properties:
  *               full_name:
  *                 type: string
+ *                 example: "Lechisa Bedasa"
  *               email:
  *                 type: string
+ *                 example: "lechisa@example.com"
  *               user_type_id:
  *                 type: string
+ *                 format: uuid
  *               institute_id:
  *                 type: string
+ *                 format: uuid
+ *               hierarchy_node_id :
+ *                 type: string
+ *                 format: uuid
  *               position:
  *                 type: string
+ *                 example: "Backend Developer"
  *               phone_number:
  *                 type: string
+ *                 example: "+251912345678"
+ *               role_ids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *                 example: ["c9f25dc9-dde1-4b4a-91b2-6f9306e39f32"]
+ *                 description: Optional list of role IDs to assign to the user
  *     responses:
  *       201:
  *         description: User registered successfully
  *       400:
- *         description: Invalid input
+ *         description: Invalid input or duplicate email
+ *       401:
+ *         description: Unauthorized (missing or invalid token)
  *       500:
  *         description: Server error
  */
-router.post("/",validateCreateUser,authenticateToken, createUser);
+router.post("/", validateCreateUser, authenticateToken, createUser);
 
 /**
  * @swagger
@@ -97,6 +138,8 @@ router.post("/",validateCreateUser,authenticateToken, createUser);
  *   get:
  *     summary: Retrieve all users (with filters and pagination)
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: query
  *         name: search
@@ -108,12 +151,10 @@ router.post("/",validateCreateUser,authenticateToken, createUser);
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Filter by user type
  *       - in: query
  *         name: is_active
  *         schema:
  *           type: boolean
- *         description: Filter by active status
  *       - in: query
  *         name: page
  *         schema:
@@ -127,10 +168,12 @@ router.post("/",validateCreateUser,authenticateToken, createUser);
  *     responses:
  *       200:
  *         description: List of users
+ *       401:
+ *         description: Unauthorized
  *       500:
  *         description: Server error
  */
-router.get("/",authenticateToken, getUsers);
+router.get("/", authenticateToken, getUsers);
 
 /**
  * @swagger
@@ -138,6 +181,8 @@ router.get("/",authenticateToken, getUsers);
  *   get:
  *     summary: Retrieve user by ID
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -148,12 +193,10 @@ router.get("/",authenticateToken, getUsers);
  *     responses:
  *       200:
  *         description: User retrieved successfully
- *       400:
- *         description: Invalid user ID
  *       404:
  *         description: User not found
  */
-router.get("/:id",authenticateToken, getUserById);
+router.get("/:id", authenticateToken, getUserById);
 
 /**
  * @swagger
@@ -161,6 +204,8 @@ router.get("/:id",authenticateToken, getUserById);
  *   put:
  *     summary: Update user details
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -187,17 +232,28 @@ router.get("/:id",authenticateToken, getUserById);
  *                 type: string
  *               institute_id:
  *                 type: string
+ *               hierarchy_node_id :
+ *                 type: string
+ *
  *               is_active:
  *                 type: boolean
+ *               role_ids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *                 description: Optional list of role IDs to update
  *     responses:
  *       200:
  *         description: User updated successfully
  *       404:
  *         description: User not found
+ *       401:
+ *         description: Unauthorized
  *       500:
  *         description: Server error
  */
-router.put("/:id",authenticateToken,validateUpdateUser, updateUser);
+router.put("/:id", authenticateToken, validateUpdateUser, updateUser);
 
 /**
  * @swagger
@@ -205,6 +261,8 @@ router.put("/:id",authenticateToken,validateUpdateUser, updateUser);
  *   delete:
  *     summary: Soft delete (deactivate) a user
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -218,7 +276,7 @@ router.put("/:id",authenticateToken,validateUpdateUser, updateUser);
  *       404:
  *         description: User not found
  */
-router.delete("/:id",authenticateToken, deleteUser);
+router.delete("/:id", authenticateToken, deleteUser);
 
 /**
  * @swagger
@@ -226,6 +284,8 @@ router.delete("/:id",authenticateToken, deleteUser);
  *   patch:
  *     summary: Activate or deactivate a user
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -249,7 +309,7 @@ router.delete("/:id",authenticateToken, deleteUser);
  *       404:
  *         description: User not found
  */
-router.patch("/:id/toggle-status",authenticateToken, toggleUserActiveStatus);
+router.patch("/:id/toggle-status", authenticateToken, toggleUserActiveStatus);
 
 /**
  * @swagger
@@ -257,6 +317,8 @@ router.patch("/:id/toggle-status",authenticateToken, toggleUserActiveStatus);
  *   post:
  *     summary: Reset user password and send via email
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -269,9 +331,11 @@ router.patch("/:id/toggle-status",authenticateToken, toggleUserActiveStatus);
  *         description: Password reset successfully
  *       404:
  *         description: User not found
+ *       401:
+ *         description: Unauthorized
  *       500:
  *         description: Server error
  */
-router.post("/:id/reset-password", resetUserPassword);
+router.post("/:id/reset-password", authenticateToken, resetUserPassword);
 
 module.exports = router;
