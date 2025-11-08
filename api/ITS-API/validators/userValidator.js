@@ -1,5 +1,5 @@
 const Joi = require("joi");
-
+const ETHIOPIAN_PHONE_REGEX = /^(\+251|0)(9|7)\d{8}$/;
 // =================== Create User Schema ===================
 const createUserSchema = Joi.object({
   full_name: Joi.string().min(3).max(100).required().messages({
@@ -13,20 +13,18 @@ const createUserSchema = Joi.object({
   }),
 
   phone_number: Joi.string()
-    .pattern(/^[0-9+\-()\s]{7,20}$/)
+    .pattern(ETHIOPIAN_PHONE_REGEX)
     .required()
     .messages({
       "string.empty": "Phone number is required.",
-      "string.pattern.base": "Please provide a valid phone number.",
+      "string.pattern.base":
+        "Phone number must be a valid Ethiopian format (e.g., +2519XXXXXXXX or 09XXXXXXXX).",
     }),
 
-  user_type_id: Joi.string()
-    .guid({ version: "uuidv4" })
-    .required()
-    .messages({
-      "string.guid": "User type ID must be a valid UUID.",
-      "any.required": "User type ID is required.",
-    }),
+  user_type_id: Joi.string().guid({ version: "uuidv4" }).required().messages({
+    "string.guid": "User type ID must be a valid UUID.",
+    "any.required": "User type ID is required.",
+  }),
 
   institute_id: Joi.string()
     .guid({ version: "uuidv4" })
@@ -39,73 +37,23 @@ const createUserSchema = Joi.object({
   position: Joi.string().max(100).optional().messages({
     "string.max": "Position cannot exceed 100 characters.",
   }),
-
-  role_sub_roles: Joi.array()
-    .items(
-      Joi.object({
-        role_id: Joi.string().guid({ version: "uuidv4" }).required().messages({
-          "string.guid": "Role ID must be a valid UUID.",
-          "any.required": "Role ID is required.",
-        }),
-        sub_role_ids: Joi.array()
-          .items(Joi.string().guid({ version: "uuidv4" }))
-          .optional()
-          .messages({
-            "string.guid": "Each sub-role ID must be a valid UUID.",
-            "array.includes": "sub_role_ids must be an array of valid UUIDs.",
-          }),
-      })
-    )
-    .optional()
-    .messages({
-      "array.base": "role_sub_roles must be an array of role-sub-role objects.",
-    }),
-
-  projects: Joi.array()
-    .items(
-      Joi.object({
-        project_id: Joi.string().guid({ version: "uuidv4" }).required().messages({
-          "string.guid": "Project ID must be a valid UUID.",
-          "any.required": "Project ID is required.",
-        }),
-        main_role_id: Joi.string().guid({ version: "uuidv4" }).optional(),
-        sub_role_id: Joi.string().guid({ version: "uuidv4" }).optional(),
-      })
-    )
-    .optional()
-    .messages({
-      "array.base": "Projects must be an array of project objects.",
-    }),
 });
 
 // =================== Update User Schema ===================
 const updateUserSchema = Joi.object({
   full_name: Joi.string().min(3).max(100).optional(),
   email: Joi.string().email().optional(),
-  phone_number: Joi.string().pattern(/^[0-9+\-()\s]{7,20}$/).optional(),
+  phone_number: Joi.string()
+    .pattern(ETHIOPIAN_PHONE_REGEX)
+    .optional()
+    .messages({
+      "string.pattern.base":
+        "Phone number must be a valid Ethiopian format (e.g., +2519XXXXXXXX or 09XXXXXXXX).",
+    }),
   user_type_id: Joi.string().guid({ version: "uuidv4" }).optional(),
   institute_id: Joi.string().guid({ version: "uuidv4" }).allow(null).optional(),
   position: Joi.string().max(100).optional(),
   is_active: Joi.boolean().optional(),
-
-  role_sub_roles: Joi.array()
-    .items(
-      Joi.object({
-        role_id: Joi.string().guid({ version: "uuidv4" }).required(),
-        sub_role_ids: Joi.array().items(Joi.string().guid({ version: "uuidv4" })).optional(),
-      })
-    )
-    .optional(),
-
-  projects: Joi.array()
-    .items(
-      Joi.object({
-        project_id: Joi.string().guid({ version: "uuidv4" }).required(),
-        main_role_id: Joi.string().guid({ version: "uuidv4" }).optional(),
-        sub_role_id: Joi.string().guid({ version: "uuidv4" }).optional(),
-      })
-    )
-    .optional(),
 });
 
 // =================== Validators ===================
@@ -113,7 +61,7 @@ exports.validateCreateUser = (req, res, next) => {
   const { error } = createUserSchema.validate(req.body, { abortEarly: true });
   if (error) {
     return res.status(400).json({
-      status: "error",
+      success: false,
       message: error.details[0].message,
     });
   }
@@ -124,7 +72,7 @@ exports.validateUpdateUser = (req, res, next) => {
   const { error } = updateUserSchema.validate(req.body, { abortEarly: true });
   if (error) {
     return res.status(400).json({
-      status: "error",
+      success: false,
       message: error.details[0].message,
     });
   }
