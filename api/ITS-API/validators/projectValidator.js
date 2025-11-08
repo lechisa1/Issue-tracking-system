@@ -1,0 +1,52 @@
+const Joi = require("joi");
+
+// Schema for creating a project
+const createProjectSchema = Joi.object({
+  name: Joi.string().trim().max(255).required().messages({
+    "string.empty": "Project name is required",
+    "string.max": "Project name must be at most 255 characters",
+  }),
+  description: Joi.string().trim().optional().messages({
+    "string.base": "Description must be a string",
+  }),
+  is_active: Joi.boolean().optional(),
+  institute_id: Joi.string().guid({ version: "uuidv4" }).optional().messages({
+    "string.guid": "Institute ID must be a valid UUID",
+  }),
+});
+
+// Schema for updating a project
+const updateProjectSchema = Joi.object({
+  name: Joi.string().trim().max(255).optional(),
+  description: Joi.string().trim().optional(),
+  is_active: Joi.boolean().optional(),
+});
+
+// Schema for project ID param
+const projectIdSchema = Joi.object({
+  id: Joi.string().guid({ version: "uuidv4" }).required().messages({
+    "string.guid": "Project ID must be a valid UUID",
+    "string.empty": "Project ID is required",
+  }),
+});
+
+// Middleware to validate creation
+exports.validateCreateProject = (req, res, next) => {
+  const { error } = createProjectSchema.validate(req.body);
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  next();
+};
+
+// Middleware to validate update
+exports.validateUpdateProject = (req, res, next) => {
+  const { error } = updateProjectSchema.validate(req.body);
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  next();
+};
+
+// Middleware to validate project ID in params
+exports.validateProjectId = (req, res, next) => {
+  const { error } = projectIdSchema.validate(req.params);
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  next();
+};
