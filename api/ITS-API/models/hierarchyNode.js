@@ -9,6 +9,7 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "hierarchy_id",
         as: "hierarchy",
       });
+
       // Self-referencing for parent-child relationship
       this.belongsTo(models.HierarchyNode, {
         foreignKey: "parent_id",
@@ -32,7 +33,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.UUID,
         allowNull: false,
       },
-      
+      parent_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
       name: {
         type: DataTypes.STRING(255),
         allowNull: false,
@@ -41,11 +45,6 @@ module.exports = (sequelize, DataTypes) => {
       description: {
         type: DataTypes.TEXT,
         allowNull: true,
-      },
-      level: {
-        type: DataTypes.INTEGER,
-        defaultValue: 1,
-        allowNull: false,
       },
       is_active: {
         type: DataTypes.BOOLEAN,

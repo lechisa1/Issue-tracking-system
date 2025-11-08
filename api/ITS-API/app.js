@@ -31,28 +31,35 @@ const hierarchyRoute = require("./routers/hierarchyRoutes");
 const hierarchyNodeRoute = require("./routers/hierarchyNodeRoutes");
 const hierarchyNodeOrganizationRoute = require("./routers/hierarchyNodeOrganizationRoutes");
 
+const changePasswordRoutes = require("./routers/passwordChangeRoutes");
+
 const issueFileAttachmentRoutes = require("./routers/issueAttachmentRoutes");
 const app = express();
 const appServer = http.createServer(app);
 
 // ================== Middleware ==================
-app.use(
-  express.json({
-    verify: (req, res, buf) => {
-      try {
-        JSON.parse(buf);
-      } catch (e) {
-        res
-          .status(400)
-          .json({
-            message:
-              "Invalid JSON format. Please ensure all property names are double-quoted and JSON is valid.",
-          });
-        throw e;
-      }
-    },
-  })
-);
+const devAuthBypass = require("./middlewares/devAuthBypass");
+app.use(devAuthBypass);
+app.use(express.json());
+
+// app.use(
+//   express.json({
+//     verify: (req, res, buf) => {
+//       try {
+//         JSON.parse(buf);
+//       } catch (e) {
+//         res
+//           .status(400)
+//           .json({
+//             message:
+//               "Invalid JSON format. Please ensure all property names are double-quoted and JSON is valid.",
+//           });
+//         throw e;
+//       }
+//     },
+//   })
+// );
+
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
 

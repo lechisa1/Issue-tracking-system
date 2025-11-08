@@ -2,17 +2,17 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("sub_roles", {
-      sub_role_id: {
+    await queryInterface.createTable("projects", {
+      project_id: {
         type: Sequelize.UUID,
         defaultValue: Sequelize.UUIDV4,
         primaryKey: true,
         allowNull: false,
       },
       name: {
-        type: Sequelize.STRING(100),
-        unique: true,
+        type: Sequelize.STRING(255),
         allowNull: false,
+        unique: true,
       },
       description: {
         type: Sequelize.TEXT,
@@ -21,17 +21,16 @@ module.exports = {
       is_active: {
         type: Sequelize.BOOLEAN,
         defaultValue: true,
-        allowNull: false,
       },
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,
-        defaultValue: Sequelize.fn("NOW"),
+        defaultValue: Sequelize.literal("NOW()"),
       },
       updated_at: {
         type: Sequelize.DATE,
         allowNull: false,
-        defaultValue: Sequelize.fn("NOW"),
+        defaultValue: Sequelize.literal("NOW()"),
       },
       deleted_at: {
         type: Sequelize.DATE,
@@ -40,7 +39,7 @@ module.exports = {
     });
   },
 
-  async down(queryInterface) {
-    await queryInterface.dropTable("sub_roles");
+  async down(queryInterface, Sequelize) {
+    await queryInterface.dropTable("projects");
   },
 };

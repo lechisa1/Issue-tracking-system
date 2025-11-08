@@ -2,6 +2,12 @@ const jwt = require("jsonwebtoken");
 const db = require("../models");
 
 const authenticateToken = async (req, res, next) => {
+  // ✅ 1️⃣ Development bypass (fake user injection)
+  if (process.env.NODE_ENV !== "production" && req.user) {
+    console.log("⚠️ Dev auth bypass detected — skipping token verification");
+    return next();
+  }
+
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1]; // Bearer <token>
 

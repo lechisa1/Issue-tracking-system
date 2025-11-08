@@ -25,17 +25,9 @@ const {
  *           type: string
  *           format: uuid
  *           description: ID of the associated project
- *         parent_id:
- *           type: string
- *           format: uuid
- *           nullable: true
- *           description: Parent hierarchy ID (if any)
  *         description:
  *           type: string
- *           example: Defines city-level hierarchy with sub-city and woreda
- *         levels:
- *           type: object
- *           example: { "1": "city", "2": "sub_city", "3": "woreda" }
+ *           example: Defines city-level hierarchy
  *         is_active:
  *           type: boolean
  *           default: true
@@ -45,13 +37,16 @@ const {
  *         updated_at:
  *           type: string
  *           format: date-time
+ *         deleted_at:
+ *           type: string
+ *           format: date-time
  */
 
 /**
  * @swagger
  * tags:
  *   - name: Hierarchies
- *     description: API endpoints for managing hierarchy structures
+ *     description: API endpoints for managing hierarchies
  */
 
 /**
@@ -59,7 +54,7 @@ const {
  * /api/hierarchies:
  *   post:
  *     summary: Create a new hierarchy or multiple hierarchies
- *     description: Supports both single and bulk hierarchy creation
+ *     description: Supports single or bulk hierarchy creation
  *     tags: [Hierarchies]
  *     requestBody:
  *       required: true
@@ -118,6 +113,10 @@ router.get("/", hierarchyController.getHierarchies);
  *     responses:
  *       200:
  *         description: Hierarchy details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Hierarchy'
  *       404:
  *         description: Hierarchy not found
  *       500:

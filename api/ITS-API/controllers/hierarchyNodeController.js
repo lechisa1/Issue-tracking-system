@@ -2,13 +2,22 @@ const { HierarchyNode, Hierarchy } = require("../models");
 const { v4: uuidv4 } = require("uuid");
 
 // Recursive function to create hierarchy nodes from nested structure
-const createNodeRecursive = async (nodeData, parent_id = null, level = 1) => {
-  const { hierarchy_id, name, description, is_active, children } = nodeData;
+const createNodeRecursive = async (
+  nodeData,
+  hierarchy_id,
+  parent_id = null,
+  level = 1
+) => {
+  const { name, description, is_active, children } = nodeData;
 
-  // Check if node exists
-  const existingNode = await HierarchyNode.findOne({ where: { name } });
+  // Check if node exists with the same name in the same hierarchy
+  const existingNode = await HierarchyNode.findOne({
+    where: { name, hierarchy_id },
+  });
   if (existingNode) {
-    throw new Error(`Hierarchy node with name '${name}' already exists.`);
+    throw new Error(
+      `Hierarchy node with name '${name}' already exists in this hierarchy.`
+    );
   }
 
   const hierarchy_node_id = uuidv4();
@@ -31,6 +40,7 @@ const createNodeRecursive = async (nodeData, parent_id = null, level = 1) => {
     for (const child of children) {
       const childNodes = await createNodeRecursive(
         child,
+        hierarchy_id,
         hierarchy_node_id,
         level + 1
       );
@@ -41,42 +51,53 @@ const createNodeRecursive = async (nodeData, parent_id = null, level = 1) => {
   return createdNodes;
 };
 
-// Create a new hierarchy node or multiple hierarchy nodes
+// Create hierarchy node(s)
 const createHierarchyNode = async (req, res) => {
   try {
     const input = req.body;
 
-    // Check if input is an array (multiple root nodes) or single object
     if (Array.isArray(input)) {
-      // Handle multiple root nodes
       const allCreatedNodes = [];
 
       for (const rootNodeData of input) {
-        const { hierarchy_id, name, description, is_active, children } =
-          rootNodeData;
+        const { hierarchy_id } = rootNodeData;
+
+        const hierarchy = await Hierarchy.findByPk(hierarchy_id);
+        if (!hierarchy) {
+          return res.status(404).json({
+            message: `Hierarchy with id '${hierarchy_id}' not found.`,
+          });
+        }
 
         const createdNodes = await createNodeRecursive(
-          { name, description, is_active, children },
-          hierarchy_id
+          rootNodeData,
+          hierarchy_id,
+          rootNodeData.parent_id || null
         );
         allCreatedNodes.push(...createdNodes);
       }
 
-      res.status(201).json(allCreatedNodes);
+      return res.status(201).json(allCreatedNodes);
     } else {
-      // Handle single root node
-      const { hierarchy_id, name, description, is_active, children } = input;
+      const { hierarchy_id, parent_id } = input;
+
+      const hierarchy = await Hierarchy.findByPk(hierarchy_id);
+      if (!hierarchy) {
+        return res
+          .status(404)
+          .json({ message: `Hierarchy with id '${hierarchy_id}' not found.` });
+      }
 
       const createdNodes = await createNodeRecursive(
-        { name, description, is_active, children },
-        hierarchy_id
+        input,
+        hierarchy_id,
+        parent_id || null
       );
-
-      res.status(201).json(createdNodes);
+      return res.status(201).json(createdNodes);
     }
   } catch (error) {
     console.error(error);
-    res
+    return res
       .status(500)
       .json({ message: "Internal server error", error: error.message });
   }
@@ -112,6 +133,7 @@ const getHierarchyNodeById = async (req, res) => {
         { model: HierarchyNode, as: "children" },
       ],
     });
+
     if (!node)
       return res.status(404).json({ message: "Hierarchy node not found" });
     res.status(200).json(node);
@@ -133,14 +155,32 @@ const updateHierarchyNode = async (req, res) => {
     if (!node)
       return res.status(404).json({ message: "Hierarchy node not found" });
 
-    // Recalculate level if parent_id is being updated
+    // Check duplicate name in the same hierarchy
+    if (name && name !== node.name) {
+      const existingNode = await HierarchyNode.findOne({
+        where: { name, hierarchy_id: hierarchy_id || node.hierarchy_id },
+      });
+      if (existingNode) {
+        return res.status(400).json({
+          message: `Hierarchy node with name '${name}' already exists in this hierarchy.`,
+        });
+      }
+    }
+
+    // Recalculate level if parent_id is updated
     let level = node.level;
     if (parent_id !== undefined && parent_id !== node.parent_id) {
       if (parent_id) {
         const parentNode = await HierarchyNode.findByPk(parent_id);
-        if (!parentNode) {
+        if (!parentNode)
           return res.status(404).json({ message: "Parent node not found" });
+
+        if (parentNode.hierarchy_id !== (hierarchy_id || node.hierarchy_id)) {
+          return res
+            .status(400)
+            .json({ message: "Parent node must belong to the same hierarchy" });
         }
+
         level = parentNode.level + 1;
       } else {
         level = 1;

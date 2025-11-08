@@ -2,15 +2,14 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("institutes", {
-      institute_id: {
-        type: Sequelize.UUID,
-        defaultValue: Sequelize.UUIDV4,
-        primaryKey: true,
+    await queryInterface.createTable("issue_categories", {
+      category_id: {
+        type: Sequelize.CHAR(36),
         allowNull: false,
+        primaryKey: true,
       },
       name: {
-        type: Sequelize.STRING(255),
+        type: Sequelize.STRING(100),
         allowNull: false,
         unique: true,
       },
@@ -18,28 +17,20 @@ module.exports = {
         type: Sequelize.TEXT,
         allowNull: true,
       },
-      is_active: {
-        type: Sequelize.BOOLEAN,
-        defaultValue: true,
-      },
       created_at: {
-        allowNull: false,
         type: Sequelize.DATE,
+        allowNull: false,
         defaultValue: Sequelize.literal("NOW()"),
       },
       updated_at: {
+        type: Sequelize.DATE,
         allowNull: false,
-        type: Sequelize.DATE,
         defaultValue: Sequelize.literal("NOW()"),
-      },
-      deleted_at: {
-        type: Sequelize.DATE,
-        allowNull: true,
       },
     });
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable("institutes");
+    await queryInterface.dropTable("issue_categories");
   },
 };

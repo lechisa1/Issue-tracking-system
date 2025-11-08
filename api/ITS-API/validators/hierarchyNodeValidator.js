@@ -45,7 +45,9 @@ exports.validateCreateHierarchyNode = (req, res, next) => {
 
 // Validate update
 exports.validateUpdateHierarchyNode = (req, res, next) => {
-  const { error } = updateHierarchyNodeSchema.validate(req.body);
+  const { error } = updateHierarchyNodeSchema.validate(req.body, {
+    allowUnknown: false,
+  });
   if (error) return res.status(400).json({ error: error.details[0].message });
   next();
 };
@@ -59,7 +61,7 @@ exports.validateHierarchyNodeId = (req, res, next) => {
     }),
   });
 
-  const { error } = schema.validate(req.params);
+  const { error } = schema.validate(req.params, { allowUnknown: false });
   if (error) return res.status(400).json({ error: error.details[0].message });
   next();
 };

@@ -22,7 +22,7 @@ module.exports = (sequelize, DataTypes) => {
 
   Project.init(
     {
-      projects_id: {
+      project_id: {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,

@@ -12,16 +12,8 @@ const createHierarchySchema = Joi.object({
     "string.empty": "Project ID is required",
   }),
 
-  parent_id: Joi.string().guid({ version: "uuidv4" }).optional().messages({
-    "string.guid": "Parent ID must be a valid UUID",
-  }),
-
   description: Joi.string().trim().optional().messages({
     "string.base": "Description must be a string",
-  }),
-
-  levels: Joi.object().optional().messages({
-    "object.base": "Levels must be a valid JSON object",
   }),
 
   is_active: Joi.boolean().optional().messages({
@@ -33,9 +25,7 @@ const createHierarchySchema = Joi.object({
 const updateHierarchySchema = Joi.object({
   name: Joi.string().trim().max(255).optional(),
   project_id: Joi.string().guid({ version: "uuidv4" }).optional(),
-  parent_id: Joi.string().guid({ version: "uuidv4" }).optional(),
   description: Joi.string().trim().optional(),
-  levels: Joi.object().optional(),
   is_active: Joi.boolean().optional(),
 });
 

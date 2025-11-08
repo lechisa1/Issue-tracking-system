@@ -18,11 +18,11 @@ const createProject = async (req, res) => {
         .status(400)
         .json({ message: "Project with this name already exists." });
 
-    const projects_id = uuidv4();
+    const project_id = uuidv4();
 
     // Create project
     const project = await Project.create({
-      projects_id,
+      project_id,
       name,
       description,
       is_active,
@@ -37,7 +37,7 @@ const createProject = async (req, res) => {
 
       // Check if association already exists
       const existingAssociation = await InstituteProject.findOne({
-        where: { institute_id, project_id: projects_id },
+        where: { institute_id, project_id: project_id },
       });
       if (existingAssociation) {
         return res
@@ -49,7 +49,7 @@ const createProject = async (req, res) => {
       await InstituteProject.create({
         institute_project_id: uuidv4(),
         institute_id,
-        project_id: projects_id,
+        project_id: project_id,
         is_active: true,
       });
     }
@@ -73,10 +73,6 @@ const getProjects = async (req, res) => {
           as: "institutes",
           through: { attributes: ["is_active"] },
         },
-        {
-          model: Hierarchy,
-          as: "hierarchies",
-        },
       ],
     });
     res.status(200).json(projects);
@@ -98,10 +94,6 @@ const getProjectById = async (req, res) => {
           model: Institute,
           as: "institutes",
           through: { attributes: ["is_active"] },
-        },
-        {
-          model: Hierarchy,
-          as: "hierarchies",
         },
       ],
     });

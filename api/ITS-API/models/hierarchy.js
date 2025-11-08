@@ -9,45 +9,47 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "project_id",
         as: "project",
       });
-      // One-to-Many relationship with HierarchyNode
-      this.hasMany(models.HierarchyNode, {
-        foreignKey: "hierarchy_id",
-        as: "nodes",
-      });
     }
   }
 
   Hierarchy.init(
     {
       hierarchy_id: {
-        type: DataTypes.UUID,
+        type: DataTypes.CHAR(36),
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
       name: {
         type: DataTypes.STRING(255),
         allowNull: false,
+        unique: true,
       },
       project_id: {
-        type: DataTypes.UUID,
+        type: DataTypes.CHAR(36),
         allowNull: false,
-      },
-      parent_id: {
-        type: DataTypes.UUID,
-        allowNull: true,
+        references: {
+          model: "projects",
+          key: "project_id",
+        },
       },
       description: {
         type: DataTypes.TEXT,
         allowNull: true,
       },
-      levels: {
-        type: DataTypes.JSON,
-        allowNull: true,
-        defaultValue: null,
-      },
       is_active: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
+      },
+      created_at: {
+        type: DataTypes.DATE,
+        defaultValue: DataTypes.NOW,
+      },
+      updated_at: {
+        type: DataTypes.DATE,
+        defaultValue: DataTypes.NOW,
+      },
+      deleted_at: {
+        type: DataTypes.DATE,
       },
     },
     {

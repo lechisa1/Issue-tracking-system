@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const hierarchyNodeController = require("../controllers/hierarchyNodeController");
-
 const { authenticateToken } = require("../middlewares/authMiddleware");
 const {
   validateCreateHierarchyNode,
@@ -28,16 +27,13 @@ const {
  *           type: string
  *           format: uuid
  *           nullable: true
- *           description: UUID of the parent node (if any)
+ *           description: UUID of the parent node (optional)
  *         name:
  *           type: string
  *           example: Department A
  *         description:
  *           type: string
  *           example: This is the department node
- *         level:
- *           type: integer
- *           example: 2
  *         is_active:
  *           type: boolean
  *           default: true
@@ -45,6 +41,9 @@ const {
  *           type: string
  *           format: date-time
  *         updated_at:
+ *           type: string
+ *           format: date-time
+ *         deleted_at:
  *           type: string
  *           format: date-time
  */
@@ -60,7 +59,7 @@ const {
  * @swagger
  * /api/hierarchy-nodes:
  *   post:
- *     summary: Create one or more hierarchy nodes (supports nested children)
+ *     summary: Create one or more hierarchy nodes (nested children supported)
  *     tags: [Hierarchy Nodes]
  *     requestBody:
  *       required: true
@@ -107,7 +106,7 @@ router.get("/", authenticateToken, hierarchyNodeController.getHierarchyNodes);
  * @swagger
  * /api/hierarchy-nodes/{id}:
  *   get:
- *     summary: Get hierarchy node by ID
+ *     summary: Get a hierarchy node by ID
  *     tags: [Hierarchy Nodes]
  *     parameters:
  *       - in: path
@@ -116,11 +115,16 @@ router.get("/", authenticateToken, hierarchyNodeController.getHierarchyNodes);
  *         schema:
  *           type: string
  *           format: uuid
+ *         description: Hierarchy node ID
  *     responses:
  *       200:
  *         description: Hierarchy node details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/HierarchyNode'
  *       404:
- *         description: Hierarchy node not found
+ *         description: Node not found
  */
 router.get(
   "/:id",
