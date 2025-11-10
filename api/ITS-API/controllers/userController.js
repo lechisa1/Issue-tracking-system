@@ -80,8 +80,17 @@ const createUser = async (req, res) => {
         .json({ success: false, message: "Invalid user type." });
     }
 
-    // ====== Optional institute validation ======
-    if (institute_id) {
+    // ====== Enforce institute_id for external_user ======
+    if (userType.name === "external_user") {
+      if (!institute_id) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Institute ID is required for external users.",
+        });
+      }
+
+      // Validate institute existence
       const institute = await Institute.findByPk(institute_id, {
         transaction: t,
       });
@@ -90,6 +99,15 @@ const createUser = async (req, res) => {
         return res
           .status(400)
           .json({ success: false, message: "Invalid institute ID." });
+      }
+    } else {
+      // internal_user or others must not have institute_id
+      if (institute_id) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Institute ID should not be provided for internal users.",
+        });
       }
     }
 
@@ -119,7 +137,7 @@ const createUser = async (req, res) => {
         password: hashedPassword,
         phone_number,
         user_type_id,
-        institute_id: institute_id ?? null,
+        institute_id: userType.name === "external_user" ? institute_id : null,
         hierarchy_node_id: hierarchy_node_id ?? null,
         is_first_logged_in: true,
         is_active: true,
