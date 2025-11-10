@@ -219,8 +219,8 @@ router.delete(
  *         description: Hierarchy not found or no parent nodes
  */
 router.get(
-  "/parent-nodes",
-  validateParentNodesQuery,
+  "/parent-nodes/:hierarchy_id",
+  validateParentNodesQuery, // update validator to use req.params
   hierarchyNodeController.getParentNodes
 );
 

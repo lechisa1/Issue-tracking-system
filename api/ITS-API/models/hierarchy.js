@@ -9,14 +9,9 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "project_id",
         as: "project",
       });
-      // A hierarchy belongs to a project
-      Hierarchy.belongsTo(models.Project, {
-        foreignKey: "project_id",
-        as: "project",
-      });
 
       // A hierarchy has many nodes
-      Hierarchy.hasMany(models.HierarchyNode, {
+      this.hasMany(models.HierarchyNode, {
         foreignKey: "hierarchy_id",
         as: "nodes",
       });
