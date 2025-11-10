@@ -6,19 +6,19 @@ const {
   RoleSubRolePermission,
   Permission,
   ProjectUserRole,
+  RolePermission,
 } = require("../models");
 const { v4: uuidv4 } = require("uuid");
 const { Op } = require("sequelize");
 const { Sequelize } = require("sequelize");
 
-// Create Role
 const createRole = async (req, res) => {
   const t = await Role.sequelize.transaction();
   try {
-    const { name, description, sub_roles } = req.body;
-    // sub_roles: [{ sub_role_id, permission_ids: [] }]
+    const { name, description, sub_roles, permission_ids } = req.body;
+    // `permission_ids` is only used when there are no sub_roles
 
-    // Check if role exists
+    // ====== Check if role exists ======
     const existing = await Role.findOne({ where: { name }, transaction: t });
     if (existing) {
       await t.rollback();
@@ -28,7 +28,7 @@ const createRole = async (req, res) => {
       });
     }
 
-    // Create Role
+    // ====== Create Role ======
     const role = await Role.create(
       {
         role_id: uuidv4(),
@@ -41,15 +41,12 @@ const createRole = async (req, res) => {
       { transaction: t }
     );
 
-    // Process sub-roles and permissions
+    // ====== Case 1: If sub-roles exist ======
     if (Array.isArray(sub_roles) && sub_roles.length > 0) {
       for (const sr of sub_roles) {
-        // Validate sub-role exists and is active
+        // Validate sub-role
         const subRole = await SubRole.findOne({
-          where: {
-            sub_role_id: sr.sub_role_id,
-            is_active: true,
-          },
+          where: { sub_role_id: sr.sub_role_id, is_active: true },
           transaction: t,
         });
 
@@ -61,7 +58,7 @@ const createRole = async (req, res) => {
           });
         }
 
-        // Create RoleSubRole association
+        // Create RoleSubRole link
         const roleSubRole = await RoleSubRole.create(
           {
             roles_sub_roles_id: uuidv4(),
@@ -74,9 +71,9 @@ const createRole = async (req, res) => {
           { transaction: t }
         );
 
+        // Attach permissions to the RoleSubRole
         if (sr.permission_ids && sr.permission_ids.length > 0) {
           let permissionIds = sr.permission_ids;
-
           if (typeof permissionIds === "string") {
             try {
               permissionIds = JSON.parse(permissionIds);
@@ -85,16 +82,8 @@ const createRole = async (req, res) => {
             }
           }
 
-          permissionIds = Array.isArray(permissionIds)
-            ? permissionIds.map((id) => String(id).trim())
-            : [String(permissionIds).trim()];
-
-          console.log("Normalized Permission IDs:", permissionIds);
           const validPermissions = await Permission.findAll({
-            where: {
-              permission_id: permissionIds,
-              is_active: true, // only active permissions are allowed
-            },
+            where: { permission_id: permissionIds, is_active: true },
             transaction: t,
           });
 
@@ -102,7 +91,7 @@ const createRole = async (req, res) => {
             await t.rollback();
             return res.status(400).json({
               success: false,
-              message: "Some permissions are invalid",
+              message: "Some permissions are invalid for sub-role",
             });
           }
 
@@ -110,7 +99,7 @@ const createRole = async (req, res) => {
             role_sub_roles_permission_id: uuidv4(),
             roles_sub_roles_id: roleSubRole.roles_sub_roles_id,
             permission_id: pid,
-            assigned_by: "8993455e-312b-433f-b8d7-15491875d38a",
+            assigned_by: "system",
             assigned_at: new Date(),
             created_at: new Date(),
             updated_at: new Date(),
@@ -123,9 +112,46 @@ const createRole = async (req, res) => {
       }
     }
 
+    // ====== Case 2: If NO sub-roles, assign permissions directly to role ======
+    else if (permission_ids && permission_ids.length > 0) {
+      let permissionIds = permission_ids;
+      if (typeof permissionIds === "string") {
+        try {
+          permissionIds = JSON.parse(permissionIds);
+        } catch {
+          permissionIds = permissionIds.split(",").map((i) => i.trim());
+        }
+      }
+
+      const validPermissions = await Permission.findAll({
+        where: { permission_id: permissionIds, is_active: true },
+        transaction: t,
+      });
+
+      if (validPermissions.length !== permissionIds.length) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Some permissions are invalid for role",
+        });
+      }
+
+      const rolePermissions = permissionIds.map((pid) => ({
+        role_permission_id: uuidv4(),
+        role_id: role.role_id,
+        permission_id: pid,
+        assigned_by: "system",
+        assigned_at: new Date(),
+        created_at: new Date(),
+        updated_at: new Date(),
+      }));
+
+      await RolePermission.bulkCreate(rolePermissions, { transaction: t });
+    }
+
     await t.commit();
 
-    // Fetch created role with relationships
+    // ====== Fetch created role with relationships ======
     const createdRole = await Role.findOne({
       where: { role_id: role.role_id },
       include: [
@@ -140,21 +166,22 @@ const createRole = async (req, res) => {
             {
               model: RoleSubRolePermission,
               as: "permissions",
-              include: [
-                {
-                  model: Permission,
-                  as: "permission",
-                },
-              ],
+              include: [{ model: Permission, as: "permission" }],
             },
           ],
+        },
+        {
+          model: RolePermission,
+          as: "rolePermissions",
+          include: [{ model: Permission, as: "permission" }],
         },
       ],
     });
 
     return res.status(201).json({
       success: true,
-      message: "Role created successfully with sub-roles and permissions",
+      message:
+        "Role created successfully (with sub-roles or direct permissions)",
       data: createdRole,
     });
   } catch (error) {

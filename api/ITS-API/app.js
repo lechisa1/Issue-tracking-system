@@ -130,7 +130,7 @@ app.use("/api/change-password", changePasswordRoutes);
 
 app.use("/api/issue-file-attachment", issueFileAttachmentRoutes);
 
-app.use("/permissions", permissionRoute);
+app.use("/api/permissions", permissionRoute);
 // ================== Root Endpoint ==================
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to Issue Tracking System API 🚀" });
