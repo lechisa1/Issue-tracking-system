@@ -44,6 +44,16 @@ module.exports = {
           key: "institute_id",
         },
         onUpdate: "CASCADE",
+        onDelete: "SET NULL ",
+      },
+      hierarchy_node_id: {
+        type: Sequelize.UUID,
+        allowNull: true,
+        references: {
+          model: "hierarchy_nodes",
+          key: "hierarchy_node_id",
+        },
+        onUpdate: "CASCADE",
         onDelete: "SET NULL",
       },
       position: {

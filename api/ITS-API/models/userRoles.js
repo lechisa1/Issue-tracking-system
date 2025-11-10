@@ -15,7 +15,6 @@ module.exports = (sequelize, DataTypes) => {
       user_role_id: { type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4 },
       user_id: { type: DataTypes.UUID },
       role_id: { type: DataTypes.UUID },
-      user_type: DataTypes.STRING,
       assigned_by: DataTypes.UUID,
       assigned_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
       is_active: { type: DataTypes.BOOLEAN, defaultValue: true },

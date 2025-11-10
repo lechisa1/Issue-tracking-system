@@ -16,6 +16,12 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "role_id",
         as: "projectUserRoles",
       });
+      Role.belongsToMany(models.User, {
+        through: models.UserRoles,
+        foreignKey: "role_id",
+        otherKey: "user_id",
+        as: "users",
+      });
     }
   }
 
@@ -59,7 +65,7 @@ module.exports = (sequelize, DataTypes) => {
       timestamps: false,
       underscored: true,
       paranoid: true,
-      deletedAt: 'deleted_at',
+      deletedAt: "deleted_at",
     }
   );
 

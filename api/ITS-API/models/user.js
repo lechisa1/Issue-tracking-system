@@ -26,6 +26,16 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "reported_by",
         as: "reportedIssues",
       });
+      User.belongsToMany(models.Role, {
+        through: models.UserRoles,
+        foreignKey: "user_id",
+        otherKey: "role_id",
+        as: "roles",
+      });
+      User.belongsTo(models.HierarchyNode, {
+        foreignKey: "hierarchy_node_id",
+        as: "hierarchyNode",
+      });
     }
   }
 
@@ -66,6 +76,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(100),
         allowNull: true,
       },
+      hierarchy_node_id: { type: DataTypes.UUID, allowNull: true },
       profile_image: {
         type: DataTypes.STRING(255),
         allowNull: true,

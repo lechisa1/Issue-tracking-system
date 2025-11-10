@@ -8,6 +8,8 @@ const {
   RoleSubRole,
   RoleSubRolePermission,
   Permission,
+  UserRoles,
+  HierarchyNode,
   sequelize,
 } = require("../models");
 const { v4: uuidv4, validate: isUuid } = require("uuid");
@@ -18,7 +20,6 @@ const { sendEmail } = require("../utils/sendEmail");
 
 const { getPagination, getPagingData } = require("../utils/pagination");
 
-// controllers/userController.js
 const createUser = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -29,9 +30,11 @@ const createUser = async (req, res) => {
       institute_id,
       position,
       phone_number,
+      role_ids,
+      hierarchy_node_id,
     } = req.body;
 
-    // Check if email exists
+    // ====== Check for existing email ======
     const existingUser = await User.findOne({
       where: { email },
       transaction: t,
@@ -44,7 +47,7 @@ const createUser = async (req, res) => {
       });
     }
 
-    // Validate user type
+    // ====== Validate user type ======
     const userType = await UserType.findByPk(user_type_id, { transaction: t });
     if (!userType) {
       await t.rollback();
@@ -54,12 +57,12 @@ const createUser = async (req, res) => {
       });
     }
 
-    // Validate institute for institute users
+    // ====== Validate institute if external user ======
     if (userType.name === "external_user" && !institute_id) {
       await t.rollback();
       return res.status(400).json({
         success: false,
-        message: "Institute ID is required for institute users.",
+        message: "Institute ID is required for external users.",
       });
     }
 
@@ -75,11 +78,24 @@ const createUser = async (req, res) => {
         });
       }
     }
+    if (hierarchy_node_id) {
+      const hierarchyNode = await HierarchyNode.findByPk(hierarchy_node_id, {
+        transaction: t,
+      });
+      if (!hierarchyNode) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Invalid hierarchy node ID.",
+        });
+      }
+    }
 
-    // Generate password and create user
+    // ====== Generate and hash password ======
     const password = generateRandomPassword();
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // ====== Create user ======
     const user = await User.create(
       {
         user_id: uuidv4(),
@@ -91,6 +107,7 @@ const createUser = async (req, res) => {
         institute_id: userType.name === "external_user" ? institute_id : null,
         position,
         is_first_logged_in: true,
+        hierarchy_node_id: hierarchy_node_id ?? null,
         is_active: true,
         created_at: new Date(),
         updated_at: new Date(),
@@ -98,9 +115,39 @@ const createUser = async (req, res) => {
       { transaction: t }
     );
 
+    // ====== Assign Roles ======
+    if (Array.isArray(role_ids) && role_ids.length > 0) {
+      // Validate all roles exist
+      const roles = await Role.findAll({
+        where: { role_id: role_ids },
+        transaction: t,
+      });
+
+      if (roles.length !== role_ids.length) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Some provided role IDs are invalid.",
+        });
+      }
+
+      const userRoles = role_ids.map((rid) => ({
+        user_role_id: uuidv4(),
+        user_id: user.user_id,
+        role_id: rid,
+        assigned_by: req.user?.user_id || null,
+        assigned_at: new Date(),
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      }));
+
+      await UserRoles.bulkCreate(userRoles, { transaction: t });
+    }
+
     await t.commit();
 
-    // =============Send email ==========
+    // ====== Send welcome email ======
     await sendEmail(
       email,
       `Welcome to ${process.env.APP_NAME}!`,
@@ -113,6 +160,7 @@ const createUser = async (req, res) => {
     `
     );
 
+    // ====== Return user with details ======
     const newUser = await User.findByPk(user.user_id, {
       include: [
         {
@@ -125,16 +173,27 @@ const createUser = async (req, res) => {
           as: "institute",
           attributes: ["name", "contact_email"],
         },
+        {
+          model: Role,
+          as: "roles",
+          through: { attributes: [] }, // from user_roles table
+        },
+        {
+          model: HierarchyNode,
+          as: "hierarchyNode",
+          attributes: ["name", "description"],
+        },
       ],
     });
 
     return res.status(201).json({
       success: true,
-      message: "User registered successfully",
+      message: "User registered successfully with roles",
       data: newUser,
     });
   } catch (error) {
-    await t.rollback();
+    if (!t.finished) await t.rollback();
+    console.error("Error creating user with roles:", error);
     return res.status(500).json({
       success: false,
       message: "Error registering user",
@@ -155,6 +214,8 @@ const updateUser = async (req, res) => {
       institute_id,
       position,
       phone_number,
+      role_ids,
+      hierarchy_node_id,
       is_active,
     } = req.body;
 
@@ -220,6 +281,18 @@ const updateUser = async (req, res) => {
         });
       }
     }
+    // ====== Hierarchy node validation ======
+    if (hierarchy_node_id) {
+      const node = await HierarchyNode.findByPk(hierarchy_node_id, {
+        transaction: t,
+      });
+      if (!node) {
+        await t.rollback();
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid hierarchy node ID." });
+      }
+    }
 
     // ====== Update user ======
     await user.update(
@@ -231,11 +304,49 @@ const updateUser = async (req, res) => {
         user_type_id: user_type_id ?? user.user_type_id,
         institute_id: userType.name === "institute_user" ? institute_id : null,
         is_active: is_active ?? user.is_active,
+        hierarchy_node_id: hierarchy_node_id || null,
         updated_at: new Date(),
       },
       { transaction: t }
     );
+    // ====== Update roles if provided ======
+    if (Array.isArray(role_ids)) {
+      // Get existing roles
+      const existingRoles = await UserRoles.findAll({
+        where: { user_id: id },
+        transaction: t,
+      });
+      const existingRoleIds = existingRoles.map((r) => r.role_id);
 
+      // Determine new roles to add
+      const rolesToAdd = role_ids.filter((r) => !existingRoleIds.includes(r));
+      const rolesToRemove = existingRoleIds.filter(
+        (r) => !role_ids.includes(r)
+      );
+
+      // Add new roles
+      if (rolesToAdd.length > 0) {
+        const newRoles = rolesToAdd.map((rid) => ({
+          user_role_id: uuidv4(),
+          user_id: id,
+          role_id: rid,
+          assigned_by: req.user?.user_id || null,
+          assigned_at: new Date(),
+          is_active: true,
+          created_at: new Date(),
+          updated_at: new Date(),
+        }));
+        await UserRoles.bulkCreate(newRoles, { transaction: t });
+      }
+
+      // Remove roles
+      if (rolesToRemove.length > 0) {
+        await UserRoles.destroy({
+          where: { user_id: id, role_id: rolesToRemove },
+          transaction: t,
+        });
+      }
+    }
     await t.commit();
 
     // ====== Fetch updated user with relations ======
@@ -250,6 +361,17 @@ const updateUser = async (req, res) => {
           model: Institute,
           as: "institute",
           attributes: ["name", "contact_email"],
+        },
+        {
+          model: Role,
+          as: "roles",
+          attributes: ["role_id", "name", "description"],
+          through: { attributes: [] },
+        },
+        {
+          model: HierarchyNode,
+          as: "hierarchyNode",
+          attributes: ["name", "description"],
         },
       ],
     });
@@ -304,26 +426,26 @@ const getUsers = async (req, res) => {
           as: "userType",
           attributes: ["user_type_id", "name", "description"],
         },
-        // {
-        //   model: Role,
-        //   as: "roles",
-        //   attributes: ["role_id", "name", "description", "level"],
-        //   through: {
-        //     attributes: ["assigned_at", "assigned_by", "is_active"],
-        //     where: { is_active: true },
-        //     required: false,
-        //   },
-        // },
+        {
+          model: Role,
+          as: "roles",
+          through: { attributes: [] },
+        },
         {
           model: Institute,
           as: "institute",
-          attributes: ["institute_id", "name"],
+          attributes: ["institute_id", "name", "address"],
+        },
+        {
+          model: HierarchyNode,
+          as: "hierarchyNode",
+          attributes: ["name", "description"],
         },
       ],
       order: [["created_at", "DESC"]],
       limit: pageLimit,
       offset,
-      distinct: true, // required when including associations
+      distinct: true,
     });
 
     const response = getPagingData(data, page, pageLimit);
@@ -364,20 +486,20 @@ const getUserById = async (req, res) => {
           as: "userType",
           attributes: ["user_type_id", "name", "description"],
         },
-        // {
-        //   model: Role,
-        //   as: "roles",
-        //   attributes: ["role_id", "name", "description", "level"],
-        //   through: {
-        //     attributes: ["assigned_at", "assigned_by", "is_active"],
-        //     where: { is_active: true },
-        //     required: false,
-        //   },
-        // },
+        {
+          model: Role,
+          as: "roles",
+          through: { attributes: [] },
+        },
         {
           model: Institute,
           as: "institute",
-          attributes: ["institute_id", "name"],
+          attributes: ["institute_id", "name", "address", "contact_email"],
+        },
+        {
+          model: HierarchyNode,
+          as: "hierarchyNode",
+          attributes: ["name", "description"],
         },
       ],
     });
@@ -672,4 +794,5 @@ module.exports = {
   deleteUser,
   toggleUserActiveStatus,
   resetUserPassword,
+  getProfile,
 };
