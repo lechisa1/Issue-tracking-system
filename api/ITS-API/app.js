@@ -34,6 +34,8 @@ const hierarchyNodeOrganizationRoute = require("./routers/hierarchyNodeOrganizat
 const changePasswordRoutes = require("./routers/passwordChangeRoutes");
 
 const issueFileAttachmentRoutes = require("./routers/issueAttachmentRoutes");
+
+const permissionRoute=require('./routers/permissionRoutes')
 const app = express();
 const appServer = http.createServer(app);
 
@@ -127,6 +129,8 @@ app.use("/api/issue-escalations", issueEscalationRoutes);
 app.use("/api/change-password", changePasswordRoutes);
 
 app.use("/api/issue-file-attachment", issueFileAttachmentRoutes);
+
+app.use("/permissions", permissionRoute);
 // ================== Root Endpoint ==================
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to Issue Tracking System API 🚀" });

@@ -90,13 +90,11 @@ const createRole = async (req, res) => {
             : [String(permissionIds).trim()];
 
           console.log("Normalized Permission IDs:", permissionIds);
-
           const validPermissions = await Permission.findAll({
-            where: Sequelize.literal(`
-      "permission_id" IN (${permissionIds
-        .map((id) => `'${id}'::uuid`)
-        .join(",")})
-    `),
+            where: {
+              permission_id: permissionIds,
+              is_active: true, // only active permissions are allowed
+            },
             transaction: t,
           });
 

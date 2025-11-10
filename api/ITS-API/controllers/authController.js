@@ -122,7 +122,6 @@ const login = async (req, res) => {
               name: user.institute.name,
             }
           : null,
-        roles,
       },
     });
   } catch (error) {

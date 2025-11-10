@@ -9,6 +9,7 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "project_id",
         as: "project",
       });
+      
 
       // A hierarchy has many nodes
       this.hasMany(models.HierarchyNode, {
