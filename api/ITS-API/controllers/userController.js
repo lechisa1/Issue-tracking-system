@@ -20,6 +20,33 @@ const { sendEmail } = require("../utils/sendEmail");
 
 const { getPagination, getPagingData } = require("../utils/pagination");
 
+const getUserTypes = async (req, res) => {
+  try {
+    const userTypes = await UserType.findAll({
+      attributes: [
+        "user_type_id",
+        "name",
+        "description",
+        "created_at",
+        "updated_at",
+      ],
+      order: [["name", "ASC"]],
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "User types fetched successfully",
+      data: userTypes,
+    });
+  } catch (error) {
+    console.error("Error fetching user types:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch user types",
+      error: error.message,
+    });
+  }
+};
 const createUser = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -275,12 +302,12 @@ const getUsers = async (req, res) => {
         },
         {
           model: UserType,
-          as: "user_type",
+          as: "userType",
           attributes: ["user_type_id", "name"],
         },
         {
           model: HierarchyNode,
-          as: "hierarchy_node",
+          as: "hierarchyNode",
           attributes: ["hierarchy_node_id", "name"],
         },
       ],
@@ -316,12 +343,12 @@ const getUserById = async (req, res) => {
         },
         {
           model: UserType,
-          as: "user_type",
+          as: "userType",
           attributes: ["user_type_id", "name"],
         },
         {
           model: HierarchyNode,
-          as: "hierarchy_node",
+          as: "hierarchyNode",
           attributes: ["hierarchy_node_id", "name"],
         },
       ],
@@ -618,4 +645,5 @@ module.exports = {
   toggleUserActiveStatus,
   resetUserPassword,
   getProfile,
+  getUserTypes,
 };

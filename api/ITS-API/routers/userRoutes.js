@@ -15,6 +15,7 @@ const {
   deleteUser,
   toggleUserActiveStatus,
   resetUserPassword,
+  getUserTypes,
 } = require("../controllers/userController");
 
 /**
@@ -161,8 +162,8 @@ router.post("/", validateCreateUser, authenticateToken, createUser);
  *       500:
  *         description: Server error
  */
-router.get("/", authenticateToken, getUsers);
-
+router.get("/", getUsers);
+router.use("/user-types", getUserTypes);
 /**
  * @swagger
  * /api/users/{id}:
