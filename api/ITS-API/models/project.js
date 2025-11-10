@@ -5,21 +5,17 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class Project extends Model {
     static associate(models) {
-      Project.belongsTo(models.Institute, {
-        foreignKey: "institute_id",
-        as: "institute",
-      });
-
-      Project.belongsTo(models.User, {
-        foreignKey: "created_by",
-        as: "creator",
-      });
-
-
-      // Project issues
-      Project.hasMany(models.Issue, {
+      // Many-to-Many relationship with Institute through InstituteProject
+      this.belongsToMany(models.Institute, {
+        through: models.InstituteProject,
         foreignKey: "project_id",
-        as: "issues",
+        otherKey: "institute_id",
+        as: "institutes",
+      });
+      // One-to-Many relationship with Hierarchy
+      this.hasMany(models.Hierarchy, {
+        foreignKey: "project_id",
+        as: "hierarchies",
       });
     }
   }
@@ -30,13 +26,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
+        primaryKey: true,
       },
       name: {
         type: DataTypes.STRING(255),
-        allowNull: false,
-      },
-      code: {
-        type: DataTypes.STRING(100),
         allowNull: false,
         unique: true,
       },
@@ -44,33 +37,20 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: true,
       },
-      status: {
-        type: DataTypes.STRING(50),
-        defaultValue: "active",
-      },
-      institute_id: {
-        type: DataTypes.UUID,
-        allowNull: true,
-      },
-      created_by: {
-        type: DataTypes.UUID,
-        allowNull: false,
-      },
-      created_at: {
-        type: DataTypes.DATE,
-        defaultValue: DataTypes.NOW,
-      },
-      updated_at: {
-        type: DataTypes.DATE,
-        defaultValue: DataTypes.NOW,
+      is_active: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
       },
     },
     {
       sequelize,
       modelName: "Project",
       tableName: "projects",
-      timestamps: false,
-      underscored: true,
+      timestamps: true,
+      createdAt: "created_at",
+      updatedAt: "updated_at",
+      deletedAt: "deleted_at",
+      paranoid: true, // enables soft delete
     }
   );
 

@@ -4,27 +4,20 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class HierarchyNode extends Model {
     static associate(models) {
-      // Node belongs to hierarchy
-      HierarchyNode.belongsTo(models.Hierarchy, {
+      // Belongs to Hierarchy
+      this.belongsTo(models.Hierarchy, {
         foreignKey: "hierarchy_id",
         as: "hierarchy",
       });
 
-      // Self-referencing parent-child
-      HierarchyNode.belongsTo(models.HierarchyNode, {
+      // Self-referencing for parent-child relationship
+      this.belongsTo(models.HierarchyNode, {
         foreignKey: "parent_id",
         as: "parent",
       });
-
-      HierarchyNode.hasMany(models.HierarchyNode, {
+      this.hasMany(models.HierarchyNode, {
         foreignKey: "parent_id",
         as: "children",
-      });
-
-      // Users can belong to hierarchy node
-      HierarchyNode.hasMany(models.User, {
-        foreignKey: "hierarchy_node_id",
-        as: "users",
       });
     }
   }
@@ -36,23 +29,37 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
-      hierarchy_id: { type: DataTypes.UUID, allowNull: false },
-      parent_id: { type: DataTypes.UUID, allowNull: true },
-      name: { type: DataTypes.STRING(255), allowNull: false, unique: true },
-      description: { type: DataTypes.TEXT, allowNull: true },
-      is_active: { type: DataTypes.BOOLEAN, defaultValue: true },
-      created_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
-      updated_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
-      deleted_at: { type: DataTypes.DATE, allowNull: true },
+      hierarchy_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+      },
+      parent_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
+      name: {
+        type: DataTypes.STRING(255),
+        allowNull: false,
+        unique: true,
+      },
+      description: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+      is_active: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
+      },
     },
     {
       sequelize,
       modelName: "HierarchyNode",
       tableName: "hierarchy_node",
-      timestamps: false,
-      underscored: true,
-      paranoid: true,
+      timestamps: true,
+      createdAt: "created_at",
+      updatedAt: "updated_at",
       deletedAt: "deleted_at",
+      paranoid: true,
     }
   );
 

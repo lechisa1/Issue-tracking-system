@@ -10,9 +10,8 @@ module.exports = {
       {
         institute_id: uuidv4(),
         name: "Bole Airport International",
-        address: "Addis Ababa, Ethiopia",
-        contact_email: "info@eai.gov.et",
-        contact_phone: "+251-11-123-4567",
+        description:
+          "A major international airport located in Addis Ababa, Ethiopia.",
         is_active: true,
         created_at: now,
         updated_at: now,
@@ -20,9 +19,8 @@ module.exports = {
       {
         institute_id: uuidv4(),
         name: "Information Network Security Agency (INSA)",
-        address: "Addis Ababa, Ethiopia",
-        contact_email: "contact@insa.gov.et",
-        contact_phone: "+251-11-765-4321",
+        description:
+          "A national cybersecurity agency responsible for information network protection and innovation.",
         is_active: true,
         created_at: now,
         updated_at: now,
@@ -30,9 +28,8 @@ module.exports = {
       {
         institute_id: uuidv4(),
         name: "Ministry of Innovation and Technology (MInT)",
-        address: "Addis Ababa, Ethiopia",
-        contact_email: "info@mint.gov.et",
-        contact_phone: "+251-11-555-0101",
+        description:
+          "The federal institution responsible for innovation and technology development in Ethiopia.",
         is_active: true,
         created_at: now,
         updated_at: now,

@@ -62,12 +62,6 @@ const {
  *         updated_at:
  *           type: string
  *           format: date-time
- *     UserRole:
- *       type: object
- *       properties:
- *         role_id:
- *           type: string
- *           format: uuid
  *         assigned_by:
  *           type: string
  *           format: uuid
@@ -113,13 +107,7 @@ const {
  *               phone_number:
  *                 type: string
  *                 example: "+251912345678"
- *               role_ids:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: uuid
- *                 example: ["c9f25dc9-dde1-4b4a-91b2-6f9306e39f32"]
- *                 description: Optional list of role IDs to assign to the user
+
  *     responses:
  *       201:
  *         description: User registered successfully
@@ -237,12 +225,7 @@ router.get("/:id", authenticateToken, getUserById);
  *
  *               is_active:
  *                 type: boolean
- *               role_ids:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: uuid
- *                 description: Optional list of role IDs to update
+
  *     responses:
  *       200:
  *         description: User updated successfully

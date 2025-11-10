@@ -11,7 +11,6 @@ const {
 } = require("../models");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { v4: uuidv4 } = require("uuid");
 
 const login = async (req, res) => {
   try {
@@ -112,6 +111,7 @@ const login = async (req, res) => {
       user: {
         user_id: user.user_id,
         full_name: user.full_name,
+        UserType: user.UserType,
         email: user.email,
         phone_number: user.phone_number,
         position: user.position,

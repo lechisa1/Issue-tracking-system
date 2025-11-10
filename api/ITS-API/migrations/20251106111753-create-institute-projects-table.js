@@ -2,56 +2,55 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("issue_comments", {
-      comment_id: {
+    await queryInterface.createTable("institute_projects", {
+      institute_project_id: {
         type: Sequelize.UUID,
         defaultValue: Sequelize.UUIDV4,
         primaryKey: true,
         allowNull: false,
       },
-      issue_id: {
+      institute_id: {
         type: Sequelize.UUID,
         allowNull: false,
         references: {
-          model: "issues",
-          key: "issue_id",
+          model: "institutes",
+          key: "institute_id",
         },
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
       },
-      author_id: {
+      project_id: {
         type: Sequelize.UUID,
         allowNull: false,
         references: {
-          model: "users",
-          key: "user_id",
+          model: "projects",
+          key: "project_id",
         },
         onUpdate: "CASCADE",
-        onDelete: "SET NULL",
+        onDelete: "CASCADE",
       },
-      comment_text: {
-        type: Sequelize.TEXT,
-        allowNull: false,
-      },
-      is_internal_note: {
+      is_active: {
         type: Sequelize.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
+        defaultValue: true,
       },
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,
-        defaultValue: Sequelize.fn("NOW"),
+        defaultValue: Sequelize.literal("NOW()"),
       },
       updated_at: {
         type: Sequelize.DATE,
         allowNull: false,
-        defaultValue: Sequelize.fn("NOW"),
+        defaultValue: Sequelize.literal("NOW()"),
+      },
+      deleted_at: {
+        type: Sequelize.DATE,
+        allowNull: true,
       },
     });
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable("issue_comments");
+    await queryInterface.dropTable("institute_projects");
   },
 };

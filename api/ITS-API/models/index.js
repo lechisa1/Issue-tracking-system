@@ -41,6 +41,13 @@ fs.readdirSync(__dirname)
     db[model.name] = model;
   });
 
+// Add new models
+db.Institute = require("./institute")(sequelize, Sequelize.DataTypes);
+db.Project = require("./project")(sequelize, Sequelize.DataTypes);
+db.InstituteProject = require("./instituteProject")(sequelize, Sequelize.DataTypes);
+db.Hierarchy = require("./hierarchy")(sequelize, Sequelize.DataTypes);
+db.HierarchyNode = require("./hierarchyNode")(sequelize, Sequelize.DataTypes);
+
 Object.keys(db).forEach((modelName) => {
   if (db[modelName].associate) {
     db[modelName].associate(db);

@@ -25,6 +25,12 @@ const issueRoutes = require("./routers/issueRoutes");
 const issueAssignmentRoutes = require("./routers/issueAssignmentRoutes");
 const issueEscalationRoutes = require("./routers/issueEscaltionRoute");
 
+const instituteRoute = require("./routers/instituteRoutes");
+const instituteProjectsRoute = require("./routers/instituteProjectRoutes");
+const hierarchyRoute = require("./routers/hierarchyRoutes");
+const hierarchyNodeRoute = require("./routers/hierarchyNodeRoutes");
+const hierarchyNodeOrganizationRoute = require("./routers/hierarchyNodeOrganizationRoutes");
+
 const changePasswordRoutes = require("./routers/passwordChangeRoutes");
 
 const issueFileAttachmentRoutes = require("./routers/issueAttachmentRoutes");
@@ -32,7 +38,26 @@ const app = express();
 const appServer = http.createServer(app);
 
 // ================== Middleware ==================
-app.use(express.json());
+// const devAuthBypass = require("./middlewares/devAuthBypass");
+// app.use(devAuthBypass);
+// app.use(express.json());
+
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      try {
+        JSON.parse(buf);
+      } catch (e) {
+        res.status(400).json({
+          message:
+            "Invalid JSON format. Please ensure all property names are double-quoted and JSON is valid.",
+        });
+        throw e;
+      }
+    },
+  })
+);
+
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -58,13 +83,7 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
 ];
 const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
+  origin: true, // Allow all origins for development
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   credentials: true,
   optionsSuccessStatus: 204,
@@ -90,6 +109,14 @@ app.use("/api/role-permission", rolePermissionRoute);
 app.use("/api/user-roles", userRoleRoute);
 
 app.use("/api/auth", authRoute);
+
+app.use("/api/projects", require("./routers/projectRoutes"));
+app.use("/api/institutes", instituteRoute);
+app.use("/api/institute-projects", instituteProjectsRoute);
+
+app.use("/api/hierarchies", hierarchyRoute);
+app.use("/api/hierarchy-nodes", hierarchyNodeRoute);
+app.use("/api/hierarchy-node-organizations", hierarchyNodeOrganizationRoute);
 
 app.use("/api/issue-categories", issueCategories);
 app.use("/api/issue-priorities", issuePriorities);

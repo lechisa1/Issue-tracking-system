@@ -2,15 +2,14 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("issue_categories", {
-      category_id: {
-        type: Sequelize.UUID,
-        defaultValue: Sequelize.UUIDV4,
-        primaryKey: true,
+    await queryInterface.createTable("issue_priorities", {
+      priority_id: {
+        type: Sequelize.CHAR(36),
         allowNull: false,
+        primaryKey: true,
       },
       name: {
-        type: Sequelize.STRING(100),
+        type: Sequelize.STRING(50),
         allowNull: false,
         unique: true,
       },
@@ -21,17 +20,17 @@ module.exports = {
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,
-        defaultValue: Sequelize.fn("NOW"),
+        defaultValue: Sequelize.literal("NOW()"),
       },
       updated_at: {
         type: Sequelize.DATE,
         allowNull: false,
-        defaultValue: Sequelize.fn("NOW"),
+        defaultValue: Sequelize.literal("NOW()"),
       },
     });
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable("issue_categories");
+    await queryInterface.dropTable("issue_priorities");
   },
 };

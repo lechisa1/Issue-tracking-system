@@ -2,15 +2,15 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("project", {
+    await queryInterface.createTable("projects", {
       project_id: {
         type: Sequelize.UUID,
-        defaultValue: Sequelize.literal("uuid_generate_v4()"),
+        defaultValue: Sequelize.UUIDV4,
         primaryKey: true,
         allowNull: false,
       },
       name: {
-        type: Sequelize.STRING(100),
+        type: Sequelize.STRING(255),
         allowNull: false,
         unique: true,
       },
@@ -18,41 +18,28 @@ module.exports = {
         type: Sequelize.TEXT,
         allowNull: true,
       },
-      organization_id: {
-        type: Sequelize.UUID,
-        allowNull: false,
-        references: {
-          model: "organizations",
-          key: "organization_id",
-        },
+      is_active: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: true,
       },
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,
-        defaultValue: Sequelize.fn("NOW"),
+        defaultValue: Sequelize.literal("NOW()"),
       },
       updated_at: {
         type: Sequelize.DATE,
         allowNull: false,
-        defaultValue: Sequelize.fn("NOW"),
+        defaultValue: Sequelize.literal("NOW()"),
       },
-
       deleted_at: {
         type: Sequelize.DATE,
         allowNull: true,
-      },
-      deleted_by: {
-        type: Sequelize.UUID,
-        allowNull: true,
-        allowNull: true,  references: {
-          model: "users",
-          key: "user_id",
-        },
       },
     });
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable("project");
+    await queryInterface.dropTable("projects");
   },
 };
