@@ -65,3 +65,17 @@ exports.validateHierarchyNodeId = (req, res, next) => {
   if (error) return res.status(400).json({ error: error.details[0].message });
   next();
 };
+
+// Validate query parameter for getting parent nodes by hierarchy_id
+exports.validateParentNodesQuery = (req, res, next) => {
+  const schema = Joi.object({
+    hierarchy_id: Joi.string().guid({ version: "uuidv4" }).required().messages({
+      "string.guid": "Hierarchy ID must be a valid UUID",
+      "any.required": "Hierarchy ID is required",
+    }),
+  });
+
+  const { error } = schema.validate(req.query, { allowUnknown: false });
+  if (error) return res.status(400).json({ error: error.details[0].message });
+  next();
+};

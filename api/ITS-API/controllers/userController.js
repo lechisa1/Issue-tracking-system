@@ -1,4 +1,3 @@
-
 const {
   User,
   UserType,
@@ -29,16 +28,19 @@ const createUser = async (req, res) => {
       user_type_id,
       institute_id,
       position,
-      phone_number
+      phone_number,
     } = req.body;
 
     // Check if email exists
-    const existingUser = await User.findOne({ where: { email }, transaction: t });
+    const existingUser = await User.findOne({
+      where: { email },
+      transaction: t,
+    });
     if (existingUser) {
       await t.rollback();
       return res.status(400).json({
         success: false,
-        message: "User with this email already exists."
+        message: "User with this email already exists.",
       });
     }
 
@@ -48,26 +50,28 @@ const createUser = async (req, res) => {
       await t.rollback();
       return res.status(400).json({
         success: false,
-        message: "Invalid user type."
+        message: "Invalid user type.",
       });
     }
 
     // Validate institute for institute users
-    if (userType.name === 'external_user' && !institute_id) {
+    if (userType.name === "external_user" && !institute_id) {
       await t.rollback();
       return res.status(400).json({
         success: false,
-        message: "Institute ID is required for institute users."
+        message: "Institute ID is required for institute users.",
       });
     }
 
     if (institute_id) {
-      const institute = await Institute.findByPk(institute_id, { transaction: t });
+      const institute = await Institute.findByPk(institute_id, {
+        transaction: t,
+      });
       if (!institute) {
         await t.rollback();
         return res.status(400).json({
           success: false,
-          message: "Invalid institute ID."
+          message: "Invalid institute ID.",
         });
       }
     }
@@ -76,59 +80,65 @@ const createUser = async (req, res) => {
     const password = generateRandomPassword();
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await User.create({
-      user_id: uuidv4(),
-      full_name,
-      email,
-      password: hashedPassword,
-      phone_number,
-      user_type_id,
-      institute_id: userType.name === 'external_user' ? institute_id : null,
-      position,
-      is_first_logged_in: true,
-      is_active: true,
-      created_at: new Date(),
-      updated_at: new Date(),
-    }, { transaction: t });
+    const user = await User.create(
+      {
+        user_id: uuidv4(),
+        full_name,
+        email,
+        password: hashedPassword,
+        phone_number,
+        user_type_id,
+        institute_id: userType.name === "external_user" ? institute_id : null,
+        position,
+        is_first_logged_in: true,
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      { transaction: t }
+    );
 
     await t.commit();
 
     // =============Send email ==========
-    await sendEmail(email, `Welcome to ${process.env.APP_NAME}!`, `
+    await sendEmail(
+      email,
+      `Welcome to ${process.env.APP_NAME}!`,
+      `
       Dear ${full_name},
       Your account has been successfully created.
       Email: ${email}
       Temporary Password: ${password}
       Please change your password after first login.
-    `);
+    `
+    );
 
     const newUser = await User.findByPk(user.user_id, {
       include: [
         {
           model: UserType,
-          as: 'userType',
-          attributes: ['name', 'description']
+          as: "userType",
+          attributes: ["name", "description"],
         },
         {
           model: Institute,
-          as: 'institute',
-          attributes: ['name', 'contact_email']
-        }
-      ]
+          as: "institute",
+          attributes: ["name", "contact_email"],
+        },
+      ],
     });
 
     return res.status(201).json({
       success: true,
       message: "User registered successfully",
-      data: newUser
+      data: newUser,
     });
-
   } catch (error) {
     await t.rollback();
     return res.status(500).json({
       success: false,
       message: "Error registering user",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -145,7 +155,7 @@ const updateUser = async (req, res) => {
       institute_id,
       position,
       phone_number,
-      is_active
+      is_active,
     } = req.body;
 
     // ====== Find user ======
@@ -154,7 +164,7 @@ const updateUser = async (req, res) => {
       await t.rollback();
       return res.status(404).json({
         success: false,
-        message: "User not found."
+        message: "User not found.",
       });
     }
 
@@ -162,13 +172,13 @@ const updateUser = async (req, res) => {
     if (email && email !== user.email) {
       const existingEmail = await User.findOne({
         where: { email },
-        transaction: t
+        transaction: t,
       });
       if (existingEmail) {
         await t.rollback();
         return res.status(400).json({
           success: false,
-          message: "Another user with this email already exists."
+          message: "Another user with this email already exists.",
         });
       }
     }
@@ -181,7 +191,7 @@ const updateUser = async (req, res) => {
         await t.rollback();
         return res.status(400).json({
           success: false,
-          message: "Invalid user type."
+          message: "Invalid user type.",
         });
       }
     } else {
@@ -190,36 +200,41 @@ const updateUser = async (req, res) => {
     }
 
     // ====== Validate institute ======
-    if (userType.name === 'institute_user') {
+    if (userType.name === "institute_user") {
       if (!institute_id) {
         await t.rollback();
         return res.status(400).json({
           success: false,
-          message: "Institute ID is required for institute users."
+          message: "Institute ID is required for institute users.",
         });
       }
 
-      const institute = await Institute.findByPk(institute_id, { transaction: t });
+      const institute = await Institute.findByPk(institute_id, {
+        transaction: t,
+      });
       if (!institute) {
         await t.rollback();
         return res.status(400).json({
           success: false,
-          message: "Invalid institute ID."
+          message: "Invalid institute ID.",
         });
       }
     }
 
     // ====== Update user ======
-    await user.update({
-      full_name: full_name ?? user.full_name,
-      email: email ?? user.email,
-      phone_number: phone_number ?? user.phone_number,
-      position: position ?? user.position,
-      user_type_id: user_type_id ?? user.user_type_id,
-      institute_id: userType.name === 'institute_user' ? institute_id : null,
-      is_active: is_active ?? user.is_active,
-      updated_at: new Date(),
-    }, { transaction: t });
+    await user.update(
+      {
+        full_name: full_name ?? user.full_name,
+        email: email ?? user.email,
+        phone_number: phone_number ?? user.phone_number,
+        position: position ?? user.position,
+        user_type_id: user_type_id ?? user.user_type_id,
+        institute_id: userType.name === "institute_user" ? institute_id : null,
+        is_active: is_active ?? user.is_active,
+        updated_at: new Date(),
+      },
+      { transaction: t }
+    );
 
     await t.commit();
 
@@ -228,34 +243,31 @@ const updateUser = async (req, res) => {
       include: [
         {
           model: UserType,
-          as: 'userType',
-          attributes: ['name', 'description']
+          as: "userType",
+          attributes: ["name", "description"],
         },
         {
           model: Institute,
-          as: 'institute',
-          attributes: ['name', 'contact_email']
-        }
-      ]
+          as: "institute",
+          attributes: ["name", "contact_email"],
+        },
+      ],
     });
 
     return res.status(200).json({
       success: true,
       message: "User updated successfully",
-      data: updatedUser
+      data: updatedUser,
     });
-
   } catch (error) {
     await t.rollback();
     return res.status(500).json({
       success: false,
       message: "Error updating user",
-      error: error.message
+      error: error.message,
     });
   }
 };
-
-
 
 // ============Get all users=====================
 const getUsers = async (req, res) => {
@@ -305,7 +317,7 @@ const getUsers = async (req, res) => {
         {
           model: Institute,
           as: "institute",
-          attributes: ["institute_id", "name", "address"],
+          attributes: ["institute_id", "name"],
         },
       ],
       order: [["created_at", "DESC"]],
@@ -321,7 +333,6 @@ const getUsers = async (req, res) => {
       message: "Users retrieved successfully",
       data: response,
     });
-
   } catch (error) {
     console.error("Error fetching users:", error);
     return res.status(500).json({
@@ -331,7 +342,6 @@ const getUsers = async (req, res) => {
     });
   }
 };
-
 
 const getUserById = async (req, res) => {
   try {
@@ -367,7 +377,7 @@ const getUserById = async (req, res) => {
         {
           model: Institute,
           as: "institute",
-          attributes: ["institute_id", "name", "address", "contact_email"],
+          attributes: ["institute_id", "name"],
         },
       ],
     });
@@ -384,7 +394,6 @@ const getUserById = async (req, res) => {
       message: "User retrieved successfully",
       data: user,
     });
-
   } catch (error) {
     console.error("Error fetching user:", error);
     return res.status(500).json({
@@ -395,8 +404,6 @@ const getUserById = async (req, res) => {
   }
 };
 
-
-
 const deleteUser = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -406,7 +413,7 @@ const deleteUser = async (req, res) => {
       await t.rollback();
       return res.status(400).json({
         success: false,
-        message: "Invalid user ID format."
+        message: "Invalid user ID format.",
       });
     }
 
@@ -415,25 +422,27 @@ const deleteUser = async (req, res) => {
       await t.rollback();
       return res.status(404).json({
         success: false,
-        message: "User not found."
+        message: "User not found.",
       });
     }
 
     // Soft delete (deactivate)
-    await user.update({ is_active: false, updated_at: new Date() }, { transaction: t });
+    await user.update(
+      { is_active: false, updated_at: new Date() },
+      { transaction: t }
+    );
     await t.commit();
 
     return res.status(200).json({
       success: true,
-      message: "User deactivated successfully."
+      message: "User deactivated successfully.",
     });
-
   } catch (error) {
     await t.rollback();
     return res.status(500).json({
       success: false,
       message: "Error deactivating user",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -447,7 +456,7 @@ const toggleUserActiveStatus = async (req, res) => {
       await t.rollback();
       return res.status(400).json({
         success: false,
-        message: "Invalid user ID format."
+        message: "Invalid user ID format.",
       });
     }
 
@@ -455,7 +464,7 @@ const toggleUserActiveStatus = async (req, res) => {
       await t.rollback();
       return res.status(400).json({
         success: false,
-        message: "is_active must be a boolean value."
+        message: "is_active must be a boolean value.",
       });
     }
 
@@ -464,25 +473,27 @@ const toggleUserActiveStatus = async (req, res) => {
       await t.rollback();
       return res.status(404).json({
         success: false,
-        message: "User not found."
+        message: "User not found.",
       });
     }
 
-    await user.update({ is_active, updated_at: new Date() }, { transaction: t });
+    await user.update(
+      { is_active, updated_at: new Date() },
+      { transaction: t }
+    );
     await t.commit();
 
     return res.status(200).json({
       success: true,
       message: `User ${is_active ? "activated" : "deactivated"} successfully.`,
-      data: { user_id: id, is_active }
+      data: { user_id: id, is_active },
     });
-
   } catch (error) {
     await t.rollback();
     return res.status(500).json({
       success: false,
       message: "Error toggling user status",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -496,7 +507,7 @@ const resetUserPassword = async (req, res) => {
       await t.rollback();
       return res.status(400).json({
         success: false,
-        message: "Invalid user ID format."
+        message: "Invalid user ID format.",
       });
     }
 
@@ -505,7 +516,7 @@ const resetUserPassword = async (req, res) => {
       await t.rollback();
       return res.status(404).json({
         success: false,
-        message: "User not found."
+        message: "User not found.",
       });
     }
 
@@ -513,11 +524,14 @@ const resetUserPassword = async (req, res) => {
     const newPassword = generateRandomPassword();
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    await user.update({
-      password: hashedPassword,
-      is_first_logged_in: true,
-      updated_at: new Date()
-    }, { transaction: t });
+    await user.update(
+      {
+        password: hashedPassword,
+        is_first_logged_in: true,
+        updated_at: new Date(),
+      },
+      { transaction: t }
+    );
 
     await t.commit();
 
@@ -536,19 +550,18 @@ const resetUserPassword = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Password reset successfully. The new password has been sent via email."
+      message:
+        "Password reset successfully. The new password has been sent via email.",
     });
-
   } catch (error) {
     await t.rollback();
     return res.status(500).json({
       success: false,
       message: "Error resetting user password",
-      error: error.message
+      error: error.message,
     });
   }
 };
-
 
 const getProfile = async (req, res) => {
   try {
@@ -643,16 +656,13 @@ const getProfile = async (req, res) => {
     return res.status(200).json({ success: true, data: user });
   } catch (error) {
     console.error(error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Internal server error",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };
-
 
 module.exports = {
   createUser,
@@ -661,5 +671,5 @@ module.exports = {
   updateUser,
   deleteUser,
   toggleUserActiveStatus,
-  resetUserPassword
+  resetUserPassword,
 };

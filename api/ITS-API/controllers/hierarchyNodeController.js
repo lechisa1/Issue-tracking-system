@@ -222,10 +222,51 @@ const deleteHierarchyNode = async (req, res) => {
   }
 };
 
+// Get top-level hierarchy nodes (parent_id = null) for a specific hierarchy
+const getParentNodes = async (req, res) => {
+  try {
+    const { hierarchy_id } = req.params;
+
+    // Validate hierarchy existence
+    const hierarchy = await Hierarchy.findByPk(hierarchy_id);
+    if (!hierarchy) {
+      return res
+        .status(404)
+        .json({ message: `Hierarchy with id '${hierarchy_id}' not found.` });
+    }
+
+    // Fetch top-level nodes
+    const parentNodes = await HierarchyNode.findAll({
+      where: {
+        hierarchy_id,
+        parent_id: null,
+      },
+      include: [
+        { model: Hierarchy, as: "hierarchy" },
+        { model: HierarchyNode, as: "children" },
+      ],
+      order: [["created_at", "ASC"]],
+    });
+
+    return res.status(200).json({
+      success: true,
+      hierarchy_id,
+      count: parentNodes.length,
+      parentNodes,
+    });
+  } catch (error) {
+    console.error("Error fetching parent nodes:", error);
+    return res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+};
+
 module.exports = {
   createHierarchyNode,
   getHierarchyNodes,
   getHierarchyNodeById,
   updateHierarchyNode,
   deleteHierarchyNode,
+  getParentNodes,
 };

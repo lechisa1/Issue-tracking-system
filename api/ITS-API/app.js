@@ -38,27 +38,25 @@ const app = express();
 const appServer = http.createServer(app);
 
 // ================== Middleware ==================
-const devAuthBypass = require("./middlewares/devAuthBypass");
-app.use(devAuthBypass);
-app.use(express.json());
+// const devAuthBypass = require("./middlewares/devAuthBypass");
+// app.use(devAuthBypass);
+// app.use(express.json());
 
-// app.use(
-//   express.json({
-//     verify: (req, res, buf) => {
-//       try {
-//         JSON.parse(buf);
-//       } catch (e) {
-//         res
-//           .status(400)
-//           .json({
-//             message:
-//               "Invalid JSON format. Please ensure all property names are double-quoted and JSON is valid.",
-//           });
-//         throw e;
-//       }
-//     },
-//   })
-// );
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      try {
+        JSON.parse(buf);
+      } catch (e) {
+        res.status(400).json({
+          message:
+            "Invalid JSON format. Please ensure all property names are double-quoted and JSON is valid.",
+        });
+        throw e;
+      }
+    },
+  })
+);
 
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
@@ -105,9 +103,6 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // ================== API Routes go here ==================
 
-
-
-
 app.use("/api/users", userRoute);
 app.use("/api/roles", roleRoute);
 app.use("/api/role-permission", rolePermissionRoute);
@@ -116,12 +111,12 @@ app.use("/api/user-roles", userRoleRoute);
 app.use("/api/auth", authRoute);
 
 app.use("/api/projects", require("./routers/projectRoutes"));
-app.use('/api/institutes',instituteRoute);
-app.use('/api/institute-projects',instituteProjectsRoute);
+app.use("/api/institutes", instituteRoute);
+app.use("/api/institute-projects", instituteProjectsRoute);
 
-app.use('/api/hierarchies',hierarchyRoute);
-app.use('/api/hierarchy-nodes',hierarchyNodeRoute);
-app.use('/api/hierarchy-node-organizations',hierarchyNodeOrganizationRoute);
+app.use("/api/hierarchies", hierarchyRoute);
+app.use("/api/hierarchy-nodes", hierarchyNodeRoute);
+app.use("/api/hierarchy-node-organizations", hierarchyNodeOrganizationRoute);
 
 app.use("/api/issue-categories", issueCategories);
 app.use("/api/issue-priorities", issuePriorities);

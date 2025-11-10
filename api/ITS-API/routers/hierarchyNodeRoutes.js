@@ -6,6 +6,7 @@ const {
   validateCreateHierarchyNode,
   validateHierarchyNodeId,
   validateUpdateHierarchyNode,
+  validateParentNodesQuery,
 } = require("../validators/hierarchyNodeValidator");
 
 /**
@@ -192,6 +193,35 @@ router.delete(
   authenticateToken,
   validateHierarchyNodeId,
   hierarchyNodeController.deleteHierarchyNode
+);
+
+/**
+ * @swagger
+ * /api/hierarchy-nodes/parent-nodes:
+ *   get:
+ *     summary: Get top-level (parent) hierarchy nodes for a hierarchy
+ *     description: Returns nodes with `parent_id = null` for the specified `hierarchy_id`.
+ *     tags: [Hierarchy Nodes]
+ *     parameters:
+ *       - in: query
+ *         name: hierarchy_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the hierarchy
+ *     responses:
+ *       200:
+ *         description: List of parent nodes
+ *       400:
+ *         description: Validation error
+ *       404:
+ *         description: Hierarchy not found or no parent nodes
+ */
+router.get(
+  "/parent-nodes",
+  validateParentNodesQuery,
+  hierarchyNodeController.getParentNodes
 );
 
 module.exports = router;
