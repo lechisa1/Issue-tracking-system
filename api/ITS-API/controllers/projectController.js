@@ -1,7 +1,7 @@
 const {
   Project,
   Institute,
-  Hierarchy,
+  HierarchyNode,
   ProjectUserRole,
   Role,
   SubRole,
@@ -131,7 +131,8 @@ const getProjectById = async (req, res) => {
 const assignUserToProject = async (req, res) => {
   const t = await sequelize.transaction();
   try {
-    const { project_id, user_id, role_id, sub_role_id } = req.body;
+    const { project_id, user_id, role_id, sub_role_id, hierarchy_node_id } =
+      req.body;
 
     // ====== Validate project ======
     const project = await Project.findByPk(project_id, { transaction: t });
@@ -184,6 +185,30 @@ const assignUserToProject = async (req, res) => {
       });
     }
 
+    // ====== External user logic ======
+    if (user.user_type === "external_user") {
+      if (!hierarchy_node_id) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "External users must be assigned a hierarchy node.",
+        });
+      }
+
+      // Validate hierarchy node
+      const node = await HierarchyNode.findByPk(hierarchy_node_id, {
+        transaction: t,
+      });
+      if (!node || node.project_id !== project_id) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message:
+            "Hierarchy node not found or does not belong to this project.",
+        });
+      }
+    }
+
     // ====== Create project-user-role ======
     const assignment = await ProjectUserRole.create(
       {
@@ -192,6 +217,8 @@ const assignUserToProject = async (req, res) => {
         user_id,
         role_id,
         sub_role_id: sub_role_id ?? null,
+        hierarchy_node_id:
+        user.user_type === "external_user" ? hierarchy_node_id : null,
         is_active: true,
         created_at: new Date(),
         updated_at: new Date(),
@@ -203,7 +230,7 @@ const assignUserToProject = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "User assigned to project successfully",
+      message: "User assigned to project successfully.",
       data: assignment,
     });
   } catch (error) {
