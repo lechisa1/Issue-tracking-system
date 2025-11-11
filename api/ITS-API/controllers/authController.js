@@ -42,7 +42,7 @@ const login = async (req, res) => {
     const token = jwt.sign(
       { user_id: user.user_id, email: user.email },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRATION_TIME || "3h" }
+      { expiresIn: process.env.JWT_EXPIRATION_TIME || "12h" }
     );
 
     // Fetch active roles, subroles, and permissions

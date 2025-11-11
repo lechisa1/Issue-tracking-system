@@ -4,10 +4,10 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class HierarchyNode extends Model {
     static associate(models) {
-      // Belongs to Hierarchy
-      this.belongsTo(models.Hierarchy, {
-        foreignKey: "hierarchy_id",
-        as: "hierarchy",
+      // Belongs to Project
+      this.belongsTo(models.Project, {
+        foreignKey: "project_id",
+        as: "project",
       });
 
       // Self-referencing for parent-child relationship
@@ -29,7 +29,7 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
-      hierarchy_id: {
+      project_id: {
         type: DataTypes.UUID,
         allowNull: false,
       },
@@ -45,6 +45,10 @@ module.exports = (sequelize, DataTypes) => {
       description: {
         type: DataTypes.TEXT,
         allowNull: true,
+      },
+      level: {
+        type: DataTypes.INTEGER,
+        defaultValue: 1,
       },
       is_active: {
         type: DataTypes.BOOLEAN,

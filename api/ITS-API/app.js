@@ -116,7 +116,7 @@ app.use("/api/projects", require("./routers/projectRoutes"));
 app.use("/api/institutes", instituteRoute);
 app.use("/api/institute-projects", instituteProjectsRoute);
 
-app.use("/api/hierarchies", hierarchyRoute);
+// app.use("/api/hierarchies", hierarchyRoute);
 app.use("/api/hierarchy-nodes", hierarchyNodeRoute);
 app.use("/api/hierarchy-node-organizations", hierarchyNodeOrganizationRoute);
 

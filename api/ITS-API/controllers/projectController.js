@@ -7,6 +7,7 @@ const {
   SubRole,
   User,
   InstituteProject,
+  sequelize,
 } = require("../models");
 const { v4: uuidv4 } = require("uuid");
 
@@ -99,6 +100,23 @@ const getProjectById = async (req, res) => {
           as: "institutes",
           through: { attributes: ["is_active"] },
         },
+        {
+          model: ProjectUserRole,
+          as: "projectUserRoles", // make sure your Project model has `hasMany(ProjectUserRole, { as: "projectUserRoles" })`
+          include: [
+            {
+              model: User,
+              as: "user",
+              attributes: ["user_id", "full_name", "email"],
+            },
+            { model: Role, as: "role", attributes: ["role_id", "name"] },
+            {
+              model: SubRole,
+              as: "subRole",
+              attributes: ["sub_role_id", "name"],
+            }, // MUST match the alias
+          ],
+        },
       ],
     });
     if (!project) return res.status(404).json({ message: "Project not found" });
@@ -160,12 +178,10 @@ const assignUserToProject = async (req, res) => {
     });
     if (existing) {
       await t.rollback();
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "User already assigned to this project.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "User already assigned to this project.",
+      });
     }
 
     // ====== Create project-user-role ======
@@ -260,7 +276,6 @@ const removeUserFromProject = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
-
 
 module.exports = {
   createProject,
