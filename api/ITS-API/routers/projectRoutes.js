@@ -42,6 +42,31 @@ const {
  *         updated_at:
  *           type: string
  *           format: date-time
+ *
+ *     AssignUserToProject:
+ *       type: object
+ *       required:
+ *         - project_id
+ *         - user_id
+ *         - role_id
+ *       properties:
+ *         project_id:
+ *           type: string
+ *           format: uuid
+ *           example: "1d9a8217-7e63-4a9d-b62f-0b82f20f5456"
+ *         user_id:
+ *           type: string
+ *           format: uuid
+ *           example: "5b0f7b23-67c3-40d4-b3e5-47b1e3b7a90d"
+ *         role_id:
+ *           type: string
+ *           format: uuid
+ *           example: "38b4a1a0-f7f9-45b1-bc90-d3b6ef7c9f81"
+ *         sub_role_id:
+ *           type: string
+ *           format: uuid
+ *           nullable: true
+ *           example: "7b2c9d28-6c87-4c81-9f3a-c2b0df67d91a"
  */
 
 /**
@@ -229,6 +254,32 @@ router.delete(
   authenticateToken,
   validateProjectId,
   projectController.deleteProject
+);
+
+/**
+ * @swagger
+ * /api/projects/assign-user:
+ *   post:
+ *     summary: Assign a user to a project with a role (and optional sub-role)
+ *     tags: [Projects]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AssignUserToProject'
+ *     responses:
+ *       201:
+ *         description: User assigned to project successfully
+ *       400:
+ *         description: Validation or duplicate assignment error
+ *       404:
+ *         description: Project, user, or role not found
+ */
+router.post(
+  "/assign-user",
+  authenticateToken,
+  projectController.assignUserToProject
 );
 
 module.exports = router;
