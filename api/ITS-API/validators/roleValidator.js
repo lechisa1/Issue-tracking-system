@@ -1,7 +1,5 @@
 const Joi = require("joi");
 
-const Joi = require("joi");
-
 // Schema for creating a Role
 const createRoleSchema = Joi.object({
   name: Joi.string().trim().required().messages({
@@ -69,7 +67,6 @@ exports.validateCreateRole = (req, res, next) => {
     });
   next();
 };
-
 
 // Schema for updating a Role
 const updateRoleSchema = Joi.object({
