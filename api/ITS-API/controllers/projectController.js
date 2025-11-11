@@ -100,6 +100,7 @@ const getProjectById = async (req, res) => {
           as: "institutes",
           through: { attributes: ["is_active"] },
         },
+        // HierarchyNode
         {
           model: ProjectUserRole,
           as: "projectUserRoles", // make sure your Project model has `hasMany(ProjectUserRole, { as: "projectUserRoles" })`
@@ -115,6 +116,11 @@ const getProjectById = async (req, res) => {
               as: "subRole",
               attributes: ["sub_role_id", "name"],
             }, // MUST match the alias
+            {
+              model: HierarchyNode,
+              as: "hierarchyNode",
+              attributes: ["hierarchy_node_id", "name"],
+            },
           ],
         },
       ],
@@ -218,7 +224,8 @@ const assignUserToProject = async (req, res) => {
         role_id,
         sub_role_id: sub_role_id ?? null,
         hierarchy_node_id:
-        user.user_type === "external_user" ? hierarchy_node_id : null,
+          // user.user_type === "external_user" ? hierarchy_node_id : null,
+          hierarchy_node_id,
         is_active: true,
         created_at: new Date(),
         updated_at: new Date(),
