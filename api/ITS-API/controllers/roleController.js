@@ -16,7 +16,6 @@ const createRole = async (req, res) => {
   const t = await Role.sequelize.transaction();
   try {
     const { name, description, sub_roles, permission_ids } = req.body;
-    // `permission_ids` is only used when there are no sub_roles
 
     // ====== Check if role exists ======
     const existing = await Role.findOne({ where: { name }, transaction: t });
@@ -41,29 +40,53 @@ const createRole = async (req, res) => {
       { transaction: t }
     );
 
-    // ====== Case 1: If sub-roles exist ======
+    // ====== Handle sub-roles if provided ======
     if (Array.isArray(sub_roles) && sub_roles.length > 0) {
       for (const sr of sub_roles) {
-        // Validate sub-role
-        const subRole = await SubRole.findOne({
-          where: { sub_role_id: sr.sub_role_id, is_active: true },
-          transaction: t,
-        });
+        let subRole;
 
-        if (!subRole) {
+        // Existing sub-role
+        if (sr.sub_role_id) {
+          subRole = await SubRole.findOne({
+            where: { sub_role_id: sr.sub_role_id, is_active: true },
+            transaction: t,
+          });
+
+          if (!subRole) {
+            await t.rollback();
+            return res.status(400).json({
+              success: false,
+              message: `Invalid or inactive sub-role ID: ${sr.sub_role_id}`,
+            });
+          }
+        }
+        // New sub-role
+        else if (sr.name) {
+          subRole = await SubRole.create(
+            {
+              sub_role_id: uuidv4(),
+              name: sr.name,
+              description: sr.description || null,
+              is_active: true,
+              created_at: new Date(),
+              updated_at: new Date(),
+            },
+            { transaction: t }
+          );
+        } else {
           await t.rollback();
           return res.status(400).json({
             success: false,
-            message: `Invalid or inactive sub-role ID: ${sr.sub_role_id}`,
+            message: "Either sub_role_id or name must be provided for sub-role",
           });
         }
 
-        // Create RoleSubRole link
+        // Link sub-role to role
         const roleSubRole = await RoleSubRole.create(
           {
             roles_sub_roles_id: uuidv4(),
             role_id: role.role_id,
-            sub_role_id: sr.sub_role_id,
+            sub_role_id: subRole.sub_role_id,
             is_active: true,
             created_at: new Date(),
             updated_at: new Date(),
@@ -71,7 +94,7 @@ const createRole = async (req, res) => {
           { transaction: t }
         );
 
-        // Attach permissions to the RoleSubRole
+        // Attach permissions to this sub-role
         if (sr.permission_ids && sr.permission_ids.length > 0) {
           let permissionIds = sr.permission_ids;
           if (typeof permissionIds === "string") {
@@ -111,8 +134,7 @@ const createRole = async (req, res) => {
         }
       }
     }
-
-    // ====== Case 2: If NO sub-roles, assign permissions directly to role ======
+    // ====== Assign permissions directly to role if no sub-roles ======
     else if (permission_ids && permission_ids.length > 0) {
       let permissionIds = permission_ids;
       if (typeof permissionIds === "string") {
@@ -151,7 +173,7 @@ const createRole = async (req, res) => {
 
     await t.commit();
 
-    // ====== Fetch created role with relationships ======
+    // ====== Fetch role with sub-roles and permissions ======
     const createdRole = await Role.findOne({
       where: { role_id: role.role_id },
       include: [
@@ -159,10 +181,7 @@ const createRole = async (req, res) => {
           model: RoleSubRole,
           as: "roleSubRoles",
           include: [
-            {
-              model: SubRole,
-              as: "subRole",
-            },
+            { model: SubRole, as: "subRole" },
             {
               model: RoleSubRolePermission,
               as: "permissions",

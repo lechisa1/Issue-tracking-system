@@ -1,6 +1,5 @@
 const Joi = require("joi");
 
-// Schema for creating a Role
 const createRoleSchema = Joi.object({
   name: Joi.string().trim().required().messages({
     "string.empty": "Role name is required",
@@ -29,22 +28,17 @@ const createRoleSchema = Joi.object({
       Joi.object({
         sub_role_id: Joi.string()
           .guid({ version: "uuidv4" })
-          .allow(null, "")
+          .optional()
+          .allow("")
           .messages({
             "string.guid": "Each sub_role_id must be a valid UUID",
           }),
 
-        name: Joi.string()
-          .trim()
-          .when("sub_role_id", {
-            is: Joi.exist().not(null).not(""),
-            then: Joi.forbidden(),
-            otherwise: Joi.required(),
-          })
-          .messages({
-            "any.required": "Name is required when sub_role_id is not provided",
-            "any.unknown": "Name is not allowed when sub_role_id exists",
-          }),
+        name: Joi.string().trim().optional().messages({
+          "string.empty": "Name cannot be empty if creating a new sub-role",
+        }),
+
+        description: Joi.string().trim().optional(),
 
         permission_ids: Joi.alternatives()
           .try(
@@ -55,10 +49,25 @@ const createRoleSchema = Joi.object({
             ),
             Joi.string()
           )
-          .optional(),
+          .optional()
+          .messages({
+            "array.includes": "permission_ids must be a list of UUIDs",
+          }),
       })
+        // Ensure at least sub_role_id or name exists
+        .custom((value, helpers) => {
+          if (!value.sub_role_id && !value.name) {
+            return helpers.message(
+              "Either sub_role_id (existing) or name (new) must be provided for sub-role"
+            );
+          }
+          return value;
+        })
     )
-    .optional(),
+    .optional()
+    .messages({
+      "array.base": "sub_roles must be an array",
+    }),
 });
 
 // Middleware wrappers
