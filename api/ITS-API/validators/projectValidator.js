@@ -14,7 +14,26 @@ const createProjectSchema = Joi.object({
     "string.guid": "Institute ID must be a valid UUID",
   }),
 });
+// ===============================
+exports.validateAssignUserToProject = (req, res, next) => {
+  const schema = Joi.object({
+    project_id: Joi.string().guid({ version: "uuidv4" }).required(),
+    user_id: Joi.string().guid({ version: "uuidv4" }).required(),
+    role_id: Joi.string().guid({ version: "uuidv4" }).required(),
+    sub_role_id: Joi.string()
+      .guid({ version: "uuidv4" })
+      .optional()
+      .allow(null),
+  });
 
+  const { error } = schema.validate(req.body);
+  if (error) {
+    return res
+      .status(400)
+      .json({ success: false, message: error.details[0].message });
+  }
+  next();
+};
 // Schema for updating a project
 const updateProjectSchema = Joi.object({
   name: Joi.string().trim().max(255).optional(),

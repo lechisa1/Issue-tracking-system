@@ -303,19 +303,15 @@ const getRoleById = async (req, res) => {
   }
 };
 
-// Update Role
 const updateRole = async (req, res) => {
   const t = await Role.sequelize.transaction();
   try {
     const { id } = req.params;
-    const { name, description, sub_roles } = req.body;
+    const { name, description, sub_roles, permission_ids } = req.body;
 
     // Find the role
     const role = await Role.findOne({
-      where: {
-        role_id: id,
-        is_active: true,
-      },
+      where: { role_id: id, is_active: true },
       transaction: t,
     });
 
@@ -327,7 +323,7 @@ const updateRole = async (req, res) => {
       });
     }
 
-    // Check if name is being changed and if it already exists
+    // Check for duplicate name
     if (name && name !== role.name) {
       const existingRole = await Role.findOne({
         where: { name },
@@ -343,7 +339,7 @@ const updateRole = async (req, res) => {
       }
     }
 
-    // Update role basic info
+    //Update role info
     await role.update(
       {
         name: name || role.name,
@@ -353,112 +349,116 @@ const updateRole = async (req, res) => {
       { transaction: t }
     );
 
-    // Update sub-roles and permissions if provided
-    if (Array.isArray(sub_roles)) {
-      // Soft delete existing role-subrole associations
+    // CASE 1: If sub_roles are provided, handle as before
+    // ==========================================================
+    if (Array.isArray(sub_roles) && sub_roles.length > 0) {
       await RoleSubRole.update(
-        {
-          is_active: false,
-          deleted_at: new Date(),
-          updated_at: new Date(),
-        },
-        {
-          where: { role_id: id },
-          transaction: t,
-        }
+        { is_active: false, deleted_at: new Date(), updated_at: new Date() },
+        { where: { role_id: id }, transaction: t }
       );
 
-      // Soft delete existing permissions for this role
-      const existingRoleSubRoles = await RoleSubRole.findAll({
-        where: { role_id: id },
-        transaction: t,
-      });
+      // Recreate role-subrole + permissions
+      for (const sr of sub_roles) {
+        const subRole = await SubRole.findOne({
+          where: { sub_role_id: sr.sub_role_id, is_active: true },
+          transaction: t,
+        });
 
-      if (existingRoleSubRoles.length > 0) {
-        const roleSubRoleIds = existingRoleSubRoles.map(
-          (rsr) => rsr.roles_sub_roles_id
-        );
+        if (!subRole) {
+          await t.rollback();
+          return res.status(400).json({
+            success: false,
+            message: `Invalid or inactive sub-role ID: ${sr.sub_role_id}`,
+          });
+        }
 
-        await RoleSubRolePermission.update(
+        // Create new RoleSubRole
+        const roleSubRole = await RoleSubRole.create(
           {
+            roles_sub_roles_id: uuidv4(),
+            role_id: id,
+            sub_role_id: sr.sub_role_id,
+            is_active: true,
+            created_at: new Date(),
             updated_at: new Date(),
           },
-          {
-            where: { roles_sub_roles_id: roleSubRoleIds },
-            transaction: t,
-          }
+          { transaction: t }
         );
-      }
 
-      // Create new sub-role associations
-      if (sub_roles.length > 0) {
-        for (const sr of sub_roles) {
-          // Validate sub-role exists and is active
-          const subRole = await SubRole.findOne({
-            where: {
-              sub_role_id: sr.sub_role_id,
-              is_active: true,
-            },
+        // Assign permissions to sub-role (if any)
+        if (sr.permission_ids?.length > 0) {
+          const validPerms = await Permission.findAll({
+            where: { permission_id: sr.permission_ids },
             transaction: t,
           });
 
-          if (!subRole) {
+          if (validPerms.length !== sr.permission_ids.length) {
             await t.rollback();
             return res.status(400).json({
               success: false,
-              message: `Invalid or inactive sub-role ID: ${sr.sub_role_id}`,
+              message: "Some permissions are invalid",
             });
           }
 
-          // Create new RoleSubRole association
-          const roleSubRole = await RoleSubRole.create(
-            {
-              roles_sub_roles_id: uuidv4(),
-              role_id: id,
-              sub_role_id: sr.sub_role_id,
-              is_active: true,
-              created_at: new Date(),
-              updated_at: new Date(),
-            },
-            { transaction: t }
-          );
+          const roleSubRolePerms = sr.permission_ids.map((pid) => ({
+            role_sub_roles_permission_id: uuidv4(),
+            roles_sub_roles_id: roleSubRole.roles_sub_roles_id,
+            permission_id: pid,
+            assigned_by: req.user?.user_id || null,
+            assigned_at: new Date(),
+            created_at: new Date(),
+            updated_at: new Date(),
+          }));
 
-          // Assign permissions if provided
-          if (sr.permission_ids && sr.permission_ids.length > 0) {
-            const validPermissions = await Permission.findAll({
-              where: { permission_id: sr.permission_ids },
-              transaction: t,
-            });
-
-            if (validPermissions.length !== sr.permission_ids.length) {
-              await t.rollback();
-              return res.status(400).json({
-                success: false,
-                message: "Some permissions are invalid",
-              });
-            }
-
-            const roleSubRolePerms = sr.permission_ids.map((pid) => ({
-              role_sub_roles_permission_id: uuidv4(),
-              roles_sub_roles_id: roleSubRole.roles_sub_roles_id,
-              permission_id: pid,
-              assigned_by: req.user.user_id,
-              assigned_at: new Date(),
-              created_at: new Date(),
-              updated_at: new Date(),
-            }));
-
-            await RoleSubRolePermission.bulkCreate(roleSubRolePerms, {
-              transaction: t,
-            });
-          }
+          await RoleSubRolePermission.bulkCreate(roleSubRolePerms, {
+            transaction: t,
+          });
         }
       }
+
+      //  When role has sub_roles, remove direct permissions if any
+      await RolePermission.destroy({ where: { role_id: id }, transaction: t });
+    }
+
+    // CASE 2: If NO sub_roles, allow assigning direct permissions
+    // ==========================================================
+    else if (Array.isArray(permission_ids) && permission_ids.length > 0) {
+      // Soft delete old direct role permissions
+      await RolePermission.update(
+        { is_active: false, updated_at: new Date() },
+        { where: { role_id: id }, transaction: t }
+      );
+
+      // Validate permissions
+      const validPerms = await Permission.findAll({
+        where: { permission_id: permission_ids },
+        transaction: t,
+      });
+
+      if (validPerms.length !== permission_ids.length) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Some permissions are invalid",
+        });
+      }
+
+      // Assign new permissions directly to the role
+      const rolePerms = permission_ids.map((pid) => ({
+        role_permission_id: uuidv4(),
+        role_id: id,
+        permission_id: pid,
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      }));
+
+      await RolePermission.bulkCreate(rolePerms, { transaction: t });
     }
 
     await t.commit();
 
-    // Fetch updated role with relationships
+    //  Fetch updated role details
     const updatedRole = await Role.findOne({
       where: { role_id: id },
       include: [
@@ -468,21 +468,20 @@ const updateRole = async (req, res) => {
           where: { is_active: true },
           required: false,
           include: [
-            {
-              model: SubRole,
-              as: "subRole",
-            },
+            { model: SubRole, as: "subRole" },
             {
               model: RoleSubRolePermission,
               as: "permissions",
-              include: [
-                {
-                  model: Permission,
-                  as: "permission",
-                },
-              ],
+              include: [{ model: Permission, as: "permission" }],
             },
           ],
+        },
+        {
+          model: RolePermission,
+          as: "rolePermissions",
+          where: { is_active: true },
+          required: false,
+          include: [{ model: Permission, as: "permission" }],
         },
       ],
     });
