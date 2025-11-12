@@ -7,6 +7,7 @@ const {
   SubRole,
   User,
   InstituteProject,
+  sequelize,
 } = require("../models");
 const { v4: uuidv4 } = require("uuid");
 
@@ -98,6 +99,23 @@ const getProjectById = async (req, res) => {
           model: Institute,
           as: "institutes",
           through: { attributes: ["is_active"] },
+        },
+        {
+          model: ProjectUserRole,
+          as: "projectUserRoles", // make sure your Project model has `hasMany(ProjectUserRole, { as: "projectUserRoles" })`
+          include: [
+            {
+              model: User,
+              as: "user",
+              attributes: ["user_id", "full_name", "email"],
+            },
+            { model: Role, as: "role", attributes: ["role_id", "name"] },
+            {
+              model: SubRole,
+              as: "subRole",
+              attributes: ["sub_role_id", "name"],
+            }, // MUST match the alias
+          ],
         },
       ],
     });
@@ -285,7 +303,6 @@ const removeUserFromProject = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
-
 
 module.exports = {
   createProject,

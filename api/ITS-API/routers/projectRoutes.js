@@ -199,6 +199,56 @@ router.put(
  *       404:
  *         description: Project not found
  */
+
+/**
+ * @swagger
+ * /api/projects/assign-user:
+ *   post:
+ *     summary: Assign a user to a project with a role (and optional sub-role)
+ *     tags: [Projects]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - project_id
+ *               - user_id
+ *               - role_id
+ *             properties:
+ *               project_id:
+ *                 type: string
+ *                 format: uuid
+ *                 description: ID of the project
+ *               user_id:
+ *                 type: string
+ *                 format: uuid
+ *                 description: ID of the user to assign
+ *               role_id:
+ *                 type: string
+ *                 format: uuid
+ *                 description: Role ID for the user in the project
+ *               sub_role_id:
+ *                 type: string
+ *                 format: uuid
+ *                 description: Optional sub-role ID
+ *     responses:
+ *       201:
+ *         description: User assigned successfully
+ *       400:
+ *         description: Validation error or user already assigned
+ *       404:
+ *         description: Project, user, or role not found
+ *       500:
+ *         description: Internal server error
+ */
+router.post(
+  "/assign-user",
+  authenticateToken,
+  projectController.assignUserToProject
+);
+
 router.delete(
   "/:id",
   authenticateToken,
