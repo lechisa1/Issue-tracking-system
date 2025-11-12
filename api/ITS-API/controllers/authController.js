@@ -16,7 +16,6 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Find user by email
     const user = await User.findOne({
       where: { email },
       include: [
@@ -24,6 +23,11 @@ const login = async (req, res) => {
           model: Institute,
           as: "institute",
           attributes: ["institute_id", "name"],
+        },
+        {
+          model: UserType,
+          as: "userType",
+          attributes: ["user_type_id", "name"],
         },
       ],
     });
@@ -40,7 +44,11 @@ const login = async (req, res) => {
 
     // Generate JWT
     const token = jwt.sign(
-      { user_id: user.user_id, email: user.email },
+      {
+        user_id: user.user_id,
+        email: user.email,
+        user_type: user.userType ? user.userType.name : null,
+      },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRATION_TIME || "12h" }
     );
@@ -111,11 +119,11 @@ const login = async (req, res) => {
       user: {
         user_id: user.user_id,
         full_name: user.full_name,
-        UserType: user.UserType,
         email: user.email,
         phone_number: user.phone_number,
         position: user.position,
         profile_image: user.profile_image,
+        user_type: user.userType ? user.userType.name : null,
         institute: user.institute
           ? {
               institute_id: user.institute.institute_id,
