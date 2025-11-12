@@ -8,12 +8,12 @@ module.exports = {
         defaultValue: Sequelize.UUIDV4,
         primaryKey: true,
       },
-      hierarchy_id: {
+      project_id: {
         type: Sequelize.UUID,
         allowNull: false,
         references: {
-          model: "hierarchy",
-          key: "hierarchy_id",
+          model: "projects", // assuming your Project table name is 'projects'
+          key: "project_id",
         },
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
@@ -37,6 +37,10 @@ module.exports = {
         type: Sequelize.TEXT,
         allowNull: true,
       },
+      level: {
+        type: Sequelize.INTEGER,
+        defaultValue: 1,
+      },
       is_active: {
         type: Sequelize.BOOLEAN,
         defaultValue: true,
@@ -51,6 +55,7 @@ module.exports = {
       },
       deleted_at: {
         type: Sequelize.DATE,
+        allowNull: true,
       },
     });
   },

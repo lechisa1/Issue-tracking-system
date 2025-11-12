@@ -3,7 +3,10 @@ node_modules/
 
 # Environment variables
 .env
-
+# Ignore uploads
+uploads/
+public/uploads/
+tmp/
 # Logs
 logs/
 *.log

@@ -6,6 +6,7 @@ const {
   validateCreateHierarchyNode,
   validateHierarchyNodeId,
   validateUpdateHierarchyNode,
+  validateParentNodesQuery,
 } = require("../validators/hierarchyNodeValidator");
 
 /**
@@ -19,10 +20,10 @@ const {
  *           type: string
  *           format: uuid
  *           description: Unique identifier for the hierarchy node
- *         hierarchy_id:
+ *         project_id:
  *           type: string
  *           format: uuid
- *           description: UUID of the hierarchy this node belongs to
+ *           description: UUID of the project this node belongs to
  *         parent_id:
  *           type: string
  *           format: uuid
@@ -52,14 +53,14 @@ const {
  * @swagger
  * tags:
  *   - name: Hierarchy Nodes
- *     description: API endpoints for managing hierarchy nodes
+ *     description: API endpoints for managing hierarchy nodes by project
  */
 
 /**
  * @swagger
  * /api/hierarchy-nodes:
  *   post:
- *     summary: Create one or more hierarchy nodes (nested children supported)
+ *     summary: Create one or more hierarchy nodes
  *     tags: [Hierarchy Nodes]
  *     requestBody:
  *       required: true
@@ -192,6 +193,35 @@ router.delete(
   authenticateToken,
   validateHierarchyNodeId,
   hierarchyNodeController.deleteHierarchyNode
+);
+
+/**
+ * @swagger
+ * /api/hierarchy-nodes/parent-nodes/{project_id}:
+ *   get:
+ *     summary: Get top-level (parent) hierarchy nodes for a project
+ *     description: Returns nodes with `parent_id = null` for the specified `project_id`.
+ *     tags: [Hierarchy Nodes]
+ *     parameters:
+ *       - in: path
+ *         name: project_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the project
+ *     responses:
+ *       200:
+ *         description: List of parent nodes
+ *       400:
+ *         description: Validation error
+ *       404:
+ *         description: Project not found or no parent nodes
+ */
+router.get(
+  "/parent-nodes/:project_id",
+  validateParentNodesQuery,
+  hierarchyNodeController.getParentNodes
 );
 
 module.exports = router;

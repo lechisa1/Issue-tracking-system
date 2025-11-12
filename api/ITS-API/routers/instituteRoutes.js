@@ -6,6 +6,7 @@ const {
   validateUpdateInstitute,
   validateInstituteId,
 } = require("../validators/instituteValidator"); // Joi-based validators
+const { authenticateToken } = require("../middlewares/authMiddleware");
 
 /**
  * @swagger
@@ -66,7 +67,12 @@ const {
  *       500:
  *         description: Internal server error
  */
-router.post("/", validateCreateInstitute, instituteController.createInstitute);
+router.post(
+  "/",
+  authenticateToken,
+  validateCreateInstitute,
+  instituteController.createInstitute
+);
 
 /**
  * @swagger
@@ -80,7 +86,7 @@ router.post("/", validateCreateInstitute, instituteController.createInstitute);
  *       500:
  *         description: Internal server error
  */
-router.get("/", instituteController.getInstitutes);
+router.get("/", authenticateToken, instituteController.getInstitutes);
 
 /**
  * @swagger
@@ -103,7 +109,12 @@ router.get("/", instituteController.getInstitutes);
  *       500:
  *         description: Internal server error
  */
-router.get("/:id", validateInstituteId, instituteController.getInstituteById);
+router.get(
+  "/:id",
+  authenticateToken,
+  validateInstituteId,
+  instituteController.getInstituteById
+);
 
 /**
  * @swagger
@@ -134,6 +145,7 @@ router.get("/:id", validateInstituteId, instituteController.getInstituteById);
  */
 router.put(
   "/:id",
+  authenticateToken,
   validateUpdateInstitute,
   validateInstituteId,
   instituteController.updateInstitute
@@ -160,6 +172,11 @@ router.put(
  *       500:
  *         description: Internal server error
  */
-router.delete("/:id", validateInstituteId, instituteController.deleteInstitute);
+router.delete(
+  "/:id",
+  authenticateToken,
+  validateInstituteId,
+  instituteController.deleteInstitute
+);
 
 module.exports = router;

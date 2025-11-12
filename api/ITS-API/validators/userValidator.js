@@ -37,18 +37,12 @@ const createUserSchema = Joi.object({
   position: Joi.string().max(100).optional().messages({
     "string.max": "Position cannot exceed 100 characters.",
   }),
-  role_ids: Joi.array()
-    .items(Joi.string().guid({ version: "uuidv4" }))
-    .optional()
-    .messages({
-      "string.guid": "Each role ID must be a valid UUID.",
-    }),
+
   hierarchy_node_id: Joi.string()
     .guid({ version: "uuidv4" })
     .allow(null)
     .optional(),
 });
-
 
 // =================== Update User Schema ===================
 const updateUserSchema = Joi.object({

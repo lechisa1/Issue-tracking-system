@@ -20,6 +20,33 @@ const { sendEmail } = require("../utils/sendEmail");
 
 const { getPagination, getPagingData } = require("../utils/pagination");
 
+const getUserTypes = async (req, res) => {
+  try {
+    const userTypes = await UserType.findAll({
+      attributes: [
+        "user_type_id",
+        "name",
+        "description",
+        "created_at",
+        "updated_at",
+      ],
+      order: [["name", "ASC"]],
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "User types fetched successfully",
+      data: userTypes,
+    });
+  } catch (error) {
+    console.error("Error fetching user types:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch user types",
+      error: error.message,
+    });
+  }
+};
 const createUser = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -28,74 +55,80 @@ const createUser = async (req, res) => {
       email,
       user_type_id,
       institute_id,
-      position,
       phone_number,
-      role_ids,
       hierarchy_node_id,
     } = req.body;
 
-    // ====== Check for existing email ======
+    // ====== Check existing email ======
     const existingUser = await User.findOne({
       where: { email },
       transaction: t,
     });
     if (existingUser) {
       await t.rollback();
-      return res.status(400).json({
-        success: false,
-        message: "User with this email already exists.",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "User already exists." });
     }
 
     // ====== Validate user type ======
     const userType = await UserType.findByPk(user_type_id, { transaction: t });
     if (!userType) {
       await t.rollback();
-      return res.status(400).json({
-        success: false,
-        message: "Invalid user type.",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user type." });
     }
 
-    // ====== Validate institute if external user ======
-    if (userType.name === "external_user" && !institute_id) {
-      await t.rollback();
-      return res.status(400).json({
-        success: false,
-        message: "Institute ID is required for external users.",
-      });
-    }
+    // ====== Enforce institute_id for external_user ======
+    if (userType.name === "external_user") {
+      if (!institute_id) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Institute ID is required for external users.",
+        });
+      }
 
-    if (institute_id) {
+      // Validate institute existence
       const institute = await Institute.findByPk(institute_id, {
         transaction: t,
       });
       if (!institute) {
         await t.rollback();
-        return res.status(400).json({
-          success: false,
-          message: "Invalid institute ID.",
-        });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid institute ID." });
       }
-    }
-    if (hierarchy_node_id) {
-      const hierarchyNode = await HierarchyNode.findByPk(hierarchy_node_id, {
-        transaction: t,
-      });
-      if (!hierarchyNode) {
+    } else {
+      // internal_user or others must not have institute_id
+      if (institute_id) {
         await t.rollback();
         return res.status(400).json({
           success: false,
-          message: "Invalid hierarchy node ID.",
+          message: "Institute ID should not be provided for internal users.",
         });
       }
     }
 
-    // ====== Generate and hash password ======
+    // ====== Optional hierarchy validation ======
+    if (hierarchy_node_id) {
+      const node = await HierarchyNode.findByPk(hierarchy_node_id, {
+        transaction: t,
+      });
+      if (!node) {
+        await t.rollback();
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid hierarchy node ID." });
+      }
+    }
+
+    // ====== Generate password ======
     const password = generateRandomPassword();
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // ====== Create user ======
+    // ====== Create User ======
     const user = await User.create(
       {
         user_id: uuidv4(),
@@ -105,45 +138,14 @@ const createUser = async (req, res) => {
         phone_number,
         user_type_id,
         institute_id: userType.name === "external_user" ? institute_id : null,
-        position,
-        is_first_logged_in: true,
         hierarchy_node_id: hierarchy_node_id ?? null,
+        is_first_logged_in: true,
         is_active: true,
         created_at: new Date(),
         updated_at: new Date(),
       },
       { transaction: t }
     );
-
-    // ====== Assign Roles ======
-    if (Array.isArray(role_ids) && role_ids.length > 0) {
-      // Validate all roles exist
-      const roles = await Role.findAll({
-        where: { role_id: role_ids },
-        transaction: t,
-      });
-
-      if (roles.length !== role_ids.length) {
-        await t.rollback();
-        return res.status(400).json({
-          success: false,
-          message: "Some provided role IDs are invalid.",
-        });
-      }
-
-      const userRoles = role_ids.map((rid) => ({
-        user_role_id: uuidv4(),
-        user_id: user.user_id,
-        role_id: rid,
-        assigned_by: req.user?.user_id || null,
-        assigned_at: new Date(),
-        is_active: true,
-        created_at: new Date(),
-        updated_at: new Date(),
-      }));
-
-      await UserRoles.bulkCreate(userRoles, { transaction: t });
-    }
 
     await t.commit();
 
@@ -160,45 +162,15 @@ const createUser = async (req, res) => {
     `
     );
 
-    // ====== Return user with details ======
-    const newUser = await User.findByPk(user.user_id, {
-      include: [
-        {
-          model: UserType,
-          as: "userType",
-          attributes: ["name", "description"],
-        },
-        {
-          model: Institute,
-          as: "institute",
-          attributes: ["name", "contact_email"],
-        },
-        {
-          model: Role,
-          as: "roles",
-          through: { attributes: [] }, // from user_roles table
-        },
-        {
-          model: HierarchyNode,
-          as: "hierarchyNode",
-          attributes: ["name", "description"],
-        },
-      ],
-    });
-
     return res.status(201).json({
       success: true,
-      message: "User registered successfully with roles",
-      data: newUser,
+      message: "User registered globally (no roles assigned yet)",
+      data: user,
     });
   } catch (error) {
     if (!t.finished) await t.rollback();
-    console.error("Error creating user with roles:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Error registering user",
-      error: error.message,
-    });
+    console.error("Error creating user:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -206,21 +178,19 @@ const createUser = async (req, res) => {
 const updateUser = async (req, res) => {
   const t = await sequelize.transaction();
   try {
-    const { id } = req.params;
+    const { user_id } = req.params;
     const {
       full_name,
       email,
       user_type_id,
       institute_id,
-      position,
       phone_number,
-      role_ids,
       hierarchy_node_id,
       is_active,
     } = req.body;
 
     // ====== Find user ======
-    const user = await User.findByPk(id, { transaction: t });
+    const user = await User.findByPk(user_id, { transaction: t });
     if (!user) {
       await t.rollback();
       return res.status(404).json({
@@ -229,7 +199,7 @@ const updateUser = async (req, res) => {
       });
     }
 
-    // ====== Check if email already used by another user ======
+    // ====== Check for email duplication ======
     if (email && email !== user.email) {
       const existingEmail = await User.findOne({
         where: { email },
@@ -239,49 +209,38 @@ const updateUser = async (req, res) => {
         await t.rollback();
         return res.status(400).json({
           success: false,
-          message: "Another user with this email already exists.",
+          message: "Email is already in use by another user.",
         });
       }
     }
 
     // ====== Validate user type ======
-    let userType = null;
     if (user_type_id) {
-      userType = await UserType.findByPk(user_type_id, { transaction: t });
+      const userType = await UserType.findByPk(user_type_id, {
+        transaction: t,
+      });
       if (!userType) {
         await t.rollback();
-        return res.status(400).json({
-          success: false,
-          message: "Invalid user type.",
-        });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid user type." });
       }
-    } else {
-      // Keep existing user type if not changed
-      userType = await UserType.findByPk(user.user_type_id, { transaction: t });
     }
 
-    // ====== Validate institute ======
-    if (userType.name === "institute_user") {
-      if (!institute_id) {
-        await t.rollback();
-        return res.status(400).json({
-          success: false,
-          message: "Institute ID is required for institute users.",
-        });
-      }
-
+    // ====== Optional institute validation ======
+    if (institute_id) {
       const institute = await Institute.findByPk(institute_id, {
         transaction: t,
       });
       if (!institute) {
         await t.rollback();
-        return res.status(400).json({
-          success: false,
-          message: "Invalid institute ID.",
-        });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid institute ID." });
       }
     }
-    // ====== Hierarchy node validation ======
+
+    // ====== Optional hierarchy validation ======
     if (hierarchy_node_id) {
       const node = await HierarchyNode.findByPk(hierarchy_node_id, {
         transaction: t,
@@ -300,166 +259,89 @@ const updateUser = async (req, res) => {
         full_name: full_name ?? user.full_name,
         email: email ?? user.email,
         phone_number: phone_number ?? user.phone_number,
-        position: position ?? user.position,
         user_type_id: user_type_id ?? user.user_type_id,
-        institute_id: userType.name === "institute_user" ? institute_id : null,
+        institute_id: institute_id ?? null,
+        hierarchy_node_id: hierarchy_node_id ?? null,
         is_active: is_active ?? user.is_active,
-        hierarchy_node_id: hierarchy_node_id || null,
         updated_at: new Date(),
       },
       { transaction: t }
     );
-    // ====== Update roles if provided ======
-    if (Array.isArray(role_ids)) {
-      // Get existing roles
-      const existingRoles = await UserRoles.findAll({
-        where: { user_id: id },
-        transaction: t,
-      });
-      const existingRoleIds = existingRoles.map((r) => r.role_id);
 
-      // Determine new roles to add
-      const rolesToAdd = role_ids.filter((r) => !existingRoleIds.includes(r));
-      const rolesToRemove = existingRoleIds.filter(
-        (r) => !role_ids.includes(r)
-      );
-
-      // Add new roles
-      if (rolesToAdd.length > 0) {
-        const newRoles = rolesToAdd.map((rid) => ({
-          user_role_id: uuidv4(),
-          user_id: id,
-          role_id: rid,
-          assigned_by: req.user?.user_id || null,
-          assigned_at: new Date(),
-          is_active: true,
-          created_at: new Date(),
-          updated_at: new Date(),
-        }));
-        await UserRoles.bulkCreate(newRoles, { transaction: t });
-      }
-
-      // Remove roles
-      if (rolesToRemove.length > 0) {
-        await UserRoles.destroy({
-          where: { user_id: id, role_id: rolesToRemove },
-          transaction: t,
-        });
-      }
-    }
     await t.commit();
-
-    // ====== Fetch updated user with relations ======
-    const updatedUser = await User.findByPk(id, {
-      include: [
-        {
-          model: UserType,
-          as: "userType",
-          attributes: ["name", "description"],
-        },
-        {
-          model: Institute,
-          as: "institute",
-          attributes: ["name", "contact_email"],
-        },
-        {
-          model: Role,
-          as: "roles",
-          attributes: ["role_id", "name", "description"],
-          through: { attributes: [] },
-        },
-        {
-          model: HierarchyNode,
-          as: "hierarchyNode",
-          attributes: ["name", "description"],
-        },
-      ],
-    });
 
     return res.status(200).json({
       success: true,
-      message: "User updated successfully",
-      data: updatedUser,
+      message: "User updated successfully.",
+      data: user,
     });
   } catch (error) {
-    await t.rollback();
-    return res.status(500).json({
-      success: false,
-      message: "Error updating user",
-      error: error.message,
-    });
+    if (!t.finished) await t.rollback();
+    console.error("Error updating user:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
 // ============Get all users=====================
 const getUsers = async (req, res) => {
   try {
-    const { search, user_type_id, is_active, page = 1, limit = 10 } = req.query;
-    const { limit: pageLimit, offset } = getPagination(page, limit);
+    const {
+      institute_id,
+      user_type_id,
+      hierarchy_node_id,
+      is_active,
+      search, // optional: for name/email search
+    } = req.query;
 
-    const where = {};
+    // ====== Build filters dynamically ======
+    const whereClause = {};
 
-    // ===== Search filter =====
+    if (institute_id) whereClause.institute_id = institute_id;
+    if (user_type_id) whereClause.user_type_id = user_type_id;
+    if (hierarchy_node_id) whereClause.hierarchy_node_id = hierarchy_node_id;
+    if (is_active !== undefined) whereClause.is_active = is_active === "true";
+
     if (search) {
-      where[Op.or] = [
-        { full_name: { [Op.iLike]: `%${search}%` } },
-        { email: { [Op.iLike]: `%${search}%` } },
-        { position: { [Op.iLike]: `%${search}%` } },
+      whereClause[Op.or] = [
+        { full_name: { [Op.like]: `%${search}%` } },
+        { email: { [Op.like]: `%${search}%` } },
+        { phone_number: { [Op.like]: `%${search}%` } },
       ];
     }
 
-    // ===== User type filter =====
-    if (user_type_id) where.user_type_id = user_type_id;
-
-    // ===== Active/inactive filter =====
-    if (typeof is_active !== "undefined") {
-      where.is_active = is_active === "true" || is_active === true;
-    }
-
-    // ===== Fetch users =====
-    const data = await User.findAndCountAll({
-      where,
-      attributes: { exclude: ["password"] },
+    // ====== Fetch users with associations ======
+    const users = await User.findAll({
+      where: whereClause,
       include: [
-        {
-          model: UserType,
-          as: "userType",
-          attributes: ["user_type_id", "name", "description"],
-        },
-        {
-          model: Role,
-          as: "roles",
-          through: { attributes: [] },
-        },
         {
           model: Institute,
           as: "institute",
-          attributes: ["institute_id", "name", "address"],
+          attributes: ["institute_id", "name"],
+        },
+        {
+          model: UserType,
+          as: "userType",
+          attributes: ["user_type_id", "name"],
         },
         {
           model: HierarchyNode,
           as: "hierarchyNode",
-          attributes: ["name", "description"],
+          attributes: ["hierarchy_node_id", "name"],
         },
       ],
       order: [["created_at", "DESC"]],
-      limit: pageLimit,
-      offset,
-      distinct: true,
     });
-
-    const response = getPagingData(data, page, pageLimit);
 
     return res.status(200).json({
       success: true,
-      message: "Users retrieved successfully",
-      data: response,
+      message: "Users fetched successfully.",
+      data: users,
     });
   } catch (error) {
     console.error("Error fetching users:", error);
     return res.status(500).json({
       success: false,
-      message: "Error retrieving users",
+      message: "Failed to fetch users.",
       error: error.message,
     });
   }
@@ -467,39 +349,25 @@ const getUsers = async (req, res) => {
 
 const getUserById = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { user_id } = req.params;
 
-    // ===== Validate UUID =====
-    if (!isUuid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid user ID format",
-      });
-    }
-
-    // ===== Fetch user with associations =====
-    const user = await User.findByPk(id, {
-      attributes: { exclude: ["password"] },
+    // ====== Find user with relations ======
+    const user = await User.findByPk(user_id, {
       include: [
-        {
-          model: UserType,
-          as: "userType",
-          attributes: ["user_type_id", "name", "description"],
-        },
-        {
-          model: Role,
-          as: "roles",
-          through: { attributes: [] },
-        },
         {
           model: Institute,
           as: "institute",
           attributes: ["institute_id", "name", "address", "contact_email"],
         },
         {
+          model: UserType,
+          as: "userType",
+          attributes: ["user_type_id", "name"],
+        },
+        {
           model: HierarchyNode,
           as: "hierarchyNode",
-          attributes: ["name", "description"],
+          attributes: ["hierarchy_node_id", "name"],
         },
       ],
     });
@@ -507,20 +375,20 @@ const getUserById = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: "User not found.",
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: "User retrieved successfully",
+      message: "User fetched successfully.",
       data: user,
     });
   } catch (error) {
     console.error("Error fetching user:", error);
     return res.status(500).json({
       success: false,
-      message: "Error retrieving user details",
+      message: "Failed to fetch user.",
       error: error.message,
     });
   }
@@ -795,4 +663,5 @@ module.exports = {
   toggleUserActiveStatus,
   resetUserPassword,
   getProfile,
+  getUserTypes,
 };

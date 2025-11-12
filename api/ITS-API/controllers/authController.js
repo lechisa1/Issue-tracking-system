@@ -11,7 +11,6 @@ const {
 } = require("../models");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { v4: uuidv4 } = require("uuid");
 
 const login = async (req, res) => {
   try {
@@ -43,7 +42,7 @@ const login = async (req, res) => {
     const token = jwt.sign(
       { user_id: user.user_id, email: user.email },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRATION_TIME || "3h" }
+      { expiresIn: process.env.JWT_EXPIRATION_TIME || "12h" }
     );
 
     // Fetch active roles, subroles, and permissions
@@ -112,6 +111,7 @@ const login = async (req, res) => {
       user: {
         user_id: user.user_id,
         full_name: user.full_name,
+        UserType: user.UserType,
         email: user.email,
         phone_number: user.phone_number,
         position: user.position,
@@ -122,7 +122,6 @@ const login = async (req, res) => {
               name: user.institute.name,
             }
           : null,
-        roles,
       },
     });
   } catch (error) {

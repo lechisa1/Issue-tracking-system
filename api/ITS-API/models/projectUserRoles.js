@@ -24,6 +24,11 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "sub_role_id",
         as: "subRole",
       });
+      // 🟢 Add link to hierarchy node (for external users)
+      ProjectUserRole.belongsTo(models.HierarchyNode, {
+        foreignKey: "hierarchy_node_id",
+        as: "hierarchyNode",
+      });
     }
   }
 
@@ -50,6 +55,11 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.UUID,
         allowNull: true,
       },
+      // 🟢 New: Hierarchy Node (only for external users)
+      hierarchy_node_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
       is_active: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
@@ -72,9 +82,9 @@ module.exports = (sequelize, DataTypes) => {
       indexes: [
         {
           unique: true,
-          fields: ['project_id', 'user_id']
-        }
-      ]
+          fields: ["project_id", "user_id"],
+        },
+      ],
     }
   );
 

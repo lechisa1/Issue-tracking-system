@@ -1,4 +1,3 @@
-
 "use strict";
 const { Model } = require("sequelize");
 
@@ -13,9 +12,13 @@ module.exports = (sequelize, DataTypes) => {
         as: "institutes",
       });
       // One-to-Many relationship with Hierarchy
-      this.hasMany(models.Hierarchy, {
+      this.hasMany(models.HierarchyNode, {
         foreignKey: "project_id",
         as: "hierarchies",
+      });
+      this.hasMany(models.ProjectUserRole, {
+        foreignKey: "project_id",
+        as: "projectUserRoles",
       });
     }
   }

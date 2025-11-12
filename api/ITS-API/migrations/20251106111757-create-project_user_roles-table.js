@@ -1,5 +1,7 @@
 "use strict";
 
+const hierarchy = require("../models/hierarchy");
+
 module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.createTable("project_user_roles", {
@@ -18,6 +20,16 @@ module.exports = {
         },
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
+      },
+      hierarchy_node_id: {
+        type: Sequelize.UUID,
+        allowNull: true,
+        references: {
+          model: "hierarchy_node",
+          key: "hierarchy_node_id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "SET NULL",
       },
       user_id: {
         type: Sequelize.UUID,
@@ -65,8 +77,6 @@ module.exports = {
         defaultValue: Sequelize.fn("NOW"),
       },
     });
-
-
   },
 
   async down(queryInterface) {
