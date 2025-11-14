@@ -1,0 +1,40 @@
+name: Backend CI (Test Branch Only)
+
+on:
+  push:
+    branches:
+      - ci-cd 
+  pull_request:
+    branches:
+      - ci-cd
+
+jobs:
+  backend-ci:
+    name: Build & Test Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout repo
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2️⃣ Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      # 3️⃣ Install dependencies
+      - name: Install Dependencies
+        working-directory: api/ITS-API
+        run: npm install
+
+      # 4️⃣ Run tests (will skip if no tests)
+      - name: Run Tests
+        working-directory: api/ITS-API
+        run: npm test --if-present
+
+      # 5️⃣ Build backend
+      - name: Build Backend
+        working-directory: api/ITS-API
+        run: npm run build --if-present
