@@ -16,20 +16,13 @@ const allowedTypes = [
   "image/png",
 ];
 
+const tempUploadDir = path.join(__dirname, "../public/uploads/temp");
+if (!fs.existsSync(tempUploadDir))
+  fs.mkdirSync(tempUploadDir, { recursive: true });
+
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const { issue_id } = req.body;
-    if (!issue_id) return cb(new Error("Issue ID is required"));
-
-    const issueDir = path.join(
-      __dirname,
-      `../public/uploads/issues/${issue_id}`
-    );
-    if (!fs.existsSync(issueDir)) fs.mkdirSync(issueDir, { recursive: true });
-
-    cb(null, issueDir);
-  },
-  filename: function (req, file, cb) {
+  destination: (req, file, cb) => cb(null, tempUploadDir),
+  filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     const ext = path.extname(file.originalname);
     const baseName = path
@@ -48,7 +41,8 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB
+  limits: { fileSize: 100 * 1024 * 1024 },
 });
 
+// Export the upload object itself so we can use different methods
 module.exports = upload;

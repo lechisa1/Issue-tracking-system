@@ -8,7 +8,7 @@ const createRoleSchema = Joi.object({
   description: Joi.string().trim().required().messages({
     "string.empty": "Role description is required",
   }),
-
+  is_active: Joi.boolean().optional(),
   permission_ids: Joi.alternatives()
     .try(
       Joi.array().items(
@@ -86,24 +86,30 @@ exports.validateCreateRole = (req, res, next) => {
 const updateRoleSchema = Joi.object({
   name: Joi.string().trim().optional(),
   description: Joi.string().trim().optional(),
+  is_active: Joi.boolean().optional(),
+
+  // Allow updating permissions at role level
+  permission_ids: Joi.array()
+    .items(
+      Joi.string()
+        .guid({ version: "uuidv4" })
+        .messages({ "string.guid": "Each permission_id must be a valid UUID" })
+    )
+    .optional(),
+
   sub_roles: Joi.array()
     .items(
       Joi.object({
         sub_role_id: Joi.string()
           .guid({ version: "uuidv4" })
           .required()
-          .messages({
-            "string.guid": "Each sub_role_id must be a valid UUID",
-          }),
+          .messages({ "string.guid": "Each sub_role_id must be a valid UUID" }),
 
-        permission_ids: Joi.alternatives()
-          .try(
-            Joi.array().items(
-              Joi.string().guid({ version: "uuidv4" }).messages({
-                "string.guid": "Each permission_id must be a valid UUID",
-              })
-            ),
-            Joi.string()
+        permission_ids: Joi.array()
+          .items(
+            Joi.string().guid({ version: "uuidv4" }).messages({
+              "string.guid": "Each permission_id must be a valid UUID",
+            })
           )
           .optional(),
       })

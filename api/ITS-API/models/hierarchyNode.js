@@ -58,7 +58,7 @@ module.exports = (sequelize, DataTypes) => {
     {
       sequelize,
       modelName: "HierarchyNode",
-      tableName: "hierarchy_node",
+      tableName: "hierarchy_nodes",
       timestamps: true,
       createdAt: "created_at",
       updatedAt: "updated_at",
