@@ -2,7 +2,7 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("hierarchy_node", {
+    await queryInterface.createTable("hierarchy_nodes", {
       hierarchy_node_id: {
         type: Sequelize.UUID,
         defaultValue: Sequelize.UUIDV4,
@@ -22,7 +22,7 @@ module.exports = {
         type: Sequelize.UUID,
         allowNull: true,
         references: {
-          model: "hierarchy_node",
+          model: "hierarchy_nodes",
           key: "hierarchy_node_id",
         },
         onUpdate: "CASCADE",
@@ -61,6 +61,6 @@ module.exports = {
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable("hierarchy_node");
+    await queryInterface.dropTable("hierarchy_nodes");
   },
 };

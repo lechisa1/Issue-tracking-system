@@ -19,7 +19,7 @@ module.exports = {
         allowNull: false,
       },
       is_active: {
-        type: DataTypes.BOOLEAN,
+        type: Sequelize.BOOLEAN,
         defaultValue: true,
         allowNull: true,
       },
