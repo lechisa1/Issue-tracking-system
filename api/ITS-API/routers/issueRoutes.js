@@ -7,7 +7,8 @@ const {
   validateGetIssuesQuery,
   validateIssueIdParam,
 } = require("../validators/issueValidator");
-
+const { authenticateToken } = require("../middlewares/authMiddleware");
+const upload = require("../middlewares/uploadMiddleware");
 /**
  * @swagger
  * tags:
@@ -61,7 +62,7 @@ const {
  *       400:
  *         description: Bad request
  */
-router.post("/", validateCreateIssue, issueController.createIssue);
+// router.post("/", validateCreateIssue, issueController.createIssue);
 
 /**
  * @swagger
@@ -74,7 +75,19 @@ router.post("/", validateCreateIssue, issueController.createIssue);
  *         description: List of issues
  */
 router.get("/", validateGetIssuesQuery, issueController.getIssues);
+router.post(
+  "",
+  authenticateToken,
+  upload.array("attachments"),
+  issueController.createIssueWithAttachments
+);
 
+router.patch(
+  "/:issue_id",
+  authenticateToken,
+  upload.array("attachments"),
+  issueController.updateIssueWithAttachments
+);
 /**
  * @swagger
  * /api/issues/{id}:

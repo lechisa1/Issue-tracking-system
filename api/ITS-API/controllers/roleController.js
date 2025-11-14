@@ -162,7 +162,7 @@ const createRole = async (req, res) => {
         role_permission_id: uuidv4(),
         role_id: role.role_id,
         permission_id: pid,
-        assigned_by: "49f1a85c-17c9-401b-9cce-3185cc2ccc4e",
+        assigned_by: "8993455e-312b-433f-b8d7-15491875d38a",
         assigned_at: new Date(),
         created_at: new Date(),
         updated_at: new Date(),
@@ -295,6 +295,18 @@ const getRoleById = async (req, res) => {
                   attributes: ["permission_id", "resource", "action"],
                 },
               ],
+            },
+          ],
+        },
+        {
+          model: RolePermission,
+          as: "rolePermissions",
+          required: false,
+          include: [
+            {
+              model: Permission,
+              as: "permission",
+              attributes: ["permission_id", "resource", "action"],
             },
           ],
         },
