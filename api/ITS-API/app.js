@@ -38,6 +38,8 @@ const issueFileAttachmentRoutes = require("./routers/issueAttachmentRoutes");
 const permissionRoute = require("./routers/permissionRoutes");
 
 const issueGuideLines = require("./routers/issueReportingGuidelineRoutes");
+const getAssignedProjectRoute = require("./routers/getAssignedProjectRoute");
+const issueFlowRoute = require("./routers/issueFlowRoute");
 const app = express();
 const appServer = http.createServer(app);
 
@@ -133,8 +135,10 @@ app.use("/api/change-password", changePasswordRoutes);
 app.use("/api/issue-file-attachment", issueFileAttachmentRoutes);
 
 app.use("/api/permissions", permissionRoute);
-
+app.use("/api/issue-flow", issueFlowRoute);
 app.use("/api/issue-guidelines", issueGuideLines);
+
+app.use("/api/flow", getAssignedProjectRoute);
 // ================== Root Endpoint ==================
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to Issue Tracking System API 🚀" });

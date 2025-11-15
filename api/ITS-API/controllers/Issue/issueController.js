@@ -9,6 +9,9 @@ const {
   IssueTier,
   IssueEscalation,
   IssueComment,
+  ProjectUserRole,
+  Institute,
+  Project,
   IssueAttachment,
   IssueAction,
   IssueStatusHistory,
@@ -114,24 +117,70 @@ const createIssueWithAttachments = async (req, res) => {
       url_path,
       issue_description,
       issue_occured_time,
-      replace = false, // optional, for file replacement
+      replace = false,
     } = req.body;
+
     const reported_by = req.user?.user_id;
-    console.log(
-      "reported byyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
-      reported_by
-    );
-    const issue_id = uuidv4();
+    if (!reported_by) {
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
+    }
+
     if (!title || title.trim() === "") {
       return res
         .status(400)
         .json({ success: false, message: "Title is required" });
     }
-    // 1️⃣ Create the issue
+
+    console.log("REQ BODY institute_project_id =", institute_project_id);
+
+    // ✅ Fetch user's assigned projects
+    const assignedProjects = await ProjectUserRole.findAll({
+      where: { user_id: reported_by, is_active: true },
+      include: [
+        {
+          model: Project,
+          as: "project",
+          include: [
+            {
+              model: InstituteProject,
+              as: "instituteProjects",
+              attributes: ["institute_project_id"],
+            },
+          ],
+        },
+      ],
+      transaction: t,
+    });
+
+    // Filter out invalid projects
+    const validAssignments = assignedProjects.filter(
+      (assignment) =>
+        assignment.project && assignment.project.instituteProjects?.length
+    );
+
+    // ✅ Check if user is assigned to the selected institute_project safely
+    const isAssigned = assignedProjects.some((assignment) =>
+      assignment.project?.instituteProjects?.some(
+        (ip) => ip.institute_project_id === institute_project_id
+      )
+    );
+
+    if (!isAssigned) {
+      await t.rollback();
+      return res.status(403).json({
+        success: false,
+        message: "You are not assigned to this project",
+      });
+    }
+
+    // 1️⃣ Create the issue inside transaction
+    const issue_id = uuidv4();
     const issue = await Issue.create(
       {
         issue_id,
-        institute_project_id: institute_project_id || null,
+        institute_project_id,
         title: title.trim(),
         description,
         issue_category_id: issue_category_id || null,
@@ -164,7 +213,7 @@ const createIssueWithAttachments = async (req, res) => {
       { transaction: t }
     );
 
-    // 3️⃣ Handle attachments if any
+    // 3️⃣ Handle attachments
     if (req.files && req.files.length > 0) {
       const issueDir = path.join(
         __dirname,
@@ -172,13 +221,11 @@ const createIssueWithAttachments = async (req, res) => {
       );
       if (!fs.existsSync(issueDir)) fs.mkdirSync(issueDir, { recursive: true });
 
-      // If replace=true and files already exist (for re-upload)
       if (replace) {
         const existingFiles = await IssueAttachment.findAll({
           where: { issue_id },
           transaction: t,
         });
-
         for (const file of existingFiles) {
           if (fs.existsSync(file.file_path)) fs.unlinkSync(file.file_path);
           await file.destroy({ transaction: t });
@@ -187,7 +234,7 @@ const createIssueWithAttachments = async (req, res) => {
 
       for (const file of req.files) {
         const newFilePath = path.join(issueDir, file.filename);
-        fs.renameSync(file.path, newFilePath); // move from temp -> final folder
+        fs.renameSync(file.path, newFilePath);
 
         await IssueAttachment.create(
           {
@@ -204,32 +251,50 @@ const createIssueWithAttachments = async (req, res) => {
       }
     }
 
+    // ✅ Commit transaction after all creations
     await t.commit();
 
-    // 4️⃣ Return full issue with all details + attachments
+    // 4️⃣ Fetch issue with minimal details (outside transaction)
     const issueWithDetails = await Issue.findOne({
-      where: { issue_id: issue.issue_id },
+      where: { issue_id },
       include: [
-        { model: InstituteProject, as: "instituteProject" },
-        { model: IssueCategory, as: "category" },
-        { model: IssuePriority, as: "priority" },
-        { model: HierarchyNode, as: "hierarchyNode" },
-        { model: User, as: "reporter" },
-        { model: User, as: "assignee" },
-        { model: IssueAttachment, as: "attachments" },
-        { model: IssueStatusHistory, as: "statusHistory" }, // include history
+        {
+          model: IssueAttachment,
+          as: "attachments",
+          attributes: ["file_name", "file_path"],
+        },
+        { model: User, as: "reporter", attributes: ["user_id", "full_name"] },
+        {
+          model: InstituteProject,
+          as: "instituteProject",
+          attributes: ["institute_project_id"],
+          include: [
+            {
+              model: Project,
+              as: "project",
+              attributes: ["project_id", "name"],
+            },
+            {
+              model: Institute,
+              as: "institute",
+              attributes: ["institute_id", "name"],
+            },
+          ],
+        },
       ],
     });
 
     return res.status(201).json({
       success: true,
-      message: "Issue created successfully with attachments and history",
+      message: "Issue created successfully",
       data: issueWithDetails,
     });
   } catch (error) {
-    await t.rollback();
+    try {
+      await t.rollback();
+    } catch (_) {}
 
-    // delete temp uploaded files if failure
+    // Clean up uploaded files if any
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
         if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
@@ -237,13 +302,14 @@ const createIssueWithAttachments = async (req, res) => {
     }
 
     console.error("❌ Error creating issue:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Internal server error while creating issue",
       error: error.message,
     });
   }
 };
+
 const updateIssueWithAttachments = async (req, res) => {
   const t = await sequelize.transaction();
   try {

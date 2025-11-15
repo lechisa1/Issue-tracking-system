@@ -29,6 +29,12 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "hierarchy_node_id",
         as: "hierarchyNode",
       });
+      ProjectUserRole.hasOne(models.InstituteProject, {
+        foreignKey: "project_id",
+        sourceKey: "project_id",
+        as: "instituteProject",
+      });
+
     }
   }
 

@@ -31,6 +31,7 @@ const createProject = async (req, res) => {
       name,
       description,
       is_active,
+      institute_id: institute_id || null,
     });
 
     // If institute_id is provided, create the association
@@ -51,12 +52,16 @@ const createProject = async (req, res) => {
       }
 
       // Create association
-      await InstituteProject.create({
+      const institute_project_id = await InstituteProject.create({
         institute_project_id: uuidv4(),
         institute_id,
         project_id: project_id,
         is_active: true,
       });
+      console.log(
+        "institute_project_id institute_project_id institute_project_id",
+        institute_project_id
+      );
     }
 
     res.status(201).json(project);
@@ -214,7 +219,8 @@ const assignUserToProject = async (req, res) => {
         });
       }
     }
-
+    const finalHierarchyId =
+      user.user_type === "external_user" ? hierarchy_node_id : null;
     // ====== Create project-user-role ======
     const assignment = await ProjectUserRole.create(
       {
@@ -223,9 +229,7 @@ const assignUserToProject = async (req, res) => {
         user_id,
         role_id,
         sub_role_id: sub_role_id ?? null,
-        hierarchy_node_id:
-          // user.user_type === "external_user" ? hierarchy_node_id : null,
-          hierarchy_node_id,
+        hierarchy_node_id: finalHierarchyId,
         is_active: true,
         created_at: new Date(),
         updated_at: new Date(),
