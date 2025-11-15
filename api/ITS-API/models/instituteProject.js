@@ -14,6 +14,12 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "project_id",
         as: "project",
       });
+      InstituteProject.hasMany(models.ProjectUserRole, {
+        foreignKey: "project_id",
+        sourceKey: "project_id",
+        as: "projectUserRoles",
+      });
+
     }
   }
 
