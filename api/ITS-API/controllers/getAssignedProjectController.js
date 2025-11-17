@@ -534,7 +534,7 @@ const getMyProjectHierarchy = async (req, res) => {
     // Get complete hierarchy tree for the project
     const hierarchyTree = await HierarchyNode.findAll({
       where: {
-        hierarchy_id: assignment.hierarchyNode.hierarchy_id,
+        hierarchy_id: assignment.hierarchyNode.hierarchy_node_id,
       },
       include: [
         {

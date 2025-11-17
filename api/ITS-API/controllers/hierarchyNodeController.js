@@ -64,6 +64,10 @@ const createHierarchyNode = async (req, res) => {
 // Get all hierarchy nodes
 const getHierarchyNodes = async (req, res) => {
   try {
+    console.log(
+      "HierarchyNode model attributes:",
+      Object.keys(HierarchyNode.rawAttributes)
+    );
     const nodes = await HierarchyNode.findAll({
       include: [
         { model: Project, as: "project" },
@@ -182,6 +186,43 @@ const deleteHierarchyNode = async (req, res) => {
 };
 
 // Get top-level hierarchy nodes (parent_id = null) for a specific project
+// const getParentNodes = async (req, res) => {
+//   try {
+//     const { project_id } = req.params;
+
+//     // Validate project existence
+//     const project = await Project.findByPk(project_id);
+//     if (!project) {
+//       return res
+//         .status(404)
+//         .json({ message: `Project with id '${project_id}' not found.` });
+//     }
+
+//     // Fetch top-level nodes
+//     const parentNodes = await HierarchyNode.findAll({
+//       where: { project_id, parent_id: null },
+//       include: [
+//         { model: Project, as: "project" },
+//         { model: HierarchyNode, as: "children" },
+//       ],
+//       order: [["created_at", "ASC"]],
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       project_id,
+//       count: parentNodes.length,
+//       parentNodes,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching parent nodes:", error);
+//     return res
+//       .status(500)
+//       .json({ message: "Internal server error", error: error.message });
+//   }
+// };
+
+// Get full tree structure for a project
 const getParentNodes = async (req, res) => {
   try {
     const { project_id } = req.params;
@@ -194,24 +235,43 @@ const getParentNodes = async (req, res) => {
         .json({ message: `Project with id '${project_id}' not found.` });
     }
 
-    // Fetch top-level nodes
-    const parentNodes = await HierarchyNode.findAll({
-      where: { project_id, parent_id: null },
-      include: [
-        { model: Project, as: "project" },
-        { model: HierarchyNode, as: "children" },
-      ],
-      order: [["created_at", "ASC"]],
+    // Fetch ALL nodes of the project at once
+    const allNodes = await HierarchyNode.findAll({
+      where: { project_id },
+      order: [["level", "ASC"]],
+    });
+
+    // Convert to plain JSON
+    const plainNodes = allNodes.map((n) => n.get({ plain: true }));
+
+    // Build map
+    const map = new Map();
+    plainNodes.forEach((node) => {
+      map.set(node.hierarchy_node_id, { ...node, children: [] });
+    });
+
+    // Build proper tree
+    const roots = [];
+
+    map.forEach((node) => {
+      if (node.parent_id) {
+        const parent = map.get(node.parent_id);
+        if (parent) {
+          parent.children.push(node);
+        }
+      } else {
+        roots.push(node);
+      }
     });
 
     return res.status(200).json({
       success: true,
       project_id,
-      count: parentNodes.length,
-      parentNodes,
+      count: roots.length,
+      nodes: roots, // FULL TREE
     });
   } catch (error) {
-    console.error("Error fetching parent nodes:", error);
+    console.error("Error fetching hierarchy tree:", error);
     return res
       .status(500)
       .json({ message: "Internal server error", error: error.message });

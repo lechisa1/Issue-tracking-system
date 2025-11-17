@@ -229,7 +229,7 @@ const assignUserToProject = async (req, res) => {
         user_id,
         role_id,
         sub_role_id: sub_role_id ?? null,
-        hierarchy_node_id: finalHierarchyId,
+        hierarchy_node_id: hierarchy_node_id,
         is_active: true,
         created_at: new Date(),
         updated_at: new Date(),
@@ -315,6 +315,65 @@ const removeUserFromProject = async (req, res) => {
   }
 };
 
+// Get list of projects assigned to a user
+const getProjectsAssignedToUser = async (req, res) => {
+  try {
+    const { user_id } = req.params;
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
+    const assignments = await ProjectUserRole.findAll({
+      where: { user_id, is_active: true },
+      include: [
+        {
+          model: Project,
+          as: "project",
+          include: [
+            {
+              model: InstituteProject,
+              as: "instituteProjects",
+            },
+          ],
+        },
+        {
+          model: Role,
+          as: "role",
+          attributes: ["role_id", "name"],
+        },
+        {
+          model: SubRole,
+          as: "subRole",
+          attributes: ["sub_role_id", "name"],
+        },
+        {
+          model: HierarchyNode,
+          as: "hierarchyNode",
+          attributes: ["hierarchy_node_id", "name"],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    return res.status(200).json({
+      success: true,
+      count: assignments.length,
+      data: assignments,
+    });
+  } catch (error) {
+    console.error("Error fetching assigned projects:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createProject,
   getProjects,
@@ -323,4 +382,5 @@ module.exports = {
   deleteProject,
   assignUserToProject,
   removeUserFromProject,
+  getProjectsAssignedToUser,
 };

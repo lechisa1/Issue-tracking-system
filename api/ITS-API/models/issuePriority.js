@@ -4,7 +4,8 @@ module.exports = (sequelize, DataTypes) => {
     "IssuePriority",
     {
       priority_id: {
-        type: DataTypes.CHAR(36),
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
       name: {

@@ -55,7 +55,6 @@ db.InstituteProject = require("./instituteProject")(
   sequelize,
   Sequelize.DataTypes
 );
-db.Hierarchy = require("./hierarchy")(sequelize, Sequelize.DataTypes);
 db.HierarchyNode = require("./hierarchyNode")(sequelize, Sequelize.DataTypes);
 
 Object.keys(db).forEach((modelName) => {

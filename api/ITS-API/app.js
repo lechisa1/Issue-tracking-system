@@ -27,13 +27,13 @@ const issueEscalationRoutes = require("./routers/issueEscaltionRoute");
 
 const instituteRoute = require("./routers/instituteRoutes");
 const instituteProjectsRoute = require("./routers/instituteProjectRoutes");
-const hierarchyRoute = require("./routers/hierarchyRoutes");
 const hierarchyNodeRoute = require("./routers/hierarchyNodeRoutes");
 const hierarchyNodeOrganizationRoute = require("./routers/hierarchyNodeOrganizationRoutes");
 
 const changePasswordRoutes = require("./routers/passwordChangeRoutes");
 
 const issueFileAttachmentRoutes = require("./routers/issueAttachmentRoutes");
+const fileAttachmentRoutes = require("./routers/attachementRoutes");
 
 const permissionRoute = require("./routers/permissionRoutes");
 
@@ -77,6 +77,17 @@ app.use(
       if (filePath.endsWith(".pdf")) {
         res.set("Content-Disposition", "inline");
       }
+    },
+  })
+);
+
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "uploads"), {
+    setHeaders: (res, filePath) => {
+      res.set("Access-Control-Allow-Origin", "*");
+      res.set("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS");
+      res.set("Access-Control-Allow-Headers", "Content-Type");
     },
   })
 );
@@ -132,7 +143,8 @@ app.use("/api/issue-escalations", issueEscalationRoutes);
 
 app.use("/api/change-password", changePasswordRoutes);
 
-app.use("/api/issue-file-attachment", issueFileAttachmentRoutes);
+app.use("/api/issue-attachments", issueFileAttachmentRoutes);
+app.use("/api/attachments", fileAttachmentRoutes);
 
 app.use("/api/permissions", permissionRoute);
 app.use("/api/issue-flow", issueFlowRoute);
