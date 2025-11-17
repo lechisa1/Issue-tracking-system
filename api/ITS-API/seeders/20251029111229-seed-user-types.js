@@ -9,14 +9,16 @@ module.exports = {
       {
         user_type_id: uuidv4(),
         name: "external_user",
-        description: "Users who are external stakeholders, such as clients or partners, interacting with the Issue Tracking System.",
+        description:
+          "Users who are external stakeholders, such as clients or partners, interacting with the Issue Tracking System.",
         created_at: now,
         updated_at: now,
       },
       {
         user_type_id: uuidv4(),
         name: "internal_user",
-        description: "Users who are internal staff or employees within the organization managing or overseeing projects and issues.",
+        description:
+          "Users who are internal staff or employees within the organization managing or overseeing projects and issues.",
         created_at: now,
         updated_at: now,
       },

@@ -6,9 +6,10 @@ const {
   validateUpdateIssue,
   validateGetIssuesQuery,
   validateIssueIdParam,
+  validateHierarchyNodeIdParam,
 } = require("../validators/issueValidator");
 const { authenticateToken } = require("../middlewares/authMiddleware");
-const upload = require("../middlewares/uploadMiddleware");
+
 /**
  * @swagger
  * tags:
@@ -62,7 +63,12 @@ const upload = require("../middlewares/uploadMiddleware");
  *       400:
  *         description: Bad request
  */
-// router.post("/", validateCreateIssue, issueController.createIssue);
+router.post(
+  "/",
+  authenticateToken,
+  validateCreateIssue,
+  issueController.createIssue
+);
 
 /**
  * @swagger
@@ -75,19 +81,7 @@ const upload = require("../middlewares/uploadMiddleware");
  *         description: List of issues
  */
 router.get("/", validateGetIssuesQuery, issueController.getIssues);
-router.post(
-  "",
-  authenticateToken,
-  upload.array("attachments"),
-  issueController.createIssueWithAttachments
-);
 
-router.patch(
-  "/:issue_id",
-  authenticateToken,
-  upload.array("attachments"),
-  issueController.updateIssueWithAttachments
-);
 /**
  * @swagger
  * /api/issues/{id}:
@@ -152,6 +146,7 @@ router.get("/:id", validateIssueIdParam, issueController.getIssueById);
  */
 router.put(
   "/:id",
+  authenticateToken,
   validateIssueIdParam,
   validateUpdateIssue,
   issueController.updateIssue
@@ -177,6 +172,34 @@ router.put(
  *       404:
  *         description: Issue not found
  */
+
+/**
+ * @swagger
+ * /api/issues/by-hnode/{hierarchy_node_id}:
+ *   get:
+ *     summary: Get issues by hierarchy_node_id
+ *     tags: [Issues]
+ *     parameters:
+ *       - in: path
+ *         name: hierarchy_node_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Hierarchy Node ID
+ *     responses:
+ *       200:
+ *         description: Issues for the given hierarchy node
+ *       404:
+ *         description: No issues found
+ */
+
+router.get(
+  "/issues/hierarchy/:hierarchy_node_id/project/:project_id",
+  validateHierarchyNodeIdParam,
+  issueController.getIssuesByHierarchyNodeId
+);
+
 router.delete("/:id", validateIssueIdParam, issueController.deleteIssue);
 
 module.exports = router;

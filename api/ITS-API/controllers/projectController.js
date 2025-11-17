@@ -31,6 +31,7 @@ const createProject = async (req, res) => {
       name,
       description,
       is_active,
+      institute_id: institute_id || null,
     });
 
     // If institute_id is provided, create the association
@@ -51,12 +52,16 @@ const createProject = async (req, res) => {
       }
 
       // Create association
-      await InstituteProject.create({
+      const institute_project_id = await InstituteProject.create({
         institute_project_id: uuidv4(),
         institute_id,
         project_id: project_id,
         is_active: true,
       });
+      console.log(
+        "institute_project_id institute_project_id institute_project_id",
+        institute_project_id
+      );
     }
 
     res.status(201).json(project);
@@ -100,6 +105,7 @@ const getProjectById = async (req, res) => {
           as: "institutes",
           through: { attributes: ["is_active"] },
         },
+        // HierarchyNode
         {
           model: ProjectUserRole,
           as: "projectUserRoles", // make sure your Project model has `hasMany(ProjectUserRole, { as: "projectUserRoles" })`
@@ -115,6 +121,11 @@ const getProjectById = async (req, res) => {
               as: "subRole",
               attributes: ["sub_role_id", "name"],
             }, // MUST match the alias
+            {
+              model: HierarchyNode,
+              as: "hierarchyNode",
+              attributes: ["hierarchy_node_id", "name"],
+            },
           ],
         },
       ],
@@ -208,7 +219,8 @@ const assignUserToProject = async (req, res) => {
         });
       }
     }
-
+    const finalHierarchyId =
+      user.user_type === "external_user" ? hierarchy_node_id : null;
     // ====== Create project-user-role ======
     const assignment = await ProjectUserRole.create(
       {
@@ -217,8 +229,7 @@ const assignUserToProject = async (req, res) => {
         user_id,
         role_id,
         sub_role_id: sub_role_id ?? null,
-        hierarchy_node_id:
-        user.user_type === "external_user" ? hierarchy_node_id : null,
+        hierarchy_node_id: hierarchy_node_id,
         is_active: true,
         created_at: new Date(),
         updated_at: new Date(),
@@ -304,6 +315,65 @@ const removeUserFromProject = async (req, res) => {
   }
 };
 
+// Get list of projects assigned to a user
+const getProjectsAssignedToUser = async (req, res) => {
+  try {
+    const { user_id } = req.params;
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
+    const assignments = await ProjectUserRole.findAll({
+      where: { user_id, is_active: true },
+      include: [
+        {
+          model: Project,
+          as: "project",
+          include: [
+            {
+              model: InstituteProject,
+              as: "instituteProjects",
+            },
+          ],
+        },
+        {
+          model: Role,
+          as: "role",
+          attributes: ["role_id", "name"],
+        },
+        {
+          model: SubRole,
+          as: "subRole",
+          attributes: ["sub_role_id", "name"],
+        },
+        {
+          model: HierarchyNode,
+          as: "hierarchyNode",
+          attributes: ["hierarchy_node_id", "name"],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    return res.status(200).json({
+      success: true,
+      count: assignments.length,
+      data: assignments,
+    });
+  } catch (error) {
+    console.error("Error fetching assigned projects:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createProject,
   getProjects,
@@ -312,4 +382,5 @@ module.exports = {
   deleteProject,
   assignUserToProject,
   removeUserFromProject,
+  getProjectsAssignedToUser,
 };

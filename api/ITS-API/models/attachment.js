@@ -2,34 +2,32 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-  class IssueAttachment extends Model {
+  class Attachment extends Model {
     static associate(models) {
-      // Junction belongs to Issue
-      IssueAttachment.belongsTo(models.Issue, {
-        foreignKey: "issue_id",
-        as: "issue",
-      });
-
-      // Junction belongs to Attachment
-      IssueAttachment.belongsTo(models.Attachment, {
+      // Junction: Attachment ↔ Issue
+      Attachment.hasMany(models.IssueAttachment, {
         foreignKey: "attachment_id",
-        as: "attachment",
+        as: "issueAttachments",
       });
     }
   }
 
-  IssueAttachment.init(
+  Attachment.init(
     {
-      issue_attachment_id: {
+      attachment_id: {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
-      issue_id: {
-        type: DataTypes.UUID,
+      file_name: {
+        type: DataTypes.STRING(255),
         allowNull: false,
       },
-      attachment_id: {
+      file_path: {
+        type: DataTypes.STRING(500),
+        allowNull: false,
+      },
+      uploaded_by: {
         type: DataTypes.UUID,
         allowNull: false,
       },
@@ -40,12 +38,12 @@ module.exports = (sequelize, DataTypes) => {
     },
     {
       sequelize,
-      modelName: "IssueAttachment",
-      tableName: "issue_attachments",
+      modelName: "Attachment",
+      tableName: "attachments",
       timestamps: false,
       underscored: true,
     }
   );
 
-  return IssueAttachment;
+  return Attachment;
 };

@@ -3,6 +3,9 @@ const {
   UserType,
   Institute,
   ProjectUserRole,
+  Project,
+  HierarchyNode,
+  InstituteProject,
   Role,
   SubRole,
   RoleSubRole,
@@ -151,4 +154,132 @@ const logout = async (req, res) => {
   }
 };
 
-module.exports = { login, logout };
+const getCurrentUser = async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ message: "Unauthorized" });
+
+    const token = authHeader.split(" ")[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const user = await User.findOne({
+      where: { user_id: decoded.user_id },
+
+      include: [
+        {
+          model: Institute,
+          as: "institute",
+          attributes: ["institute_id", "name"],
+        },
+        {
+          model: UserType,
+          as: "userType",
+          attributes: ["user_type_id", "name"],
+        },
+
+        // 🟢 Include user project roles
+        {
+          model: ProjectUserRole,
+          as: "projectRoles",
+          include: [
+            {
+              model: Project,
+              as: "project",
+              attributes: ["project_id", "name", "description"],
+            },
+            {
+              model: Role,
+              as: "role",
+              attributes: ["role_id", "name"],
+            },
+            {
+              model: SubRole,
+              as: "subRole",
+              attributes: ["sub_role_id", "name"],
+            },
+            {
+              model: HierarchyNode,
+              as: "hierarchyNode",
+              attributes: [
+                "hierarchy_node_id",
+                "name",
+                "level",
+                "parent_id",
+                "description",
+              ],
+            },
+            {
+              model: InstituteProject,
+              as: "instituteProject",
+              attributes: ["institute_project_id", "institute_id"],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    return res.status(200).json({
+      user: {
+        user_id: user.user_id,
+        full_name: user.full_name,
+        email: user.email,
+        phone_number: user.phone_number,
+        position: user.position,
+        profile_image: user.profile_image,
+
+        user_type: user.userType ? user.userType.name : null,
+
+        institute: user.institute
+          ? {
+              institute_id: user.institute.institute_id,
+              name: user.institute.name,
+            }
+          : null,
+
+        // 🟢 Return project roles, formatted nicely for frontend
+        project_roles: user.projectRoles?.map((pr) => ({
+          project_user_role_id: pr.project_user_role_id,
+          project: pr.project
+            ? {
+                project_id: pr.project.project_id,
+                name: pr.project.name,
+                description: pr.project.description,
+              }
+            : null,
+          role: pr.role ? pr.role.name : null,
+          role_id: pr.role ? pr.role.role_id : null,
+          sub_role: pr.subRole ? pr.subRole.name : null,
+          sub_role_id: pr.subRole ? pr.subRole.sub_role_id : null,
+
+          hierarchy_node: pr.hierarchyNode
+            ? {
+                hierarchy_node_id: pr.hierarchyNode.hierarchy_node_id,
+                name: pr.hierarchyNode.name,
+                level: pr.hierarchyNode.level,
+                parent_id: pr.hierarchyNode.parent_id,
+                description: pr.hierarchyNode.description,
+              }
+            : null,
+
+          institute_project: pr.instituteProject
+            ? {
+                institute_project_id: pr.instituteProject.institute_project_id,
+                institute_id: pr.instituteProject.institute_id,
+              }
+            : null,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    return res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+};
+
+module.exports = { login, logout, getCurrentUser };

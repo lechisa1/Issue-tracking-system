@@ -4,11 +4,16 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class Issue extends Model {
     static associate(models) {
-      // Issue ↔ InstituteProject (nullable for EAI users)
-      Issue.belongsTo(models.InstituteProject, {
-        foreignKey: "institute_project_id",
-        as: "instituteProject",
+      // Issue ↔ Project
+      Issue.belongsTo(models.Project, {
+        foreignKey: "project_id",
+        as: "project",
       });
+      // Issue ↔ InstituteProject (nullable for EAI users)
+      // Issue.belongsTo(models.InstituteProject, {
+      //   foreignKey: "institute_project_id",
+      //   as: "instituteProject",
+      // });
 
       // Issue ↔ IssueCategory
       Issue.belongsTo(models.IssueCategory, {
@@ -92,9 +97,13 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: DataTypes.UUIDV4,
       },
-      institute_project_id: {
+      // institute_project_id: {
+      //   type: DataTypes.UUID,
+      //   allowNull: true, // nullable for EAI users
+      // },
+      project_id: {
         type: DataTypes.UUID,
-        allowNull: true, // nullable for EAI users
+        allowNull: false, // issue must belong to a project now
       },
       title: {
         type: DataTypes.STRING(255),

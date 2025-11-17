@@ -16,6 +16,10 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "project_id",
         as: "hierarchies",
       });
+      this.hasMany(models.InstituteProject, {
+        foreignKey: "project_id",
+        as: "instituteProjects", // must match the include in your query
+      });
       this.hasMany(models.ProjectUserRole, {
         foreignKey: "project_id",
         as: "projectUserRoles",

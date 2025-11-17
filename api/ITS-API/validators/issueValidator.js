@@ -2,9 +2,9 @@ const Joi = require("joi");
 
 // ✅ Schema for creating a new issue
 const createIssueSchema = Joi.object({
-  institute_project_id: Joi.string().uuid().allow(null).optional().messages({
-    "string.guid": "Invalid institute project ID format",
-    "any.required": "Institute project ID is required",
+  project_id: Joi.string().uuid().allow(null).optional().messages({
+    "string.guid": "Invalid  project ID format",
+    "any.required": "project ID is required",
   }),
   title: Joi.string().min(3).max(255).required().messages({
     "string.empty": "Title is required",
@@ -39,6 +39,17 @@ const createIssueSchema = Joi.object({
   url_path: Joi.string().max(255).optional().allow(null, "").messages({
     "string.max": "URL path cannot exceed 255 characters",
   }),
+  attachment_ids: Joi.array()
+    .items(
+      Joi.string().uuid().messages({
+        "string.guid": "Invalid attachment ID format",
+      })
+    )
+    .optional()
+    .messages({
+      "array.base": "Attachment IDs must be an array",
+    }),
+
   issue_occured_time: Joi.date().optional().allow(null),
 });
 
@@ -114,6 +125,14 @@ const getIssuesQuerySchema = Joi.object({
   }),
 });
 
+// ✅ Schema for hierarchy_node_id parameter
+const hierarchyNodeIdParamSchema = Joi.object({
+  hierarchy_node_id: Joi.string().uuid().required().messages({
+    "string.guid": "Invalid hierarchy node ID format",
+    "any.required": "Hierarchy node ID is required",
+  }),
+});
+
 // ✅ Schema for issue ID parameter
 const issueIdParamSchema = Joi.object({
   id: Joi.string().uuid().required().messages({
@@ -171,9 +190,25 @@ const validateIssueIdParam = (req, res, next) => {
   next();
 };
 
+const validateHierarchyNodeIdParam = (req, res, next) => {
+  const { error } = hierarchyNodeIdParamSchema.validate(req.params, {
+    abortEarly: false,
+  });
+
+  if (error) {
+    return res.status(400).json({
+      message: "Parameter validation failed",
+      errors: error.details.map((err) => err.message),
+    });
+  }
+
+  next();
+};
+
 module.exports = {
   validateCreateIssue,
   validateUpdateIssue,
   validateGetIssuesQuery,
   validateIssueIdParam,
+  validateHierarchyNodeIdParam,
 };

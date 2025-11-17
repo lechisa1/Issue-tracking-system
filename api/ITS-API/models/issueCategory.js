@@ -4,7 +4,8 @@ module.exports = (sequelize, DataTypes) => {
     "IssueCategory",
     {
       category_id: {
-        type: DataTypes.CHAR(36),
+        type: DataTypes.UUID, // changed from CHAR(36) to UUID
+        defaultValue: DataTypes.UUIDV4, // auto-generate UUID
         primaryKey: true,
       },
       name: {

@@ -9,6 +9,7 @@ const createProjectSchema = Joi.object({
   description: Joi.string().trim().optional().messages({
     "string.base": "Description must be a string",
   }),
+  
   is_active: Joi.boolean().optional(),
   institute_id: Joi.string().guid({ version: "uuidv4" }).optional().messages({
     "string.guid": "Institute ID must be a valid UUID",
