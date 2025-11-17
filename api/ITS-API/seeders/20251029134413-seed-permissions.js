@@ -65,19 +65,27 @@ module.exports = {
     // Insert permissions one by one, ignoring duplicates
     for (const perm of permissions) {
       try {
-        await queryInterface.bulkInsert("permissions", [{
-          permission_id: uuidv4(),
-          resource: perm.resource,
-          action: perm.action,
-          created_at: now,
-          updated_at: now,
-        }], {
-          ignoreDuplicates: true // This will ignore duplicate key errors
-        });
+        await queryInterface.bulkInsert(
+          "permissions",
+          [
+            {
+              permission_id: uuidv4(),
+              resource: perm.resource,
+              action: perm.action,
+              created_at: now,
+              updated_at: now,
+            },
+          ],
+          {
+            ignoreDuplicates: true, // This will ignore duplicate key errors
+          }
+        );
       } catch (error) {
         // If duplicate error, just continue
-        if (error.name === 'SequelizeUniqueConstraintError') {
-          console.log(`Permission ${perm.resource}:${perm.action} already exists, skipping...`);
+        if (error.name === "SequelizeUniqueConstraintError") {
+          console.log(
+            `Permission ${perm.resource}:${perm.action} already exists, skipping...`
+          );
           continue;
         }
         throw error; // Re-throw other errors

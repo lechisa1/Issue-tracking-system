@@ -81,6 +81,11 @@ router.post(
  *         description: List of issues
  */
 router.get("/", validateGetIssuesQuery, issueController.getIssues);
+router.get(
+  "/user/:id",
+  validateIssueIdParam,
+  issueController.getIssuesByUserId
+);
 
 /**
  * @swagger
@@ -195,9 +200,14 @@ router.put(
  */
 
 router.get(
-  "/hierarchy/:hierarchy_node_id/project/:project_id",
+  "/issues/hierarchy/:hierarchy_node_id/project/:project_id",
   validateHierarchyNodeIdParam,
   issueController.getIssuesByHierarchyNodeId
+);
+// Change from query to URL parameter
+router.get(
+  "/issues-by-pairs/:pairs/user/:user_id",
+  issueController.getIssuesByMultipleHierarchyNodes
 );
 
 router.delete("/:id", validateIssueIdParam, issueController.deleteIssue);
