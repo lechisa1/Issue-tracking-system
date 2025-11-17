@@ -50,12 +50,6 @@ const escalateIssue = async (req, res) => {
       created_at: new Date(),
     });
 
-    // Update issue's current tier
-    await Issue.update(
-      { current_tier: to_tier, updated_at: new Date() },
-      { where: { issue_id } }
-    );
-
     // Create tier handling record
     await IssueTier.create({
       issue_tier_id: uuidv4(),
