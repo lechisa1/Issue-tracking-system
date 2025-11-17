@@ -195,7 +195,7 @@ router.put(
  */
 
 router.get(
-  "/issues/hierarchy/:hierarchy_node_id/project/:project_id",
+  "/hierarchy/:hierarchy_node_id/project/:project_id",
   validateHierarchyNodeIdParam,
   issueController.getIssuesByHierarchyNodeId
 );
