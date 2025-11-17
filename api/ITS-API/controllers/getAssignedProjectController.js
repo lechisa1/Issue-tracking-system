@@ -7,6 +7,10 @@ const {
   HierarchyNode,
   Hierarchy,
   Institute,
+  Issue,
+  IssuePriority,
+  IssueAttachment,
+  IssueCategory,
   InstituteProject,
   sequelize,
 } = require("../models");
@@ -24,10 +28,7 @@ const getMyAssignedProjects = async (req, res) => {
     }
 
     const assignedProjects = await ProjectUserRole.findAll({
-      where: {
-        user_id,
-        is_active: true,
-      },
+      where: { user_id, is_active: true },
       include: [
         {
           model: Project,
@@ -43,7 +44,7 @@ const getMyAssignedProjects = async (req, res) => {
             {
               model: InstituteProject,
               as: "instituteProjects",
-              attributes: ["institute_project_id"],
+              attributes: ["institute_project_id", "institute_id"],
               include: [
                 {
                   model: Institute,
@@ -62,6 +63,13 @@ const getMyAssignedProjects = async (req, res) => {
                 "level",
                 "parent_id",
               ],
+              include: [
+                {
+                  model: HierarchyNode,
+                  as: "parent",
+                  attributes: ["hierarchy_node_id", "name", "level"],
+                },
+              ],
             },
           ],
         },
@@ -75,53 +83,68 @@ const getMyAssignedProjects = async (req, res) => {
           as: "subRole",
           attributes: ["sub_role_id", "name", "description"],
         },
-        {
-          model: HierarchyNode,
-          as: "hierarchyNode",
-          attributes: ["hierarchy_node_id", "name", "description", "level"],
-          include: [
-            {
-              model: HierarchyNode,
-              as: "parent",
-              attributes: ["hierarchy_node_id", "name", "level"],
-            },
-          ],
-        },
       ],
       order: [[{ model: Project, as: "project" }, "name", "ASC"]],
     });
 
-    if (!assignedProjects || assignedProjects.length === 0) {
-      return res.status(404).json({
-        success: false,
+    console.log("Assigned Projects Raw:", assignedProjects); // ✅ debug
+
+    if (!assignedProjects.length) {
+      return res.status(200).json({
+        success: true,
         message: "No projects assigned to this user",
         data: [],
       });
     }
 
-    // Transform the data for better structure
-    const formattedProjects = assignedProjects
-      .filter((assignment) => assignment.project) // only include if project exists
+    const formatted = assignedProjects
+      .filter((assignment) => assignment.project)
       .map((assignment) => {
         const project = assignment.project;
-        const institute = project.instituteProjects?.[0]?.institute;
+        const instituteProject = project?.instituteProjects?.[0];
+
+        // PRINT EACH USER'S HIERARCHY NODES
+        console.log(
+          `User hierarchy nodes for project "${project.name}":`,
+          (project.hierarchies || []).map((node) => node.hierarchy_node_id)
+        );
 
         return {
           assignment_id: assignment.project_user_role_id,
+
           project: {
-            project_id: project.project_id, // <-- corrected typo (was projects_id)
+            project_id: project.project_id,
             name: project.name,
             description: project.description,
             is_active: project.is_active,
             created_at: project.created_at,
-            institute: institute
+
+            institute_project_id:
+              instituteProject?.institute_project_id || null,
+
+            institute: instituteProject?.institute
               ? {
-                  institute_id: institute.institute_id,
-                  name: institute.name,
-                  description: institute.description,
+                  institute_id: instituteProject.institute.institute_id,
+                  name: instituteProject.institute.name,
+                  description: instituteProject.institute.description,
                 }
               : null,
+
+            hierarchy_nodes: (project.hierarchies || []).map((node) => ({
+              hierarchy_node_id: node.hierarchy_node_id,
+              name: node.name,
+              description: node.description,
+              level: node.level,
+              parent: node.parent
+                ? {
+                    hierarchy_node_id: node.parent.hierarchy_node_id,
+                    name: node.parent.name,
+                    level: node.parent.level,
+                  }
+                : null,
+            })),
           },
+
           role: assignment.role
             ? {
                 role_id: assignment.role.role_id,
@@ -129,6 +152,7 @@ const getMyAssignedProjects = async (req, res) => {
                 description: assignment.role.description,
               }
             : null,
+
           sub_role: assignment.subRole
             ? {
                 sub_role_id: assignment.subRole.sub_role_id,
@@ -136,42 +160,13 @@ const getMyAssignedProjects = async (req, res) => {
                 description: assignment.subRole.description,
               }
             : null,
-          hierarchy_structure: assignment.hierarchyNode
-            ? {
-                node_id: assignment.hierarchyNode.hierarchy_node_id,
-                node_name: assignment.hierarchyNode.name,
-                node_description: assignment.hierarchyNode.description,
-                level: assignment.hierarchyNode.level,
-                hierarchy: assignment.hierarchyNode.hierarchy
-                  ? {
-                      hierarchy_id:
-                        assignment.hierarchyNode.hierarchy.hierarchy_id,
-                      name: assignment.hierarchyNode.hierarchy.name,
-                    }
-                  : null,
-                parent: assignment.hierarchyNode.parent
-                  ? {
-                      node_id:
-                        assignment.hierarchyNode.parent.hierarchy_node_id,
-                      name: assignment.hierarchyNode.parent.name,
-                      level: assignment.hierarchyNode.parent.level,
-                    }
-                  : null,
-              }
-            : null,
-          assignment_details: {
-            is_active: assignment.is_active,
-            created_at: assignment.created_at,
-            updated_at: assignment.updated_at,
-          },
         };
       });
 
     return res.status(200).json({
       success: true,
       message: "User's assigned projects retrieved successfully",
-      data: formattedProjects,
-      count: formattedProjects.length,
+      data: formatted,
     });
   } catch (error) {
     console.error("Error fetching user's assigned projects:", error);
@@ -624,8 +619,120 @@ const getMyProjectHierarchy = async (req, res) => {
   }
 };
 
+const getMyIssues = async (req, res) => {
+  try {
+    const userId = req.user?.user_id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    // Step 1: Get all assigned projects for the user
+    const assignedProjects = await ProjectUserRole.findAll({
+      where: { user_id: userId, is_active: true },
+      attributes: ["project_id"],
+      include: [
+        {
+          model: Project,
+          as: "project",
+          attributes: ["project_id"],
+          include: [
+            {
+              model: InstituteProject,
+              as: "instituteProjects",
+              attributes: ["institute_project_id"],
+            },
+          ],
+        },
+      ],
+    });
+
+    // Flatten all institute_project_ids
+    const assignedInstituteProjectIds = assignedProjects
+      .flatMap((assignment) => assignment.project?.instituteProjects || [])
+      .map((ip) => ip.institute_project_id);
+
+    if (!assignedInstituteProjectIds.length) {
+      return res.status(200).json({
+        success: true,
+        message: "No assigned projects found",
+        data: [],
+      });
+    }
+
+    // Step 2: Get issues for only these projects
+    const issues = await Issue.findAll({
+      where: {
+        reported_by: userId,
+        institute_project_id: assignedInstituteProjectIds,
+      },
+      include: [
+        {
+          model: IssueAttachment,
+          as: "attachments",
+          attributes: ["file_name", "file_path"],
+        },
+        {
+          model: User,
+          as: "reporter",
+          attributes: ["user_id", "full_name"],
+        },
+        {
+          model: User,
+          as: "assignee",
+          attributes: ["user_id", "full_name"],
+        },
+        {
+          model: IssuePriority,
+          as: "priority",
+          attributes: ["priority_id", "name"],
+        },
+        {
+          model: IssueCategory,
+          as: "category",
+          attributes: ["name"],
+        },
+        {
+          model: InstituteProject,
+          as: "instituteProject",
+          include: [
+            {
+              model: Project,
+              as: "project",
+              attributes: ["project_id", "name"],
+            },
+            {
+              model: Institute,
+              as: "institute",
+              attributes: ["institute_id", "name"],
+            },
+          ],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    return res.json({
+      success: true,
+      message: "My issues fetched successfully",
+      data: issues,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getMyAssignedProjects,
   getMyAssignedProjectDetail,
   getMyProjectHierarchy,
+  getMyIssues,
 };

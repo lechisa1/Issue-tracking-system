@@ -84,6 +84,11 @@ router.post(
   validateCreateHierarchyNode,
   hierarchyNodeController.createHierarchyNode
 );
+router.get(
+  "/project/:project_id",
+  authenticateToken,
+  hierarchyNodeController.getProjectHierarchyNodes
+);
 
 /**
  * @swagger

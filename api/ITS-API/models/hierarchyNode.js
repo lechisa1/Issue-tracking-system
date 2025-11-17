@@ -19,6 +19,11 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "parent_id",
         as: "children",
       });
+      HierarchyNode.hasMany(models.ProjectUserRole, {
+        foreignKey: "hierarchy_node_id",
+        as: "projectUserRoles",
+      });
+
     }
   }
 

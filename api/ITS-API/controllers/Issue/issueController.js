@@ -12,6 +12,7 @@ const {
   ProjectUserRole,
   Institute,
   Project,
+  Role,
   IssueAttachment,
   IssueAction,
   IssueStatusHistory,
@@ -111,7 +112,6 @@ const createIssueWithAttachments = async (req, res) => {
       title,
       description,
       issue_category_id,
-      hierarchy_node_id,
       priority_id,
       action_taken,
       url_path,
@@ -121,53 +121,44 @@ const createIssueWithAttachments = async (req, res) => {
     } = req.body;
 
     const reported_by = req.user?.user_id;
-    if (!reported_by) {
+    if (!reported_by)
       return res
         .status(401)
         .json({ success: false, message: "User not authenticated" });
-    }
 
-    if (!title || title.trim() === "") {
+    if (!title || title.trim() === "")
       return res
         .status(400)
         .json({ success: false, message: "Title is required" });
+
+    // 1️⃣ Get InstituteProject
+    const instituteProject = await InstituteProject.findByPk(
+      institute_project_id,
+      { transaction: t }
+    );
+    if (!instituteProject) {
+      await t.rollback();
+      return res
+        .status(404)
+        .json({ success: false, message: "Institute Project not found" });
     }
 
-    console.log("REQ BODY institute_project_id =", institute_project_id);
+    const project_id = instituteProject.project_id;
 
-    // ✅ Fetch user's assigned projects
-    const assignedProjects = await ProjectUserRole.findAll({
-      where: { user_id: reported_by, is_active: true },
+    // 2️⃣ Get user's assignment along with hierarchy node
+    const userAssignment = await ProjectUserRole.findOne({
+      where: { user_id: reported_by, project_id, is_active: true },
       include: [
         {
-          model: Project,
-          as: "project",
-          include: [
-            {
-              model: InstituteProject,
-              as: "instituteProjects",
-              attributes: ["institute_project_id"],
-            },
-          ],
+          model: HierarchyNode,
+          as: "hierarchyNode",
+          attributes: ["hierarchy_node_id", "parent_id", "name", "level"],
         },
       ],
       transaction: t,
     });
 
-    // Filter out invalid projects
-    const validAssignments = assignedProjects.filter(
-      (assignment) =>
-        assignment.project && assignment.project.instituteProjects?.length
-    );
-
-    // ✅ Check if user is assigned to the selected institute_project safely
-    const isAssigned = assignedProjects.some((assignment) =>
-      assignment.project?.instituteProjects?.some(
-        (ip) => ip.institute_project_id === institute_project_id
-      )
-    );
-
-    if (!isAssigned) {
+    if (!userAssignment) {
       await t.rollback();
       return res.status(403).json({
         success: false,
@@ -175,7 +166,44 @@ const createIssueWithAttachments = async (req, res) => {
       });
     }
 
-    // 1️⃣ Create the issue inside transaction
+    const hierarchy_node_id = userAssignment.hierarchyNode
+      ? userAssignment.hierarchyNode.hierarchy_node_id
+      : null;
+
+    console.log("Selected hierarchy node:", hierarchy_node_id);
+
+    // 3️⃣ Determine assigned_to (escalate to parent if external, fallback to internal QA leader)
+    let assigned_to = null;
+
+    if (
+      userAssignment.hierarchyNode &&
+      req.user.user_type === "external_user"
+    ) {
+      const parentNodeId = userAssignment.hierarchyNode.parent_id;
+      if (parentNodeId) {
+        const parentAssignment = await ProjectUserRole.findOne({
+          where: {
+            project_id,
+            hierarchy_node_id: parentNodeId,
+            is_active: true,
+          },
+          transaction: t,
+        });
+        if (parentAssignment) assigned_to = parentAssignment.user_id;
+      }
+    }
+
+    // fallback to internal QA leader if still null
+    if (!assigned_to) {
+      const qaLeader = await ProjectUserRole.findOne({
+        where: { project_id, is_active: true },
+        include: [{ model: Role, as: "role", where: { name: "QA leader" } }],
+        transaction: t,
+      });
+      if (qaLeader) assigned_to = qaLeader.user_id;
+    }
+
+    // 4️⃣ Create issue
     const issue_id = uuidv4();
     const issue = await Issue.create(
       {
@@ -184,10 +212,10 @@ const createIssueWithAttachments = async (req, res) => {
         title: title.trim(),
         description,
         issue_category_id: issue_category_id || null,
-        hierarchy_node_id: hierarchy_node_id || null,
+        hierarchy_node_id,
         priority_id: priority_id || null,
         reported_by,
-        assigned_to: null,
+        assigned_to,
         action_taken: action_taken || null,
         url_path: url_path || null,
         issue_description: issue_description || null,
@@ -199,7 +227,7 @@ const createIssueWithAttachments = async (req, res) => {
       { transaction: t }
     );
 
-    // 2️⃣ Create initial status history
+    // 5️⃣ Status history
     await IssueStatusHistory.create(
       {
         status_history_id: uuidv4(),
@@ -213,7 +241,7 @@ const createIssueWithAttachments = async (req, res) => {
       { transaction: t }
     );
 
-    // 3️⃣ Handle attachments
+    // 6️⃣ Attachments handling
     if (req.files && req.files.length > 0) {
       const issueDir = path.join(
         __dirname,
@@ -251,62 +279,21 @@ const createIssueWithAttachments = async (req, res) => {
       }
     }
 
-    // ✅ Commit transaction after all creations
     await t.commit();
-
-    // 4️⃣ Fetch issue with minimal details (outside transaction)
-    const issueWithDetails = await Issue.findOne({
-      where: { issue_id },
-      include: [
-        {
-          model: IssueAttachment,
-          as: "attachments",
-          attributes: ["file_name", "file_path"],
-        },
-        { model: User, as: "reporter", attributes: ["user_id", "full_name"] },
-        {
-          model: InstituteProject,
-          as: "instituteProject",
-          attributes: ["institute_project_id"],
-          include: [
-            {
-              model: Project,
-              as: "project",
-              attributes: ["project_id", "name"],
-            },
-            {
-              model: Institute,
-              as: "institute",
-              attributes: ["institute_id", "name"],
-            },
-          ],
-        },
-      ],
-    });
 
     return res.status(201).json({
       success: true,
       message: "Issue created successfully",
-      data: issueWithDetails,
+      data: issue,
     });
   } catch (error) {
-    try {
-      await t.rollback();
-    } catch (_) {}
-
-    // Clean up uploaded files if any
+    if (!t.finished) await t.rollback();
     if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
+      for (const file of req.files)
         if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
-      }
     }
-
-    console.error("❌ Error creating issue:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error while creating issue",
-      error: error.message,
-    });
+    console.error("Error creating issue:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -566,64 +553,168 @@ const getIssues = async (req, res) => {
   }
 };
 
-// ✅ Get issue by ID
 const getIssueById = async (req, res) => {
   try {
     const { id } = req.params;
     const issue = await Issue.findByPk(id, {
       include: [
-        { model: InstituteProject, as: "instituteProject" },
-        { model: IssueCategory, as: "category" },
-        { model: IssuePriority, as: "priority" },
-        { model: HierarchyNode, as: "hierarchyNode" },
-        { model: User, as: "reporter" },
-        { model: User, as: "assignee" },
+        // Basic associations
+        {
+          model: InstituteProject,
+          as: "instituteProject",
+          include: [
+            {
+              model: Project,
+              as: "project",
+              attributes: ["project_id", "name", "description"],
+            },
+            {
+              model: Institute,
+              as: "institute",
+              attributes: ["institute_id", "name"],
+            },
+          ],
+        },
+        {
+          model: IssueCategory,
+          as: "category",
+          attributes: ["category_id", "name", "description"],
+        },
+        {
+          model: IssuePriority,
+          as: "priority",
+          attributes: ["priority_id", "name", "description"],
+        },
+        {
+          model: HierarchyNode,
+          as: "hierarchyNode",
+          attributes: ["hierarchy_node_id", "name", "level", "parent_id"],
+        },
+
+        // User associations
+        {
+          model: User,
+          as: "reporter",
+          attributes: ["user_id", "full_name", "email"],
+        },
+        {
+          model: User,
+          as: "assignee",
+          attributes: ["user_id", "full_name", "email"],
+        },
+
+        // Assignment history
         {
           model: IssueAssignment,
           as: "assignments",
           include: [
-            { model: User, as: "assignee" },
-            { model: User, as: "assigner" },
+            {
+              model: User,
+              as: "assignee",
+              attributes: ["user_id", "full_name", "email"],
+            },
+            {
+              model: User,
+              as: "assigner",
+              attributes: ["user_id", "full_name", "email"],
+            },
           ],
+          order: [["assigned_at", "DESC"]],
         },
+
+        // Tier management
         {
           model: IssueTier,
           as: "tiers",
-          include: [{ model: User, as: "handler" }],
+          include: [
+            {
+              model: User,
+              as: "handler",
+              attributes: ["user_id", "full_name", "email"],
+            },
+          ],
+          order: [["tier_level", "ASC"]],
         },
+
+        // Escalation history
         {
           model: IssueEscalation,
           as: "escalations",
-          include: [{ model: User, as: "escalator" }],
+          include: [
+            {
+              model: User,
+              as: "escalator",
+              attributes: ["user_id", "full_name", "email"],
+            },
+          ],
+          order: [["escalated_at", "DESC"]],
         },
+
+        // Comments with replies
         {
           model: IssueComment,
           as: "comments",
-          include: [{ model: User, as: "author" }],
         },
+
+        // Attachments
         {
           model: IssueAttachment,
           as: "attachments",
-          include: [{ model: User, as: "uploader" }],
+          include: [
+            {
+              model: User,
+              as: "uploader",
+              attributes: ["user_id", "full_name", "email"],
+            },
+          ],
+          order: [["created_at", "DESC"]],
         },
+
+        // Action history (for tracking accept/resolve/escalate actions)
         {
           model: IssueAction,
           as: "actions",
-          include: [{ model: User, as: "performer" }],
+          include: [
+            {
+              model: User,
+              as: "performer",
+              attributes: ["user_id", "full_name", "email"],
+            },
+          ],
+          order: [["created_at", "DESC"]],
         },
+
+        // Status change history
         {
           model: IssueStatusHistory,
           as: "statusHistory",
-          include: [{ model: User, as: "changer" }],
+          include: [
+            {
+              model: User,
+              as: "changer",
+              attributes: ["user_id", "full_name", "email"],
+            },
+          ],
+          order: [["created_at", "DESC"]],
         },
       ],
     });
 
-    if (!issue) return res.status(404).json({ message: "Issue not found" });
-    res.status(200).json(issue);
+    if (!issue) {
+      return res.status(404).json({
+        success: false,
+        message: "Issue not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: issue,
+    });
   } catch (error) {
-    console.error(error);
+    console.error("Error fetching issue:", error);
     res.status(500).json({
+      success: false,
       message: "Internal server error",
       error: error.message,
     });
@@ -735,6 +826,83 @@ const deleteIssue = async (req, res) => {
     });
   }
 };
+const getAllChildNodes = async (nodeId) => {
+  const result = [];
+  const stack = [nodeId];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    result.push(current);
+
+    const children = await HierarchyNode.findAll({
+      where: { parent_id: current },
+      attributes: ["hierarchy_node_id"],
+    });
+
+    for (const c of children) {
+      stack.push(c.hierarchy_node_id);
+    }
+  }
+
+  return result;
+};
+
+const getMyIssues = async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user)
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+
+    let issues;
+
+    if (user.user_type === "internal_user") {
+      // INTERNAL USERS: Get all issues from their projects
+      const projectIds = user.project_roles.map((pr) => pr.project_id);
+
+      issues = await Issue.findAll({
+        include: [
+          {
+            model: InstituteProject,
+            as: "instituteProject",
+            where: { project_id: projectIds },
+            include: [{ model: Project, as: "project", attributes: ["name"] }],
+          },
+          { model: User, as: "reporter", attributes: ["full_name"] },
+          { model: IssuePriority, as: "priority" },
+        ],
+        order: [["created_at", "DESC"]],
+      });
+    } else if (user.user_type === "external_user") {
+      // EXTERNAL USERS: Get issues by accessible hierarchy nodes
+      const allowedNodeIds = new Set();
+      for (const pr of user.project_roles) {
+        if (pr.hierarchy_node_id) {
+          const nodes = await getAllChildNodes(pr.hierarchy_node_id);
+          nodes.forEach((n) => allowedNodeIds.add(n));
+        }
+      }
+
+      issues = await Issue.findAll({
+        where: { hierarchy_node_id: [...allowedNodeIds] },
+        include: [
+          {
+            model: InstituteProject,
+            as: "instituteProject",
+            include: [{ model: Project, as: "project", attributes: ["name"] }],
+          },
+          { model: User, as: "reporter", attributes: ["full_name"] },
+          { model: IssuePriority, as: "priority" },
+        ],
+        order: [["created_at", "DESC"]],
+      });
+    }
+
+    return res.json({ success: true, data: issues });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
 
 module.exports = {
   createIssue,
@@ -744,4 +912,5 @@ module.exports = {
   deleteIssue,
   createIssueWithAttachments,
   updateIssueWithAttachments,
+  getMyIssues,
 };

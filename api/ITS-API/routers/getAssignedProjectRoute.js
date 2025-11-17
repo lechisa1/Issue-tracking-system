@@ -251,7 +251,38 @@ router.get(
   authenticateToken,
   projectController.getMyAssignedProjects
 );
-
+/**
+ * @swagger
+ * /api/flow/my-requests:
+ *   get:
+ *     summary: Get all issues reported or assigned to the logged-in user
+ *     tags: [Issues]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of user's issues
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Issue'
+ *       401:
+ *         description: User not authenticated
+ *       404:
+ *         description: No issues found
+ *       500:
+ *         description: Internal server error
+ */
+router.get("/my-requests", authenticateToken, projectController.getMyIssues);
 /**
  * @swagger
  * /api/flow/my-projects/{project_id}:

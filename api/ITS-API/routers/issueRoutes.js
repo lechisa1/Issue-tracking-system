@@ -9,6 +9,11 @@ const {
 } = require("../validators/issueValidator");
 const { authenticateToken } = require("../middlewares/authMiddleware");
 const upload = require("../middlewares/uploadMiddleware");
+const {
+  acceptIssue,
+  resolveIssue,
+  escalateIssueToParent,
+} = require("../controllers/flowTestController");
 /**
  * @swagger
  * tags:
@@ -81,7 +86,12 @@ router.post(
   upload.array("attachments"),
   issueController.createIssueWithAttachments
 );
+router.get("/from-child", authenticateToken, issueController.getMyIssues);
+router.patch("/:issue_id/accept", authenticateToken, acceptIssue);
 
+router.patch("/:issue_id/resolve", authenticateToken, resolveIssue);
+
+router.patch("/:issue_id/escalate", authenticateToken, escalateIssueToParent);
 router.patch(
   "/:issue_id",
   authenticateToken,
@@ -177,6 +187,7 @@ router.put(
  *       404:
  *         description: Issue not found
  */
+
 router.delete("/:id", validateIssueIdParam, issueController.deleteIssue);
 
 module.exports = router;

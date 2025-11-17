@@ -355,7 +355,7 @@ router.delete("/:id", authenticateToken, deleteUser);
  *       404:
  *         description: User not found
  */
-router.patch("/:id/toggle-status", authenticateToken, toggleUserActiveStatus);
+router.patch("/:id/toggle-status", toggleUserActiveStatus);
 
 /**
  * @swagger

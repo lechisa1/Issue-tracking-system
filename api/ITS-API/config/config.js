@@ -1,10 +1,11 @@
 require("dotenv").config();
 
 const pool = {
-  max: 10,
-  min: 0,
-  acquire: 30000,
-  idle: 10000,
+  max: 20, // maximum active connections
+  min: 0, // minimum idle
+  acquire: 30000, // max time to try getting connection
+  idle: 10000, // close idle connections after 10s
+  evict: 10000, // remove idle clients every 10s
 };
 
 module.exports = {
@@ -16,6 +17,7 @@ module.exports = {
     port: process.env.DB_PORT || 5432,
     dialect: process.env.DB_DIALECT || "postgres",
     pool,
+    logging: false,
   },
   test: {
     username: process.env.DB_USERNAME,

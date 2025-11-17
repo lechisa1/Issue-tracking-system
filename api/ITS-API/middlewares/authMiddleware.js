@@ -124,6 +124,7 @@ const authenticateToken = async (req, res, next) => {
       project_roles: user.projectRoles.map((pr) => ({
         project_id: pr.project_id,
         project_name: pr.project?.name,
+        hierarchy_node_id: pr.hierarchy_node_id, // ✅ add this
         role_id: pr.role_id,
         role_name: pr.role?.name,
         sub_role_id: pr.sub_role_id,
