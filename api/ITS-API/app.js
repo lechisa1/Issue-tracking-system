@@ -24,15 +24,47 @@ const issuePriorities = require("./routers/issuePriorityRoutes");
 const issueRoutes = require("./routers/issueRoutes");
 const issueAssignmentRoutes = require("./routers/issueAssignmentRoutes");
 const issueEscalationRoutes = require("./routers/issueEscaltionRoute");
+const issueResolutionRoutes = require("./routers/issueResolutionRoutes");
+
+const instituteRoute = require("./routers/instituteRoutes");
+const instituteProjectsRoute = require("./routers/instituteProjectRoutes");
+const hierarchyNodeRoute = require("./routers/hierarchyNodeRoutes");
+const hierarchyNodeOrganizationRoute = require("./routers/hierarchyNodeOrganizationRoutes");
 
 const changePasswordRoutes = require("./routers/passwordChangeRoutes");
 
 const issueFileAttachmentRoutes = require("./routers/issueAttachmentRoutes");
+const fileAttachmentRoutes = require("./routers/attachementRoutes");
+
+const permissionRoute = require("./routers/permissionRoutes");
+
+const issueGuideLines = require("./routers/issueReportingGuidelineRoutes");
+const getAssignedProjectRoute = require("./routers/getAssignedProjectRoute");
+const issueFlowRoute = require("./routers/issueFlowRoute");
 const app = express();
 const appServer = http.createServer(app);
 
 // ================== Middleware ==================
-app.use(express.json());
+// const devAuthBypass = require("./middlewares/devAuthBypass");
+// app.use(devAuthBypass);
+// app.use(express.json());
+
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      try {
+        JSON.parse(buf);
+      } catch (e) {
+        res.status(400).json({
+          message:
+            "Invalid JSON format. Please ensure all property names are double-quoted and JSON is valid.",
+        });
+        throw e;
+      }
+    },
+  })
+);
+
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -50,6 +82,17 @@ app.use(
   })
 );
 
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "uploads"), {
+    setHeaders: (res, filePath) => {
+      res.set("Access-Control-Allow-Origin", "*");
+      res.set("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS");
+      res.set("Access-Control-Allow-Headers", "Content-Type");
+    },
+  })
+);
+
 // ================== CORS Configuration ==================
 const allowedOrigins = [
   "http://localhost:3000",
@@ -58,13 +101,7 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
 ];
 const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
+  origin: true, // Allow all origins for development
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   credentials: true,
   optionsSuccessStatus: 204,
@@ -91,15 +128,31 @@ app.use("/api/user-roles", userRoleRoute);
 
 app.use("/api/auth", authRoute);
 
+app.use("/api/projects", require("./routers/projectRoutes"));
+app.use("/api/institutes", instituteRoute);
+app.use("/api/institute-projects", instituteProjectsRoute);
+
+// app.use("/api/hierarchies", hierarchyRoute);
+app.use("/api/hierarchy-nodes", hierarchyNodeRoute);
+app.use("/api/hierarchy-node-organizations", hierarchyNodeOrganizationRoute);
+
 app.use("/api/issue-categories", issueCategories);
 app.use("/api/issue-priorities", issuePriorities);
 app.use("/api/issues", issueRoutes);
 app.use("/api/assignments", issueAssignmentRoutes);
 app.use("/api/issue-escalations", issueEscalationRoutes);
+app.use("/api/issue-resolutions", issueResolutionRoutes);
 
 app.use("/api/change-password", changePasswordRoutes);
 
-app.use("/api/issue-file-attachment", issueFileAttachmentRoutes);
+app.use("/api/issue-attachments", issueFileAttachmentRoutes);
+app.use("/api/attachments", fileAttachmentRoutes);
+
+app.use("/api/permissions", permissionRoute);
+app.use("/api/issue-flow", issueFlowRoute);
+app.use("/api/issue-guidelines", issueGuideLines);
+
+app.use("/api/flow", getAssignedProjectRoute);
 // ================== Root Endpoint ==================
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to Issue Tracking System API 🚀" });

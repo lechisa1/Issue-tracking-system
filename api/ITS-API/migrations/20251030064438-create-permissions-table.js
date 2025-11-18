@@ -11,12 +11,16 @@ module.exports = {
       },
       resource: {
         type: Sequelize.STRING(100),
-        unique: true,
         allowNull: false,
       },
       action: {
         type: Sequelize.STRING(100),
         allowNull: false,
+      },
+      is_active: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: true,
+        allowNull: true,
       },
       created_at: {
         type: Sequelize.DATE,
@@ -29,9 +33,19 @@ module.exports = {
         defaultValue: Sequelize.fn("NOW"),
       },
     });
+
+    // Add composite unique constraint
+    await queryInterface.addConstraint("permissions", {
+      fields: ["resource", "action"],
+      type: "unique",
+      name: "unique_permission_resource_action",
+    });
   },
 
-  async down(queryInterface) {
-    await queryInterface.dropTable("permissions");
+  async down(queryInterface, Sequelize) {
+    // Use CASCADE to automatically drop dependent objects
+    await queryInterface.sequelize.query(`
+    DROP TABLE IF EXISTS permissions CASCADE;
+  `);
   },
 };

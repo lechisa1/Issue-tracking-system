@@ -1,6 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const controller = require("../controllers/Issue/issueEscalationController");
+const {
+  validateEscalateIssue,
+} = require("../validators/issueEscalationValidator");
 
 /**
  * @swagger
@@ -19,24 +22,18 @@ const controller = require("../controllers/Issue/issueEscalationController");
  *         escalation_id:
  *           type: string
  *           format: uuid
- *           example: "6d5a3cfa-6d5e-4d3b-8a2b-4b2e343f5a66"
  *         issue_id:
  *           type: string
  *           format: uuid
- *           example: "8c7b6d5a-4e3c-2b1a-9f8e-7d6c5b4a3e2f"
  *         from_tier:
  *           type: string
- *           example: "Tier 1"
  *         to_tier:
  *           type: string
- *           example: "Tier 2"
  *         reason:
  *           type: string
- *           example: "Requires specialized knowledge"
  *         escalated_by:
  *           type: string
  *           format: uuid
- *           example: "9e8d7c6b-5a4b-3c2d-1e0f-8a7b6c5d4e3f"
  *         escalated_at:
  *           type: string
  *           format: date-time
@@ -53,21 +50,16 @@ const controller = require("../controllers/Issue/issueEscalationController");
  *         issue_escalation_history_id:
  *           type: string
  *           format: uuid
- *           example: "6d5a3cfa-6d5e-4d3b-8a2b-4b2e343f5a66"
  *         issue_id:
  *           type: string
  *           format: uuid
- *           example: "8c7b6d5a-4e3c-2b1a-9f8e-7d6c5b4a3e2f"
  *         from_tier:
  *           type: string
- *           example: "Tier 1"
  *         to_tier:
  *           type: string
- *           example: "Tier 2"
  *         escalated_by:
  *           type: string
  *           format: uuid
- *           example: "9e8d7c6b-5a4b-3c2d-1e0f-8a7b6c5d4e3f"
  *         created_at:
  *           type: string
  *           format: date-time
@@ -83,20 +75,15 @@ const controller = require("../controllers/Issue/issueEscalationController");
  *         issue_id:
  *           type: string
  *           format: uuid
- *           example: "8c7b6d5a-4e3c-2b1a-9f8e-7d6c5b4a3e2f"
  *         from_tier:
  *           type: string
- *           example: "Tier 1"
  *         to_tier:
  *           type: string
- *           example: "Tier 2"
  *         reason:
  *           type: string
- *           example: "Requires specialized knowledge"
  *         escalated_by:
  *           type: string
  *           format: uuid
- *           example: "9e8d7c6b-5a4b-3c2d-1e0f-8a7b6c5d4e3f"
  */
 
 /**
@@ -119,12 +106,13 @@ const controller = require("../controllers/Issue/issueEscalationController");
  *             schema:
  *               $ref: '#/components/schemas/IssueEscalation'
  *       400:
- *         description: Bad Request - Missing required fields
+ *         description: Bad Request
  *       404:
  *         description: Issue or user not found
  *       500:
  *         description: Internal Server Error
  */
+router.post("/", validateEscalateIssue, controller.escalateIssue);
 
 /**
  * @swagger
@@ -135,25 +123,19 @@ const controller = require("../controllers/Issue/issueEscalationController");
  *     parameters:
  *       - in: path
  *         name: issue_id
- *         required: true
  *         schema:
  *           type: string
  *           format: uuid
- *         description: The issue UUID
+ *         required: true
  *     responses:
  *       200:
- *         description: List of escalations for the issue
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/IssueEscalation'
+ *         description: List of escalations
  *       404:
- *         description: No escalations found for this issue
+ *         description: Not found
  *       500:
- *         description: Internal Server Error
+ *         description: Internal Error
  */
+router.get("/issue/:issue_id", controller.getEscalationsByIssueId);
 
 /**
  * @swagger
@@ -164,81 +146,64 @@ const controller = require("../controllers/Issue/issueEscalationController");
  *     parameters:
  *       - in: path
  *         name: issue_id
- *         required: true
  *         schema:
  *           type: string
  *           format: uuid
- *         description: The issue UUID
+ *         required: true
  *     responses:
  *       200:
- *         description: List of escalation history records for the issue
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/IssueEscalationHistory'
+ *         description: Escalation history
  *       404:
- *         description: No escalation history found for this issue
+ *         description: Not found
  *       500:
- *         description: Internal Server Error
+ *         description: Internal Error
  */
+router.get("/history/:issue_id", controller.getEscalationHistoryByIssueId);
 
 /**
  * @swagger
- * /api/issue-escalations/{escalation_id}:
+ * /api/issue-escalations/id/{escalation_id}:
  *   get:
  *     summary: Get escalation details by ID
  *     tags: [Issue Escalations]
  *     parameters:
  *       - in: path
  *         name: escalation_id
- *         required: true
  *         schema:
  *           type: string
  *           format: uuid
- *         description: The escalation UUID
+ *         required: true
  *     responses:
  *       200:
  *         description: Escalation details
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/IssueEscalation'
  *       404:
- *         description: Escalation not found
+ *         description: Not found
  *       500:
- *         description: Internal Server Error
+ *         description: Internal Error
  */
+router.get("/id/:escalation_id", controller.getEscalationById);
 
 /**
  * @swagger
- * /api/issue-escalations/{escalation_id}:
+ * /api/issue-escalations/id/{escalation_id}:
  *   delete:
- *     summary: Delete an escalation record
+ *     summary: Delete escalation record
  *     tags: [Issue Escalations]
  *     parameters:
  *       - in: path
  *         name: escalation_id
- *         required: true
  *         schema:
  *           type: string
  *           format: uuid
- *         description: The escalation UUID
+ *         required: true
  *     responses:
  *       204:
- *         description: Escalation deleted successfully
+ *         description: Deleted successfully
  *       404:
- *         description: Escalation not found
+ *         description: Not found
  *       500:
- *         description: Internal Server Error
+ *         description: Internal Error
  */
-
-// Routes
-router.post("/", controller.escalateIssue);
-router.get("/:issue_id", controller.getEscalationsByIssueId);
-router.get("/history/:issue_id", controller.getEscalationHistoryByIssueId);
-router.get("/:escalation_id", controller.getEscalationById);
-router.delete("/:escalation_id", controller.deleteEscalation);
+router.delete("/id/:escalation_id", controller.deleteEscalation);
 
 module.exports = router;

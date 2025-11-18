@@ -10,18 +10,25 @@ const config = require(__dirname + "/../config/config.js")[env];
 const db = {};
 
 let sequelize;
+
+const poolConfig = {
+  dialect: "postgres",
+  logging: false,
+  pool: {
+    max: 10,
+    min: 0,
+    acquire: 30000,
+    idle: 10000,
+  },
+};
+
 if (process.env.DATABASE_URL) {
-  sequelize = new Sequelize(process.env.DATABASE_URL, {
-    dialect: "postgres",
-    logging: false,
-  });
+  sequelize = new Sequelize(process.env.DATABASE_URL, poolConfig);
 } else {
-  sequelize = new Sequelize(
-    config.database,
-    config.username,
-    config.password,
-    config
-  );
+  sequelize = new Sequelize(config.database, config.username, config.password, {
+    ...config,
+    ...poolConfig, // merge
+  });
 }
 
 fs.readdirSync(__dirname)
@@ -40,6 +47,15 @@ fs.readdirSync(__dirname)
     );
     db[model.name] = model;
   });
+
+// Add new models
+db.Institute = require("./institute")(sequelize, Sequelize.DataTypes);
+db.Project = require("./project")(sequelize, Sequelize.DataTypes);
+db.InstituteProject = require("./instituteProject")(
+  sequelize,
+  Sequelize.DataTypes
+);
+db.HierarchyNode = require("./hierarchyNode")(sequelize, Sequelize.DataTypes);
 
 Object.keys(db).forEach((modelName) => {
   if (db[modelName].associate) {

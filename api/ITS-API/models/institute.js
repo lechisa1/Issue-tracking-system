@@ -4,15 +4,11 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class Institute extends Model {
     static associate(models) {
-      // One Institute → Many Users
-      Institute.hasMany(models.User, {
+      // Many-to-Many relationship with Project through InstituteProject
+      this.belongsToMany(models.Project, {
+        through: models.InstituteProject,
         foreignKey: "institute_id",
-        as: "users",
-      });
-
-      // One Institute → Many Projects
-      Institute.hasMany(models.Project, {
-        foreignKey: "institute_id",
+        otherKey: "project_id",
         as: "projects",
       });
     }
@@ -21,19 +17,20 @@ module.exports = (sequelize, DataTypes) => {
   Institute.init(
     {
       institute_id: {
-        type: DataTypes.UUID,
-        allowNull: false,
-        primaryKey: true,
+        type: DataTypes.CHAR(36),
         defaultValue: DataTypes.UUIDV4,
+        primaryKey: true,
+        allowNull: false,
       },
       name: {
-        type: DataTypes.STRING,
-        unique: true,
+        type: DataTypes.STRING(255),
         allowNull: false,
+        unique: true,
       },
-      address: DataTypes.TEXT,
-      contact_email: DataTypes.STRING,
-      contact_phone: DataTypes.STRING,
+      description: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
       is_active: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
@@ -46,6 +43,8 @@ module.exports = (sequelize, DataTypes) => {
       timestamps: true,
       createdAt: "created_at",
       updatedAt: "updated_at",
+      deletedAt: "deleted_at",
+      paranoid: true, // Enables soft delete
     }
   );
 

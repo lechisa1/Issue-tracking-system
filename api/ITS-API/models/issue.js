@@ -9,11 +9,22 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "project_id",
         as: "project",
       });
+      // Issue ↔ InstituteProject (nullable for EAI users)
+      // Issue.belongsTo(models.InstituteProject, {
+      //   foreignKey: "institute_project_id",
+      //   as: "instituteProject",
+      // });
 
       // Issue ↔ IssueCategory
       Issue.belongsTo(models.IssueCategory, {
         foreignKey: "issue_category_id",
         as: "category",
+      });
+
+      // Issue ↔ HierarchyNode
+      Issue.belongsTo(models.HierarchyNode, {
+        foreignKey: "hierarchy_node_id",
+        as: "hierarchyNode",
       });
 
       // Issue ↔ IssuePriority
@@ -28,7 +39,7 @@ module.exports = (sequelize, DataTypes) => {
         as: "reporter",
       });
 
-      // Issue ↔ User (current assignee)
+      // Issue ↔ User (assignee)
       Issue.belongsTo(models.User, {
         foreignKey: "assigned_to",
         as: "assignee",
@@ -86,22 +97,60 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: DataTypes.UUIDV4,
       },
-      project_id: DataTypes.UUID,
-      title: DataTypes.STRING(255),
-      description: DataTypes.TEXT,
-      issue_category_id: DataTypes.UUID,
-      priority_id: DataTypes.UUID,
+      project_id: {
+        type: DataTypes.UUID,
+        allowNull: false, // issue must belong to a project now
+      },
+      title: {
+        type: DataTypes.STRING(255),
+        allowNull: false,
+      },
+      description: {
+        type: DataTypes.TEXT,
+      },
+      issue_category_id: {
+        type: DataTypes.UUID,
+      },
+      hierarchy_node_id: {
+        type: DataTypes.UUID,
+      },
+      priority_id: {
+        type: DataTypes.UUID,
+      },
       status: {
         type: DataTypes.STRING(50),
         defaultValue: "pending",
       },
-      reported_by: DataTypes.UUID,
-      current_tier: DataTypes.STRING(50),
-      assigned_to: DataTypes.UUID,
-      created_at: DataTypes.DATE,
-      updated_at: DataTypes.DATE,
-      resolved_at: DataTypes.DATE,
-      closed_at: DataTypes.DATE,
+      reported_by: {
+        type: DataTypes.UUID,
+      },
+      assigned_to: {
+        type: DataTypes.UUID,
+      },
+      action_taken: {
+        type: DataTypes.STRING(255),
+      },
+      url_path: {
+        type: DataTypes.STRING(255),
+      },
+      issue_description: {
+        type: DataTypes.STRING(255),
+      },
+      issue_occured_time: {
+        type: DataTypes.DATE,
+      },
+      created_at: {
+        type: DataTypes.DATE,
+      },
+      updated_at: {
+        type: DataTypes.DATE,
+      },
+      resolved_at: {
+        type: DataTypes.DATE,
+      },
+      closed_at: {
+        type: DataTypes.DATE,
+      },
     },
     {
       sequelize,

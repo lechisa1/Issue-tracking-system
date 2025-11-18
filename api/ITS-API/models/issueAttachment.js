@@ -4,21 +4,23 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class IssueAttachment extends Model {
     static associate(models) {
+      // Junction belongs to Issue
       IssueAttachment.belongsTo(models.Issue, {
         foreignKey: "issue_id",
         as: "issue",
       });
 
-      IssueAttachment.belongsTo(models.User, {
-        foreignKey: "uploaded_by",
-        as: "uploader",
+      // Junction belongs to Attachment
+      IssueAttachment.belongsTo(models.Attachment, {
+        foreignKey: "attachment_id",
+        as: "attachment",
       });
     }
   }
 
   IssueAttachment.init(
     {
-      attachment_id: {
+      issue_attachment_id: {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
@@ -27,23 +29,11 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.UUID,
         allowNull: false,
       },
-      file_name: {
-        type: DataTypes.STRING(255),
-        allowNull: false,
-      },
-      file_path: {
-        type: DataTypes.STRING(500),
-        allowNull: false,
-      },
-      uploaded_by: {
+      attachment_id: {
         type: DataTypes.UUID,
         allowNull: false,
       },
       created_at: {
-        type: DataTypes.DATE,
-        defaultValue: DataTypes.NOW,
-      },
-      updated_at: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
       },

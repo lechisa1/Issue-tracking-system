@@ -19,6 +19,16 @@ module.exports = {
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
       },
+      hierarchy_node_id: {
+        type: Sequelize.UUID,
+        allowNull: true,
+        references: {
+          model: "hierarchy_nodes",
+          key: "hierarchy_node_id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "SET NULL",
+      },
       user_id: {
         type: Sequelize.UUID,
         allowNull: false,
@@ -65,8 +75,6 @@ module.exports = {
         defaultValue: Sequelize.fn("NOW"),
       },
     });
-
-
   },
 
   async down(queryInterface) {

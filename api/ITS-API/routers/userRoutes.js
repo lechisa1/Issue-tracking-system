@@ -15,6 +15,7 @@ const {
   deleteUser,
   toggleUserActiveStatus,
   resetUserPassword,
+  getUserTypes,
 } = require("../controllers/userController");
 
 /**
@@ -62,12 +63,6 @@ const {
  *         updated_at:
  *           type: string
  *           format: date-time
- *     UserRole:
- *       type: object
- *       properties:
- *         role_id:
- *           type: string
- *           format: uuid
  *         assigned_by:
  *           type: string
  *           format: uuid
@@ -113,13 +108,7 @@ const {
  *               phone_number:
  *                 type: string
  *                 example: "+251912345678"
- *               role_ids:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: uuid
- *                 example: ["c9f25dc9-dde1-4b4a-91b2-6f9306e39f32"]
- *                 description: Optional list of role IDs to assign to the user
+
  *     responses:
  *       201:
  *         description: User registered successfully
@@ -173,8 +162,70 @@ router.post("/", validateCreateUser, authenticateToken, createUser);
  *       500:
  *         description: Server error
  */
-router.get("/", authenticateToken, getUsers);
+router.get("/", getUsers);
+/**
+ * @swagger
+ * /api/users/user-types:
+ *   get:
+ *     summary: Get list of all user types
+ *     tags:
+ *       - UserTypes
+ *     responses:
+ *       200:
+ *         description: List of user types fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: User types fetched successfully
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       user_type_id:
+ *                         type: string
+ *                         format: uuid
+ *                         example: "a1b2c3d4-5678-90ab-cdef-1234567890ab"
+ *                       name:
+ *                         type: string
+ *                         example: external_user
+ *                       description:
+ *                         type: string
+ *                         example: Users from external institutes
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2025-11-10T12:34:56Z"
+ *                       updated_at:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2025-11-10T12:34:56Z"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Failed to fetch user types
+ *                 error:
+ *                   type: string
+ *                   example: Database connection error
+ */
 
+router.use("/user-types", getUserTypes);
 /**
  * @swagger
  * /api/users/{id}:
@@ -237,12 +288,7 @@ router.get("/:id", authenticateToken, getUserById);
  *
  *               is_active:
  *                 type: boolean
- *               role_ids:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: uuid
- *                 description: Optional list of role IDs to update
+
  *     responses:
  *       200:
  *         description: User updated successfully

@@ -1,7 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const issueController = require("../controllers/Issue/issueController");
-
+const {
+  validateCreateIssue,
+  validateUpdateIssue,
+  validateGetIssuesQuery,
+  validateIssueIdParam,
+  validateHierarchyNodeIdParam,
+} = require("../validators/issueValidator");
+const { authenticateToken } = require("../middlewares/authMiddleware");
+const uploadSolution = require("../middlewares/issueSolutionMiddleware");
 /**
  * @swagger
  * tags:
@@ -55,8 +63,26 @@ const issueController = require("../controllers/Issue/issueController");
  *       400:
  *         description: Bad request
  */
-router.post("/", issueController.createIssue);
+router.post(
+  "/",
+  authenticateToken,
+  validateCreateIssue,
+  issueController.createIssue
+);
 
+router.post(
+  "/resolve",
+  authenticateToken,
+  uploadSolution.array("files"),
+  issueController.resolveIssue
+);
+
+router.post(
+  "/accept",
+  authenticateToken,
+
+  issueController.acceptIssue
+);
 /**
  * @swagger
  * /api/issues:
@@ -67,7 +93,12 @@ router.post("/", issueController.createIssue);
  *       200:
  *         description: List of issues
  */
-router.get("/", issueController.getIssues);
+router.get("/", validateGetIssuesQuery, issueController.getIssues);
+router.get(
+  "/user/:id",
+  validateIssueIdParam,
+  issueController.getIssuesByUserId
+);
 
 /**
  * @swagger
@@ -89,7 +120,7 @@ router.get("/", issueController.getIssues);
  *       404:
  *         description: Issue not found
  */
-router.get("/:id", issueController.getIssueById);
+router.get("/:id", validateIssueIdParam, issueController.getIssueById);
 
 /**
  * @swagger
@@ -131,7 +162,13 @@ router.get("/:id", issueController.getIssueById);
  *       404:
  *         description: Issue not found
  */
-router.put("/:id", issueController.updateIssue);
+router.put(
+  "/:id",
+  authenticateToken,
+  validateIssueIdParam,
+  validateUpdateIssue,
+  issueController.updateIssue
+);
 
 /**
  * @swagger
@@ -153,6 +190,39 @@ router.put("/:id", issueController.updateIssue);
  *       404:
  *         description: Issue not found
  */
-router.delete("/:id", issueController.deleteIssue);
+
+/**
+ * @swagger
+ * /api/issues/by-hnode/{hierarchy_node_id}:
+ *   get:
+ *     summary: Get issues by hierarchy_node_id
+ *     tags: [Issues]
+ *     parameters:
+ *       - in: path
+ *         name: hierarchy_node_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Hierarchy Node ID
+ *     responses:
+ *       200:
+ *         description: Issues for the given hierarchy node
+ *       404:
+ *         description: No issues found
+ */
+
+router.get(
+  "/issues/hierarchy/:hierarchy_node_id/project/:project_id",
+  validateHierarchyNodeIdParam,
+  issueController.getIssuesByHierarchyNodeId
+);
+// Change from query to URL parameter
+router.get(
+  "/issues-by-pairs/:pairs/user/:user_id",
+  issueController.getIssuesByMultipleHierarchyNodes
+);
+
+router.delete("/:id", validateIssueIdParam, issueController.deleteIssue);
 
 module.exports = router;
