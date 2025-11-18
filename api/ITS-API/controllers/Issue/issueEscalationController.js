@@ -66,18 +66,6 @@ const escalateIssue = async (req, res) => {
       await EscalationAttachment.bulkCreate(links, { transaction: t });
     }
 
-    // 5. History
-    // await IssueEscalationHistory.create(
-    //   {
-    //     issue_escalation_history_id: uuidv4(),
-    //     issue_id,
-    //     from_tier,
-    //     to_tier,
-    //     escalated_by,
-    //   },
-    //   { transaction: t }
-    // );
-
     // 6. Create tier entry (for new tier assignment)
     await IssueTier.create(
       {
