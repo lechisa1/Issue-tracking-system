@@ -16,6 +16,20 @@ module.exports = (sequelize, DataTypes) => {
         as: "escalator",
       });
 
+      // IssueEscalation ↔ HierarchyNode (from_tier)
+      IssueEscalation.belongsTo(models.HierarchyNode, {
+        foreignKey: "from_tier",
+        targetKey: "hierarchy_node_id",
+        as: "fromTierNode",
+      });
+
+      // IssueEscalation ↔ HierarchyNode (to_tier)
+      IssueEscalation.belongsTo(models.HierarchyNode, {
+        foreignKey: "to_tier",
+        targetKey: "hierarchy_node_id",
+        as: "toTierNode",
+      });
+
       // IssueEscalation ↔ EscalationAttachments
       IssueEscalation.hasMany(models.EscalationAttachment, {
         foreignKey: "escalation_id",
@@ -33,8 +47,8 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: DataTypes.UUIDV4,
       },
       issue_id: DataTypes.UUID,
-      from_tier: DataTypes.STRING(50),
-      to_tier: DataTypes.STRING(50),
+      from_tier: DataTypes.UUID,
+      to_tier: DataTypes.UUID,
       reason: DataTypes.TEXT,
       escalated_by: DataTypes.UUID,
       escalated_at: DataTypes.DATE,

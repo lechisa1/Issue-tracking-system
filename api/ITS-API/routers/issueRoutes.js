@@ -9,7 +9,6 @@ const {
   validateHierarchyNodeIdParam,
 } = require("../validators/issueValidator");
 const { authenticateToken } = require("../middlewares/authMiddleware");
-const uploadSolution = require("../middlewares/issueSolutionMiddleware");
 /**
  * @swagger
  * tags:
@@ -68,13 +67,6 @@ router.post(
   authenticateToken,
   validateCreateIssue,
   issueController.createIssue
-);
-
-router.post(
-  "/resolve",
-  authenticateToken,
-  uploadSolution.array("files"),
-  issueController.resolveIssue
 );
 
 router.post(

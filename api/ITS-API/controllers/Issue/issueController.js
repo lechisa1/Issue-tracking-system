@@ -9,10 +9,13 @@ const {
   IssueTier,
   IssueEscalation,
   IssueComment,
+  IssueHistory,
   ProjectUserRole,
   Institute,
   Project,
-
+  EscalationAttachment,
+  ResolutionAttachment,
+  IssueResolution,
   IssueSolution,
   IssueSolutionAttachment,
   IssueAttachment,
@@ -66,6 +69,24 @@ const createIssue = async (req, res) => {
         status: "pending",
         created_at: new Date(),
         updated_at: new Date(),
+      },
+      { transaction: t }
+    );
+
+    // ================================
+    // CREATE ISSUE HISTORY (NEW)
+    // ================================
+    await IssueHistory.create(
+      {
+        history_id: uuidv4(),
+        issue_id: issue.issue_id,
+        user_id: reported_by,
+        action: "created",
+        status_at_time: "pending",
+        escalation_id: null,
+        resolution_id: null,
+        notes: "Issue created",
+        created_at: new Date(),
       },
       { transaction: t }
     );
@@ -207,15 +228,11 @@ const getIssuesByUserId = async (req, res) => {
         { model: HierarchyNode, as: "hierarchyNode" },
         { model: User, as: "reporter" },
         { model: User, as: "assignee" },
+        // Comments
         {
           model: IssueComment,
           as: "comments",
           include: [{ model: User, as: "author" }],
-        },
-        {
-          model: IssueAttachment,
-          as: "attachments",
-          include: [{ model: Attachment, as: "attachment" }],
         },
       ],
       order: [["created_at", "DESC"]],
@@ -250,10 +267,78 @@ const getIssueById = async (req, res) => {
           as: "comments",
           include: [{ model: User, as: "author" }],
         },
+
+        // Issue Attachments
         {
           model: IssueAttachment,
           as: "attachments",
           include: [{ model: Attachment, as: "attachment" }],
+        },
+        // Escalations & their attachments
+        {
+          model: IssueEscalation,
+          as: "escalations",
+          include: [
+            { model: User, as: "escalator" },
+            {
+              model: HierarchyNode,
+              as: "fromTierNode",
+              foreignKey: "from_tier",
+              targetKey: "hierarchy_node_id",
+            },
+            {
+              model: HierarchyNode,
+              as: "toTierNode",
+              foreignKey: "to_tier",
+              targetKey: "hierarchy_node_id",
+            },
+            {
+              model: EscalationAttachment,
+              as: "attachments",
+              include: [{ model: Attachment, as: "attachment" }],
+            },
+          ],
+        },
+        // Resolutions & their attachments
+        {
+          model: IssueResolution,
+          as: "resolutions",
+          include: [
+            { model: User, as: "resolver" },
+            {
+              model: ResolutionAttachment,
+              as: "attachments",
+              include: [{ model: Attachment, as: "attachment" }],
+            },
+          ],
+        },
+        // History logs
+        {
+          model: IssueHistory,
+          as: "history",
+          include: [
+            { model: User, as: "performed_by" },
+            {
+              model: IssueEscalation,
+              as: "escalation",
+              include: [
+                {
+                  model: HierarchyNode,
+                  as: "fromTierNode",
+                  foreignKey: "from_tier",
+                  targetKey: "hierarchy_node_id",
+                },
+                {
+                  model: HierarchyNode,
+                  as: "toTierNode",
+                  foreignKey: "to_tier",
+                  targetKey: "hierarchy_node_id",
+                },
+              ],
+            },
+            { model: IssueResolution, as: "resolution" },
+          ],
+          order: [["created_at", "DESC"]],
         },
       ],
     });
@@ -555,68 +640,24 @@ const getIssuesByMultipleHierarchyNodes = async (req, res) => {
     // });
 
     // Extract Issues from IssueTier
-    const escalatedIssues = escalatedIssuesEscalation.map((t) => t.issue);
-    const escalatedIssues = escalatedIssueTiers.map((t) => t.issue);
-
-
     // ------------------------------------------------------------
-    // 5️⃣ MERGE BOTH RESULTS WITHOUT DUPLICATES
+    // 2️⃣ GET ESCALATED ISSUES FROM IssueEscalation
+    //    - to_tier matches hierarchy_node_id
     // ------------------------------------------------------------
-    const issuesMap = new Map();
-    directIssues.forEach((issue) => issuesMap.set(issue.issue_id, issue));
-    escalatedIssues.forEach((issue) => issuesMap.set(issue.issue_id, issue));
-
-    const finalIssues = Array.from(issuesMap.values());
-
-    res.status(200).json({
-      success: true,
-      count: finalIssues.length,
-      issues: finalIssues,
-    });
-  } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: err.message });
-  }
-};
-
-const getEscalatedIssuesForUser = async (req, res) => {
-  try {
-    const { user_id } = req.params;
-
-    if (!user_id)
-      return res.status(400).json({ message: "User ID is required" });
-
-    // 1️⃣ Get user info and hierarchy node
-    const user = await User.findByPk(user_id, {
-      include: [
-        {
-          model: ProjectRole,
-          as: "project_roles",
-          include: ["hierarchy_node"],
-        },
-      ],
-    });
-
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    const hierarchyNodeIds = user.project_roles.map(
-      (r) => r.hierarchy_node.hierarchy_node_id
-    );
-
-    // 2️⃣ Get escalated issues from IssueTier
-    const escalatedIssueTiers = await IssueTier.findAll({
+    const escalatedIssuesEscalation = await IssueEscalation.findAll({
       where: {
-        tier_level: { [Op.in]: hierarchyNodeIds },
-        status: { [Op.ne]: "closed" },
+        [Op.or]: validPairs.map((pair) => ({
+          to_tier: pair.hierarchy_node_id,
+          // Optional: you can filter by project if needed
+          // project_id: pair.project_id
+        })),
       },
       include: [
         {
           model: Issue,
           as: "issue",
           where: {
-            reported_by: { [Op.ne]: user_id }, // optional
+            reported_by: { [Op.ne]: user_id },
           },
           include: [
             { model: Project, as: "project" },
@@ -640,12 +681,21 @@ const getEscalatedIssuesForUser = async (req, res) => {
       ],
     });
 
-    const escalatedIssues = escalatedIssueTiers.map((t) => t.issue);
+    const escalatedIssues = escalatedIssuesEscalation.map((t) => t.issue);
+
+    // ------------------------------------------------------------
+    // 5️⃣ MERGE BOTH RESULTS WITHOUT DUPLICATES
+    // ------------------------------------------------------------
+    const issuesMap = new Map();
+    directIssues.forEach((issue) => issuesMap.set(issue.issue_id, issue));
+    escalatedIssues.forEach((issue) => issuesMap.set(issue.issue_id, issue));
+
+    const finalIssues = Array.from(issuesMap.values());
 
     res.status(200).json({
       success: true,
-      count: escalatedIssues.length,
-      issues: escalatedIssues,
+      count: finalIssues.length,
+      issues: finalIssues,
     });
   } catch (err) {
     console.error(err);
@@ -697,6 +747,24 @@ const acceptIssue = async (req, res) => {
       { transaction: t }
     );
 
+    // ================================
+    // NEW — CREATE ISSUE HISTORY RECORD
+    // ================================
+    await IssueHistory.create(
+      {
+        history_id: uuidv4(),
+        issue_id,
+        user_id,
+        action: "accepted",
+        status_at_time: "in_progress", // new status
+        escalation_id: null,
+        resolution_id: null,
+        notes: "Issue accepted by handler and status changed to In Progress",
+        created_at: new Date(),
+      },
+      { transaction: t }
+    );
+
     await t.commit();
     return res.json({
       success: true,
@@ -730,8 +798,10 @@ const updateIssue = async (req, res) => {
       issue_description,
       issue_occured_time,
       status_change_reason,
-      attachment_ids, // optional: attach new files or replace
+      attachment_ids,
     } = req.body;
+
+    const user_id = req.user?.user_id;
 
     const issue = await Issue.findByPk(id, { transaction: t });
     if (!issue) {
@@ -740,24 +810,50 @@ const updateIssue = async (req, res) => {
     }
 
     const oldStatus = issue.status;
+    const oldAssignee = issue.assigned_to;
 
-    Object.assign(issue, {
-      title: title || issue.title,
-      description: description || issue.description,
-      issue_category_id: issue_category_id || issue.issue_category_id,
-      hierarchy_node_id: hierarchy_node_id || issue.hierarchy_node_id,
-      priority_id: priority_id || issue.priority_id,
-      assigned_to: assigned_to || issue.assigned_to,
-      action_taken: action_taken || issue.action_taken,
-      url_path: url_path || issue.url_path,
-      issue_description: issue_description || issue.issue_description,
-      issue_occured_time: issue_occured_time || issue.issue_occured_time,
-    });
+    // Track if *any* meaningful change happened
+    let hasChanges = false;
+    let notes = [];
+
+    // Detect changes and apply modifications
+    const fieldsToCheck = {
+      title,
+      description,
+      issue_category_id,
+      hierarchy_node_id,
+      priority_id,
+      action_taken,
+      url_path,
+      issue_description,
+      issue_occured_time,
+    };
+
+    for (const [field, newValue] of Object.entries(fieldsToCheck)) {
+      if (newValue && newValue !== issue[field]) {
+        hasChanges = true;
+        notes.push(`${field} updated`);
+        issue[field] = newValue;
+      }
+    }
+
+    // Handle assignee change
+    let assigneeChanged = false;
+    if (assigned_to && assigned_to !== oldAssignee) {
+      assigneeChanged = true;
+      hasChanges = true;
+      notes.push(`assigned_to changed from ${oldAssignee} to ${assigned_to}`);
+      issue.assigned_to = assigned_to;
+    }
 
     // Handle status change
+    let statusChanged = false;
     if (status && status !== issue.status) {
-      issue.status = status;
+      statusChanged = true;
+      hasChanges = true;
+      notes.push(`status changed from ${oldStatus} to ${status}`);
 
+      issue.status = status;
       if (status === "resolved") issue.resolved_at = new Date();
       if (status === "closed") issue.closed_at = new Date();
 
@@ -767,7 +863,7 @@ const updateIssue = async (req, res) => {
           issue_id: issue.issue_id,
           from_status: oldStatus,
           to_status: status,
-          changed_by: req.user?.user_id || issue.reported_by,
+          changed_by: user_id || issue.reported_by,
           reason: status_change_reason || "Status updated",
           created_at: new Date(),
         },
@@ -777,7 +873,7 @@ const updateIssue = async (req, res) => {
 
     await issue.save({ transaction: t });
 
-    // Link new attachments if provided
+    // Link new attachments
     if (
       attachment_ids &&
       Array.isArray(attachment_ids) &&
@@ -795,7 +891,35 @@ const updateIssue = async (req, res) => {
 
       if (newLinks.length > 0) {
         await IssueAttachment.bulkCreate(newLinks, { transaction: t });
+        notes.push("new attachments added");
+        hasChanges = true;
       }
+    }
+
+    // ================================
+    // CREATE ISSUE HISTORY ENTRY
+    // ================================
+    if (hasChanges) {
+      let action = "updated";
+
+      if (assigneeChanged) action = "assigned";
+      if (statusChanged)
+        action = status === "resolved" ? "resolved" : "updated";
+
+      await IssueHistory.create(
+        {
+          history_id: uuidv4(),
+          issue_id: issue.issue_id,
+          user_id: user_id,
+          action,
+          status_at_time: issue.status,
+          escalation_id: null,
+          resolution_id: null,
+          notes: notes.join("; "),
+          created_at: new Date(),
+        },
+        { transaction: t }
+      );
     }
 
     await t.commit();
@@ -847,100 +971,6 @@ const deleteIssue = async (req, res) => {
   }
 };
 
-const resolveIssue = async (req, res) => {
-  const t = await sequelize.transaction();
-  try {
-    const { issue_id, resolution_note, solution_description } = req.body;
-    const user_id = req.user?.user_id;
-    console.log("userrrrrrrrrrrrr", user_id);
-    const issue = await Issue.findByPk(issue_id);
-    if (!issue) return res.status(404).json({ message: "Issue not found" });
-
-    if (issue.status !== "in_progress") {
-      return res.status(400).json({
-        message: "Only issues with status 'in_progress' can be resolved",
-      });
-    }
-    // 1️⃣ Update issue status
-    await issue.update(
-      {
-        status: "resolved",
-        resolved_at: new Date(),
-        action_taken: resolution_note,
-      },
-      { transaction: t }
-    );
-
-    // 2️⃣ Add action record
-    await IssueAction.create(
-      {
-        action_id: uuidv4(),
-        issue_id,
-        action_name: "resolved",
-        action_description: resolution_note,
-        performed_by: user_id,
-        related_tier: issue.hierarchy_node_id,
-        created_at: new Date(),
-      },
-      { transaction: t }
-    );
-
-    // 3️⃣ Add history record
-    await IssueStatusHistory.create(
-      {
-        status_history_id: uuidv4(),
-        issue_id,
-        from_status: issue.status,
-        to_status: "resolved",
-        changed_by: user_id,
-        reason: "Issue resolved",
-        created_at: new Date(),
-      },
-      { transaction: t }
-    );
-
-    // 4️⃣ Add solution record
-    const solution = await IssueSolution.create(
-      {
-        solution_id: uuidv4(),
-        issue_id,
-        description: solution_description || null,
-        created_by: user_id,
-        created_at: new Date(),
-      },
-      { transaction: t }
-    );
-
-    // 5️⃣ Handle uploaded files
-    if (req.files && req.files.length > 0) {
-      const solutionAttachments = req.files.map((file) => ({
-        issue_solution_attachment_id: uuidv4(),
-        solution_id: solution.solution_id,
-        file_name: file.filename || file.originalname,
-        original_name: file.originalname,
-        mime_type: file.mimetype,
-        path: file.path.replace(/\\/g, "/"), // normalize for Windows paths
-        created_at: new Date(),
-      }));
-
-      await IssueSolutionAttachment.bulkCreate(solutionAttachments, {
-        transaction: t,
-      });
-    }
-
-    await t.commit();
-
-    res.json({
-      success: true,
-      message: "Issue resolved successfully with solution",
-      solution_id: solution.solution_id,
-    });
-  } catch (error) {
-    await t.rollback();
-    console.error(error);
-    res.status(500).json({ message: error.message });
-  }
-};
 module.exports = {
   createIssue,
   getIssues,
@@ -950,6 +980,5 @@ module.exports = {
   getIssuesByMultipleHierarchyNodes,
   updateIssue,
   deleteIssue,
-  resolveIssue,
   acceptIssue,
 };

@@ -63,6 +63,18 @@ module.exports = (sequelize, DataTypes) => {
         as: "escalations",
       });
 
+      // Issue ↔ IssueResolution
+      Issue.hasMany(models.IssueResolution, {
+        foreignKey: "issue_id",
+        as: "resolutions",
+      });
+
+      // Issue ↔ IssueHistory
+      Issue.hasMany(models.IssueHistory, {
+        foreignKey: "issue_id",
+        as: "history",
+      });
+
       // Issue ↔ IssueComments
       Issue.hasMany(models.IssueComment, {
         foreignKey: "issue_id",

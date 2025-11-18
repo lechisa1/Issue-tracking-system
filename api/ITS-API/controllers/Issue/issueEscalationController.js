@@ -4,6 +4,7 @@ const {
   User,
   IssueTier,
   Attachment,
+  IssueHistory,
   EscalationAttachment,
   IssueEscalationHistory,
   IssueAction,
@@ -89,6 +90,24 @@ const escalateIssue = async (req, res) => {
         action_description: `Escalated from ${from_tier} to ${to_tier}`,
         performed_by: escalated_by,
         related_tier: from_tier,
+      },
+      { transaction: t }
+    );
+
+    // ==================================
+    // 8. CREATE IssueHistory ENTRY (NEW)
+    // ==================================
+    await IssueHistory.create(
+      {
+        history_id: uuidv4(),
+        issue_id: issue_id,
+        user_id: escalated_by,
+        action: "escalated",
+        status_at_time: issue.status, // Issue status doesn't change here
+        escalation_id: escalation_id,
+        resolution_id: null,
+        notes: `Escalated from tier ${from_tier} to tier ${to_tier}. Reason: ${reason}`,
+        created_at: new Date(),
       },
       { transaction: t }
     );

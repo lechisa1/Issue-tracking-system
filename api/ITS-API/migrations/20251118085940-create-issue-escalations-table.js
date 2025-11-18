@@ -22,12 +22,12 @@ module.exports = {
       },
 
       from_tier: {
-        type: Sequelize.STRING(50),
+        type: Sequelize.UUID,
         allowNull: true,
       },
 
       to_tier: {
-        type: Sequelize.STRING(50),
+        type: Sequelize.UUID,
         allowNull: true,
       },
 

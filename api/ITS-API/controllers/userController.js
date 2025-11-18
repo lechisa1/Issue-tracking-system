@@ -349,7 +349,9 @@ const getUsers = async (req, res) => {
 
 const getUserById = async (req, res) => {
   try {
-    const { user_id } = req.params;
+    const { id: user_id } = req.params;
+
+    console.log("user_id: ", user_id);
 
     // ====== Find user with relations ======
     const user = await User.findByPk(user_id, {
@@ -357,7 +359,7 @@ const getUserById = async (req, res) => {
         {
           model: Institute,
           as: "institute",
-          attributes: ["institute_id", "name", "address", "contact_email"],
+          attributes: ["institute_id", "name"],
         },
         {
           model: UserType,
