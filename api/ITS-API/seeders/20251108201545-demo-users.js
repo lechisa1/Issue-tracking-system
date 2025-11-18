@@ -1,59 +1,3 @@
-// "use strict";
-// const { v4: uuidv4 } = require("uuid");
-// const bcrypt = require("bcrypt");
-
-// module.exports = {
-//   async up(queryInterface, Sequelize) {
-//     const now = new Date();
-
-//     const passwordHash = await bcrypt.hash("Password123!", 10);
-
-//     await queryInterface.bulkInsert("users", [
-//       {
-//         user_id: uuidv4(),
-//         full_name: "John Doe",
-//         email: "john.doe@example.com",
-//         password: passwordHash,
-//         user_type_id: "1bd1a1f5-3615-408e-ae60-049473bd74da",
-//         institute_id: null,
-//         position: "Software Engineer",
-//         phone_number: "251911234567",
-//         profile_image: null,
-//         is_first_logged_in: true,
-//         last_login_at: null,
-//         password_changed_at: null,
-//         is_active: true,
-//         created_at: now,
-//         updated_at: now,
-//       },
-//       {
-//         user_id: uuidv4(),
-//         full_name: "Jane Smith",
-//         email: "jane.smith@example.com",
-//         password: passwordHash,
-//         user_type_id: "f08af19a-22b6-4def-a398-33f179be0c20",
-//         institute_id: null,
-//         position: "Project Manager",
-//         phone_number: "251911234568",
-//         profile_image: null,
-//         is_first_logged_in: true,
-//         last_login_at: null,
-//         password_changed_at: null,
-//         is_active: true,
-//         created_at: now,
-//         updated_at: now,
-//       },
-//     ]);
-//   },
-
-//   async down(queryInterface, Sequelize) {
-//     await queryInterface.bulkDelete("users", null, {});
-//   },
-// };
-
-// instituteId: 2f7c3b21-2d19-4e58-a053-e1995b1c8a6d
-// userType: 1bd1a1f5-3615-408e-ae60-049473bd74da
-
 "use strict";
 const { v4: uuidv4 } = require("uuid");
 const bcrypt = require("bcrypt");
@@ -61,15 +5,50 @@ const bcrypt = require("bcrypt");
 module.exports = {
   async up(queryInterface, Sequelize) {
     const now = new Date();
-    const instituteId = "2a428304-ef45-4128-8c9e-66074517bf08";
-    const userTypeId = "c469f531-a88d-46a1-8196-d765f54eee08";
 
+    // ================================
+    // 1. Fetch user_type_id = external_user
+    // ================================
+    const [userType] = await queryInterface.sequelize.query(`
+      SELECT user_type_id
+      FROM user_types
+      WHERE name = 'external_user'
+      LIMIT 1
+    `);
+
+    if (!userType.length) {
+      throw new Error(
+        "User type 'external_user' not found. Seed user_types first."
+      );
+    }
+
+    const userTypeId = userType[0].user_type_id;
+
+    // ================================
+    // 2. Fetch ONE institute_id
+    // ================================
+    const [inst] = await queryInterface.sequelize.query(`
+      SELECT institute_id 
+      FROM institutes
+      ORDER BY created_at ASC
+      LIMIT 1
+    `);
+
+    if (!inst.length) {
+      throw new Error("No institutes found. Seed institutes first.");
+    }
+
+    const instituteId = inst[0].institute_id;
+
+    // ================================
+    // 3. Common password hash
+    // ================================
     const passwordHash = await bcrypt.hash("Password123!", 10);
 
+    // ================================
+    // 4. Insert demo users
+    // ================================
     await queryInterface.bulkInsert("users", [
-      // -----------------------
-      // CCC (2 Users)
-      // -----------------------
       {
         user_id: uuidv4(),
         full_name: "CCC Centeral Admin",
@@ -105,9 +84,7 @@ module.exports = {
         updated_at: now,
       },
 
-      // -----------------------
-      // RRR (2 Users)
-      // -----------------------
+      // RRR Users
       {
         user_id: uuidv4(),
         full_name: "RRR Admin",
@@ -143,9 +120,7 @@ module.exports = {
         updated_at: now,
       },
 
-      // -----------------------
-      // SSS (2 Users)
-      // -----------------------
+      // SSS Users
       {
         user_id: uuidv4(),
         full_name: "SSS Admin",
@@ -181,9 +156,7 @@ module.exports = {
         updated_at: now,
       },
 
-      // -----------------------
-      // A1A (2 Users)
-      // -----------------------
+      // A1A Users
       {
         user_id: uuidv4(),
         full_name: "A1A Admin",

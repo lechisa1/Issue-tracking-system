@@ -9,7 +9,7 @@ const {
   validateHierarchyNodeIdParam,
 } = require("../validators/issueValidator");
 const { authenticateToken } = require("../middlewares/authMiddleware");
-
+const uploadSolution = require("../middlewares/issueSolutionMiddleware");
 /**
  * @swagger
  * tags:
@@ -70,6 +70,19 @@ router.post(
   issueController.createIssue
 );
 
+router.post(
+  "/resolve",
+  authenticateToken,
+  uploadSolution.array("files"),
+  issueController.resolveIssue
+);
+
+router.post(
+  "/accept",
+  authenticateToken,
+
+  issueController.acceptIssue
+);
 /**
  * @swagger
  * /api/issues:
@@ -81,6 +94,11 @@ router.post(
  *         description: List of issues
  */
 router.get("/", validateGetIssuesQuery, issueController.getIssues);
+router.get(
+  "/user/:id",
+  validateIssueIdParam,
+  issueController.getIssuesByUserId
+);
 
 /**
  * @swagger
@@ -198,6 +216,11 @@ router.get(
   "/issues/hierarchy/:hierarchy_node_id/project/:project_id",
   validateHierarchyNodeIdParam,
   issueController.getIssuesByHierarchyNodeId
+);
+// Change from query to URL parameter
+router.get(
+  "/issues-by-pairs/:pairs/user/:user_id",
+  issueController.getIssuesByMultipleHierarchyNodes
 );
 
 router.delete("/:id", validateIssueIdParam, issueController.deleteIssue);
