@@ -244,6 +244,19 @@ const getRoles = async (req, res) => {
             },
           ],
         },
+        {
+          model: RolePermission,
+          as: "rolePermissions",
+          where: { is_active: true },
+          required: false,
+          include: [
+            {
+              model: Permission,
+              as: "permission",
+              attributes: ["permission_id", "resource", "action"],
+            },
+          ],
+        },
       ],
       order: [["created_at", "DESC"]],
     });
@@ -301,6 +314,7 @@ const getRoleById = async (req, res) => {
         {
           model: RolePermission,
           as: "rolePermissions",
+          where: { is_active: true },
           required: false,
           include: [
             {
@@ -462,7 +476,7 @@ const updateRole = async (req, res) => {
 
       // Validate permissions
       const validPerms = await Permission.findAll({
-        where: { permission_id: permission_ids },
+        where: { permission_id: permission_ids, is_active: true },
         transaction: t,
       });
 
@@ -479,6 +493,8 @@ const updateRole = async (req, res) => {
         role_permission_id: uuidv4(),
         role_id: id,
         permission_id: pid,
+        assigned_by: req.user?.user_id || "system",
+        assigned_at: new Date(),
         is_active: true,
         created_at: new Date(),
         updated_at: new Date(),

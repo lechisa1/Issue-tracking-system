@@ -170,6 +170,14 @@ const getIssues = async (req, res) => {
           as: "attachments",
           include: [{ model: Attachment, as: "attachment" }],
         },
+        {
+          model: IssueStatusHistory,
+          as: "statusHistory",
+        },
+        {
+          model: IssueAction,
+          as: "actions",
+        },
       ],
       order: [["created_at", "DESC"]],
     });
@@ -301,6 +309,7 @@ const updateIssue = async (req, res) => {
     }
 
     const oldStatus = issue.status;
+    const oldActionTaken = issue.action_taken;
 
     Object.assign(issue, {
       title: title || issue.title,
@@ -330,6 +339,22 @@ const updateIssue = async (req, res) => {
           to_status: status,
           changed_by: req.user?.user_id || issue.reported_by,
           reason: status_change_reason || "Status updated",
+          created_at: new Date(),
+        },
+        { transaction: t }
+      );
+    }
+
+    // Handle action_taken change (even if status doesn't change)
+    if (action_taken && action_taken !== oldActionTaken) {
+      await IssueStatusHistory.create(
+        {
+          status_history_id: uuidv4(),
+          issue_id: issue.issue_id,
+          from_status: oldStatus,
+          to_status: oldStatus, // Status remains the same
+          changed_by: req.user?.user_id || issue.reported_by,
+          reason: status_change_reason || `Action updated: ${action_taken}`,
           created_at: new Date(),
         },
         { transaction: t }

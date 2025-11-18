@@ -12,6 +12,11 @@ module.exports = (sequelize, DataTypes) => {
         otherKey: "roles_sub_roles_id",
         as: "roleSubRoles",
       });
+
+
+
+
+      
     }
   }
 
@@ -25,7 +30,6 @@ module.exports = (sequelize, DataTypes) => {
       resource: {
         type: DataTypes.STRING(100),
         allowNull: false,
-        unique: true,
       },
       action: {
         type: DataTypes.STRING(100),

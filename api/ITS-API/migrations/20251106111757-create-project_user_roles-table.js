@@ -1,6 +1,6 @@
 "use strict";
 
-const hierarchy = require("../models/hierarchy");
+const hierarchy = require("../models/hierarchyNode");
 
 module.exports = {
   async up(queryInterface, Sequelize) {

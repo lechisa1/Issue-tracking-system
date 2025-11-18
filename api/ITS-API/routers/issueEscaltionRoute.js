@@ -4,6 +4,31 @@ const controller = require("../controllers/Issue/issueEscalationController");
 const {
   validateEscalateIssue,
 } = require("../validators/issueEscalationValidator");
+const multer = require("multer");
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(), // Store files in memory
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'image/jpeg',
+      'image/jpg',
+      'image/png'
+    ];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only PDF, DOC, DOCX, TXT, JPG, JPEG, PNG files are allowed.'), false);
+    }
+  }
+});
 
 /**
  * @swagger
@@ -239,6 +264,10 @@ const {
 
 // Routes
 router.post("/", validateEscalateIssue, controller.escalateIssue);
+router.post("/automated", upload.array('attachments', 10), controller.automatedEscalation);
+router.post("/assign-qa", controller.assignToQATeam);
+router.post("/assign-developer", controller.assignToDeveloper);
+router.post("/mark-in-progress", require("../middlewares/authMiddleware").authenticateToken, controller.markAsInProgress);
 router.get("/:issue_id", controller.getEscalationsByIssueId);
 router.get("/history/:issue_id", controller.getEscalationHistoryByIssueId);
 router.get("/:escalation_id", controller.getEscalationById);

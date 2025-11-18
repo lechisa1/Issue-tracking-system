@@ -60,6 +60,12 @@ module.exports = {
       // System Management
       { resource: "system", action: "manage" },
       { resource: "audit", action: "view" },
+
+      // Escalation permissions
+      { resource: "escalation", action: "can_escalate_direct_to_qal" },
+      { resource: "escalation", action: "can_escalate_direct_to_qa" },
+      { resource: "escalation", action: "can_escalate_direct_to_fed" },
+      { resource: "escalation", action: "can_escalate_direct_to_bed" },
     ];
 
     // Insert permissions one by one, ignoring duplicates

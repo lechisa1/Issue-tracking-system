@@ -19,6 +19,7 @@ module.exports = {
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
       },
+
       from_status: {
         type: Sequelize.STRING(50),
         allowNull: true,

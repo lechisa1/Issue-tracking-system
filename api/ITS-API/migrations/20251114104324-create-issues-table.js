@@ -28,7 +28,7 @@ module.exports = {
         allowNull: true,
       },
       issue_category_id: {
-        type: Sequelize.UUID, // ✅ must match IssueCategory.category_id
+        type: Sequelize.UUID,
         references: {
           model: "issue_categories",
           key: "category_id",

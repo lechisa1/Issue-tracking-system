@@ -61,8 +61,8 @@ const bcrypt = require("bcrypt");
 module.exports = {
   async up(queryInterface, Sequelize) {
     const now = new Date();
-    const instituteId = "2f7c3b21-2d19-4e58-a053-e1995b1c8a6d";
-    const userTypeId = "1bd1a1f5-3615-408e-ae60-049473bd74da";
+    const instituteId = "2a428304-ef45-4128-8c9e-66074517bf08";
+    const userTypeId = "c469f531-a88d-46a1-8196-d765f54eee08";
 
     const passwordHash = await bcrypt.hash("Password123!", 10);
 
