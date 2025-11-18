@@ -3,121 +3,170 @@ const {
   Issue,
   User,
   IssueTier,
+  Attachment,
+  EscalationAttachment,
   IssueEscalationHistory,
   IssueAction,
+  sequelize,
 } = require("../../models");
+
 const { v4: uuidv4 } = require("uuid");
 
-// Escalate issue
+// ------------------------------------------------------
+//  ESCALATE ISSUE
+// ------------------------------------------------------
 const escalateIssue = async (req, res) => {
+  const t = await sequelize.transaction();
+
   try {
-    const { issue_id, from_tier, to_tier, reason, escalated_by } = req.body;
-
-    // Verify issue exists
-    const issue = await Issue.findByPk(issue_id);
-    if (!issue) {
-      return res.status(404).json({ message: "Issue not found." });
-    }
-
-    // Verify escalator exists
-    const escalator = await User.findByPk(escalated_by);
-    if (!escalator) {
-      return res.status(404).json({ message: "Escalator user not found." });
-    }
-
-    const escalation_id = uuidv4();
-
-    // Create escalation record
-    const escalation = await IssueEscalation.create({
-      escalation_id,
+    const {
       issue_id,
       from_tier,
       to_tier,
       reason,
       escalated_by,
-      escalated_at: new Date(),
-      created_at: new Date(),
-      updated_at: new Date(),
-    });
+      attachment_ids,
+    } = req.body;
 
-    // Create escalation history record
-    await IssueEscalationHistory.create({
-      issue_escalation_history_id: uuidv4(),
-      issue_id,
-      from_tier,
-      to_tier,
-      escalated_by,
-      created_at: new Date(),
-    });
+    // 1. Validate Issue
+    const issue = await Issue.findByPk(issue_id);
+    if (!issue) return res.status(404).json({ message: "Issue not found." });
 
-    // Create tier handling record
-    await IssueTier.create({
-      issue_tier_id: uuidv4(),
-      issue_id,
-      tier_level: to_tier,
-      handler_id: null, // Can be assigned later
-      assigned_at: new Date(),
-      status: "pending",
-      remarks: `Escalated from ${from_tier}`,
-      created_at: new Date(),
-      updated_at: new Date(),
-    });
+    // 2. Validate User
+    const escalator = await User.findByPk(escalated_by);
+    if (!escalator)
+      return res
+        .status(404)
+        .json({ message: "User (escalated_by) not found." });
 
-    // Create action record
-    await IssueAction.create({
-      action_id: uuidv4(),
-      issue_id,
-      action_name: "Issue Escalated",
-      action_description: `Escalated from ${from_tier} to ${to_tier}`,
-      performed_by: escalated_by,
-      related_tier: from_tier,
-      created_at: new Date(),
-    });
+    const escalation_id = uuidv4();
 
-    // Return escalation with relations
-    const escalationWithDetails = await IssueEscalation.findOne({
-      where: { escalation_id: escalation.escalation_id },
+    // 3. Create escalation
+    await IssueEscalation.create(
+      {
+        escalation_id,
+        issue_id,
+        from_tier,
+        to_tier,
+        reason,
+        escalated_by,
+        escalated_at: new Date(),
+      },
+      { transaction: t }
+    );
+
+    // 4. Attach files
+    if (attachment_ids?.length > 0) {
+      const links = attachment_ids.map((attachment_id) => ({
+        escalation_id,
+        attachment_id,
+        created_at: new Date(),
+      }));
+
+      await EscalationAttachment.bulkCreate(links, { transaction: t });
+    }
+
+    // 5. History
+    // await IssueEscalationHistory.create(
+    //   {
+    //     issue_escalation_history_id: uuidv4(),
+    //     issue_id,
+    //     from_tier,
+    //     to_tier,
+    //     escalated_by,
+    //   },
+    //   { transaction: t }
+    // );
+
+    // 6. Create tier entry (for new tier assignment)
+    await IssueTier.create(
+      {
+        issue_tier_id: uuidv4(),
+        issue_id,
+        tier_level: to_tier,
+        handler_id: null,
+        assigned_at: new Date(),
+        status: "pending",
+        remarks: `Escalated from ${from_tier}`,
+      },
+      { transaction: t }
+    );
+
+    // 7. Log Action
+    await IssueAction.create(
+      {
+        action_id: uuidv4(),
+        issue_id,
+        action_name: "Issue Escalated",
+        action_description: `Escalated from ${from_tier} to ${to_tier}`,
+        performed_by: escalated_by,
+        related_tier: from_tier,
+      },
+      { transaction: t }
+    );
+
+    // COMMIT ALL
+    await t.commit();
+
+    // Return escalation with details
+    const fullEscalation = await IssueEscalation.findOne({
+      where: { escalation_id },
       include: [
         { model: Issue, as: "issue" },
         { model: User, as: "escalator" },
+        {
+          model: EscalationAttachment,
+          as: "attachments",
+          include: [{ model: Attachment, as: "attachment" }],
+        },
       ],
     });
 
-    res.status(201).json(escalationWithDetails);
+    return res.status(201).json(fullEscalation);
   } catch (error) {
-    console.error(error);
-    res
+    console.error("ESCALATION ERROR:", error);
+    await t.rollback();
+    return res
       .status(500)
       .json({ message: "Internal server error", error: error.message });
   }
 };
 
-// Get escalations by issue ID
+// ------------------------------------------------------
+//  GET ESCALATIONS BY ISSUE ID
+// ------------------------------------------------------
 const getEscalationsByIssueId = async (req, res) => {
   try {
     const { issue_id } = req.params;
 
-    const escalations = await IssueEscalation.findAll({
+    const data = await IssueEscalation.findAll({
       where: { issue_id },
-      include: [{ model: User, as: "escalator" }],
+      include: [
+        { model: User, as: "escalator" },
+        {
+          model: EscalationAttachment,
+          as: "attachments",
+          include: [{ model: Attachment, as: "attachment" }],
+        },
+      ],
       order: [["escalated_at", "DESC"]],
     });
 
-    res.status(200).json(escalations);
+    return res.status(200).json(data);
   } catch (error) {
-    console.error(error);
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: error.message });
+    console.error("ESCALATION FETCH ERROR:", error);
+    return res.status(500).json({ message: error.message });
   }
 };
 
-// Get escalation history by issue ID
+// ------------------------------------------------------
+//  GET ESCALATION HISTORY BY ISSUE ID
+// ------------------------------------------------------
 const getEscalationHistoryByIssueId = async (req, res) => {
   try {
     const { issue_id } = req.params;
 
-    const escalationHistory = await IssueEscalationHistory.findAll({
+    const history = await IssueEscalationHistory.findAll({
       where: { issue_id },
       include: [
         { model: User, as: "escalator" },
@@ -126,16 +175,16 @@ const getEscalationHistoryByIssueId = async (req, res) => {
       order: [["created_at", "DESC"]],
     });
 
-    res.status(200).json(escalationHistory);
+    return res.status(200).json(history);
   } catch (error) {
-    console.error(error);
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: error.message });
+    console.error("ESCALATION HISTORY ERROR:", error);
+    return res.status(500).json({ message: error.message });
   }
 };
 
-// Get escalation by ID
+// ------------------------------------------------------
+//  GET ESCALATION BY ID
+// ------------------------------------------------------
 const getEscalationById = async (req, res) => {
   try {
     const { escalation_id } = req.params;
@@ -145,46 +194,45 @@ const getEscalationById = async (req, res) => {
       include: [
         { model: Issue, as: "issue" },
         { model: User, as: "escalator" },
+        {
+          model: EscalationAttachment,
+          as: "attachments",
+          include: [{ model: Attachment, as: "attachment" }],
+        },
       ],
     });
 
-    if (!escalation) {
-      return res.status(404).json({ message: "Escalation not found." });
-    }
+    if (!escalation)
+      return res.status(404).json({ message: "Escalation not found" });
 
-    res.status(200).json(escalation);
+    return res.status(200).json(escalation);
   } catch (error) {
-    console.error(error);
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: error.message });
+    console.error("GET ESCALATION ERROR:", error);
+    return res.status(500).json({ message: error.message });
   }
 };
 
-// Delete escalation
+// ------------------------------------------------------
+//  DELETE ESCALATION
+// ------------------------------------------------------
 const deleteEscalation = async (req, res) => {
   try {
     const { escalation_id } = req.params;
 
     const escalation = await IssueEscalation.findByPk(escalation_id);
-    if (!escalation) {
-      return res.status(404).json({ message: "Escalation not found." });
-    }
+    if (!escalation)
+      return res.status(404).json({ message: "Escalation not found" });
 
-    await IssueEscalation.destroy({
-      where: { escalation_id },
-    });
+    await IssueEscalation.destroy({ where: { escalation_id } });
 
-    res.status(204).send();
+    return res.status(204).send();
   } catch (error) {
-    console.error(error);
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: error.message });
+    console.error("DELETE ESCALATION ERROR:", error);
+    return res.status(500).json({ message: error.message });
   }
 };
 
-// Update module exports
+// ------------------------------------------------------
 module.exports = {
   escalateIssue,
   getEscalationsByIssueId,

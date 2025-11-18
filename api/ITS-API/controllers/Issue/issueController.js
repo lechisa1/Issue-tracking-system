@@ -406,9 +406,6 @@ const getIssuesByHierarchyNodeId = async (req, res) => {
 //   }
 // };
 
-
-
-
 const getIssuesByMultipleHierarchyNodes = async (req, res) => {
   try {
     const { pairs, user_id } = req.params;
@@ -485,18 +482,17 @@ const getIssuesByMultipleHierarchyNodes = async (req, res) => {
     //    - tier_level = hierarchy_node_id
     // ------------------------------------------------------------
 
-    const tierConditions = validPairs.map((p) => ({
-      project_id: p.project_id,
-      hierarchy_node_id: p.hierarchy_node_id, // original structure
-      tier_level: p.hierarchy_node_id, // escalated structure
-    }));
-
-    const escalatedIssueTiers = await IssueTier.findAll({
+    // ------------------------------------------------------------
+    // 2️⃣ GET ESCALATED ISSUES FROM IssueEscalation
+    //    - to_tier matches hierarchy_node_id
+    // ------------------------------------------------------------
+    const escalatedIssuesEscalation = await IssueEscalation.findAll({
       where: {
-        tier_level: {
-          [Op.in]: validPairs.map((p) => p.hierarchy_node_id),
-        },
-        status: { [Op.ne]: "closed" },
+        [Op.or]: validPairs.map((pair) => ({
+          to_tier: pair.hierarchy_node_id,
+          // Optional: you can filter by project if needed
+          // project_id: pair.project_id
+        })),
       },
       include: [
         {
@@ -527,8 +523,44 @@ const getIssuesByMultipleHierarchyNodes = async (req, res) => {
       ],
     });
 
+    // const escalatedIssueTiers = await IssueTier.findAll({
+    //   where: {
+    //     tier_level: {
+    //       [Op.in]: validPairs.map((p) => p.hierarchy_node_id),
+    //     },
+    //     status: { [Op.ne]: "closed" },
+    //   },
+    //   include: [
+    //     {
+    //       model: Issue,
+    //       as: "issue",
+    //       where: {
+    //         reported_by: { [Op.ne]: user_id },
+    //       },
+    //       include: [
+    //         { model: Project, as: "project" },
+    //         { model: IssueCategory, as: "category" },
+    //         { model: IssuePriority, as: "priority" },
+    //         { model: HierarchyNode, as: "hierarchyNode" },
+    //         { model: User, as: "reporter" },
+    //         { model: User, as: "assignee" },
+    //         {
+    //           model: IssueComment,
+    //           as: "comments",
+    //           include: [{ model: User, as: "author" }],
+    //         },
+    //         {
+    //           model: IssueAttachment,
+    //           as: "attachments",
+    //           include: [{ model: Attachment, as: "attachment" }],
+    //         },
+    //       ],
+    //     },
+    //   ],
+    // });
+
     // Extract Issues from IssueTier
-    const escalatedIssues = escalatedIssueTiers.map((t) => t.issue);
+    const escalatedIssues = escalatedIssuesEscalation.map((t) => t.issue);
 
     // ------------------------------------------------------------
     // 3️⃣ MERGE BOTH RESULTS WITHOUT DUPLICATES
@@ -558,6 +590,7 @@ const getIssuesByMultipleHierarchyNodes = async (req, res) => {
 // ================================
 // UPDATE ISSUE (with attachments)
 // ================================
+
 const updateIssue = async (req, res) => {
   const t = await sequelize.transaction();
   try {

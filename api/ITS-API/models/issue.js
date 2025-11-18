@@ -97,10 +97,6 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: DataTypes.UUIDV4,
       },
-      // institute_project_id: {
-      //   type: DataTypes.UUID,
-      //   allowNull: true, // nullable for EAI users
-      // },
       project_id: {
         type: DataTypes.UUID,
         allowNull: false, // issue must belong to a project now
