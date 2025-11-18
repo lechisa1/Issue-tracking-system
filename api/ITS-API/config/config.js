@@ -1,4 +1,5 @@
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, "../.env") });
 
 const pool = {
   max: 10,
@@ -9,7 +10,7 @@ const pool = {
 
 module.exports = {
   development: {
-    username: process.env.DB_USER,
+    username: process.env.DB_USERNAME,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     host: process.env.DB_HOST,
@@ -18,7 +19,7 @@ module.exports = {
     pool,
   },
   test: {
-    username: process.env.DB_USER,
+    username: process.env.DB_USERNAME,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     host: process.env.DB_HOST,
@@ -27,7 +28,7 @@ module.exports = {
     pool,
   },
   production: {
-    username: process.env.DB_USER,
+    username: process.env.DB_USERNAME,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     host: process.env.DB_HOST,

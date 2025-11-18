@@ -2,23 +2,18 @@
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    await queryInterface.createTable("hierarchy", {
-      hierarchy_id: {
+    await queryInterface.createTable("issue_solutions", {
+      solution_id: {
         type: Sequelize.UUID,
         defaultValue: Sequelize.UUIDV4,
         primaryKey: true,
       },
-      name: {
-        type: Sequelize.STRING(255),
-        allowNull: false,
-        unique: true,
-      },
-      project_id: {
+      issue_id: {
         type: Sequelize.UUID,
         allowNull: false,
         references: {
-          model: "projects",
-          key: "projects_id",
+          model: "issues",
+          key: "issue_id",
         },
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
@@ -27,26 +22,28 @@ module.exports = {
         type: Sequelize.TEXT,
         allowNull: true,
       },
-      is_active: {
-        type: Sequelize.BOOLEAN,
-        defaultValue: true,
+      created_by: {
+        type: Sequelize.UUID,
+        allowNull: false,
+        references: {
+          model: "users",
+          key: "user_id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "SET NULL",
       },
       created_at: {
         type: Sequelize.DATE,
-        defaultValue: Sequelize.fn("NOW"),
+        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
       },
       updated_at: {
         type: Sequelize.DATE,
-        defaultValue: Sequelize.fn("NOW"),
-      },
-      deleted_at: {
-        type: Sequelize.DATE,
-        allowNull: true,
+        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
       },
     });
   },
 
   down: async (queryInterface, Sequelize) => {
-    await queryInterface.dropTable("hierarchy");
+    await queryInterface.dropTable("issue_solutions");
   },
 };

@@ -282,4 +282,68 @@ router.post(
   projectController.assignUserToProject
 );
 
+// ------------------------ REMOVE USER FROM PROJECT ------------------------
+/**
+ * @swagger
+ * /api/projects/remove-user:
+ *   post:
+ *     summary: Remove a user from a project
+ *     tags: [Projects]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [project_id, user_id]
+ *             properties:
+ *               project_id:
+ *                 type: string
+ *                 format: uuid
+ *               user_id:
+ *                 type: string
+ *                 format: uuid
+ *     responses:
+ *       200:
+ *         description: User removed successfully
+ *       404:
+ *         description: User not assigned to project
+ */
+router.post(
+  "/remove-user",
+  authenticateToken,
+  projectController.removeUserFromProject
+);
+
+// ==========================================================================
+// ✅ NEW ENDPOINT — GET ALL PROJECTS A USER IS ASSIGNED TO
+// ==========================================================================
+/**
+ * @swagger
+ * /api/projects/user/{user_id}:
+ *   get:
+ *     summary: Get all projects the user is assigned to
+ *     tags: [Projects]
+ *     parameters:
+ *       - in: path
+ *         name: user_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: User ID to lookup assigned projects
+ *     responses:
+ *       200:
+ *         description: List of projects assigned to the user
+ *       404:
+ *         description: No projects found for user
+ *       500:
+ *         description: Internal server error
+ */
+router.get(
+  "/user/:user_id",
+  authenticateToken,
+  projectController.getProjectsAssignedToUser
+);
+
 module.exports = router;

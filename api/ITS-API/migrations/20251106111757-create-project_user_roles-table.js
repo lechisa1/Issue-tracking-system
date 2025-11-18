@@ -1,7 +1,5 @@
 "use strict";
 
-const hierarchy = require("../models/hierarchy");
-
 module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.createTable("project_user_roles", {
@@ -25,7 +23,7 @@ module.exports = {
         type: Sequelize.UUID,
         allowNull: true,
         references: {
-          model: "hierarchy_node",
+          model: "hierarchy_nodes",
           key: "hierarchy_node_id",
         },
         onUpdate: "CASCADE",

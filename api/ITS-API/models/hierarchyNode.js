@@ -28,6 +28,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
+        field: "hierarchy_node_id",
       },
       project_id: {
         type: DataTypes.UUID,

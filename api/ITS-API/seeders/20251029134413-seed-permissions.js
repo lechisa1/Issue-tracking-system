@@ -20,6 +20,18 @@ module.exports = {
       { resource: "roles", action: "delete" },
       { resource: "roles", action: "assign_permission" },
 
+      // Organization Management
+      { resource: "organizations", action: "create" },
+      { resource: "organizations", action: "read" },
+      { resource: "organizations", action: "update" },
+      { resource: "organizations", action: "delete" },
+
+      // Organization Structure
+      { resource: "organization_structures", action: "create" },
+      { resource: "organization_structures", action: "read" },
+      { resource: "organization_structures", action: "update" },
+      { resource: "organization_structures", action: "delete" },
+
       // Project Management
       { resource: "projects", action: "create" },
       { resource: "projects", action: "read" },
@@ -33,54 +45,47 @@ module.exports = {
       { resource: "issues", action: "update" },
       { resource: "issues", action: "delete" },
       { resource: "issues", action: "assign" },
-      { resource: "issues", action: "change_status" },
-      { resource: "issues", action: "add_comment" },
-      { resource: "issues", action: "view_comments" },
+      { resource: "issues", action: "accept" },
+      { resource: "issues", action: "resolve" },
+      { resource: "issues", action: "escalate" },
+      { resource: "issues", action: "view_own" },
+      { resource: "issues", action: "view_all" },
 
-      // Institute Management
-      { resource: "institutes", action: "create" },
-      { resource: "institutes", action: "read" },
-      { resource: "institutes", action: "update" },
-      { resource: "institutes", action: "delete" },
+      // Issue Priority & Category
+      { resource: "issue_priorities", action: "create" },
+      { resource: "issue_priorities", action: "read" },
+      { resource: "issue_priorities", action: "update" },
+      { resource: "issue_priorities", action: "delete" },
 
-      // Notification Management
-      { resource: "notifications", action: "send" },
-      { resource: "notifications", action: "read" },
-      { resource: "notifications", action: "view" },
-
-      // Attachment Management
-      { resource: "attachments", action: "upload" },
-      { resource: "attachments", action: "download" },
-      { resource: "attachments", action: "delete" },
-
-      // Reports & Analytics
-      { resource: "reports", action: "view" },
-      { resource: "reports", action: "export" },
-
-      // System Management
-      { resource: "system", action: "manage" },
-      { resource: "audit", action: "view" },
+      { resource: "issue_categories", action: "create" },
+      { resource: "issue_categories", action: "read" },
+      { resource: "issue_categories", action: "update" },
+      { resource: "issue_categories", action: "delete" },
     ];
 
-    // Insert permissions one by one, ignoring duplicates
     for (const perm of permissions) {
       try {
-        await queryInterface.bulkInsert("permissions", [{
-          permission_id: uuidv4(),
-          resource: perm.resource,
-          action: perm.action,
-          created_at: now,
-          updated_at: now,
-        }], {
-          ignoreDuplicates: true // This will ignore duplicate key errors
-        });
+        await queryInterface.bulkInsert(
+          "permissions",
+          [
+            {
+              permission_id: uuidv4(),
+              resource: perm.resource,
+              action: perm.action,
+              created_at: now,
+              updated_at: now,
+            },
+          ],
+          { ignoreDuplicates: true }
+        );
       } catch (error) {
-        // If duplicate error, just continue
-        if (error.name === 'SequelizeUniqueConstraintError') {
-          console.log(`Permission ${perm.resource}:${perm.action} already exists, skipping...`);
+        if (error.name === "SequelizeUniqueConstraintError") {
+          console.log(
+            `Permission ${perm.resource}:${perm.action} already exists, skipping...`
+          );
           continue;
         }
-        throw error; // Re-throw other errors
+        throw error;
       }
     }
   },
