@@ -49,7 +49,10 @@ module.exports = {
       { resource: "issues", action: "resolve" },
       { resource: "issues", action: "escalate" },
       { resource: "issues", action: "view_own" },
-      { resource: "issues", action: "view_all" },
+      { resource: "issues", action: "can_escalate_to_qal" },
+      { resource: "issues", action: "can_escalate_to_qam" },
+      { resource: "issues", action: "can_escalate_to_frontend" },
+      { resource: "issues", action: "can_escalate_to_backend" },
 
       // Issue Priority & Category
       { resource: "issue_priorities", action: "create" },

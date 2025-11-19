@@ -168,7 +168,7 @@ app.use((err, req, res, next) => {
 // ================== Start App Server ==================
 const appPort = process.env.PORT || 4000;
 appServer.listen(appPort, () => {
-  console.log(` App server running at http://localhost:${appPort}`);
+  console.log(` App server running at http:// 192.168.1.150:${appPort}`);
 });
 
 // ================== Socket.IO Setup ==================

@@ -8,6 +8,7 @@ const {
   InstituteProject,
   Role,
   SubRole,
+  RolePermission,
   RoleSubRole,
   RoleSubRolePermission,
   Permission,
@@ -32,117 +33,184 @@ const login = async (req, res) => {
           as: "userType",
           attributes: ["user_type_id", "name"],
         },
+
+        // Include system roles (global roles)
+        {
+          model: Role,
+          as: "roles",
+          through: { attributes: [] }, 
+          include: [
+            {
+              model: RolePermission,
+              as: "rolePermissions",
+              include: [{ model: Permission, as: "permission" }],
+            },
+          ],
+        },
       ],
     });
 
     if (!user)
       return res.status(401).json({ message: "Invalid email or password" });
     if (!user.is_active)
-      return res.status(403).json({ message: "User is inactive" });
+      return res.status(403).json({ message: "User inactive" });
 
-    // Compare password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
       return res.status(401).json({ message: "Invalid email or password" });
 
-    // Generate JWT
-    const token = jwt.sign(
-      {
-        user_id: user.user_id,
-        email: user.email,
-        user_type: user.userType ? user.userType.name : null,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRATION_TIME || "12h" }
-    );
-
-    // Fetch active roles, subroles, and permissions
+    // Load project roles with permissions
     const projectRoles = await ProjectUserRole.findAll({
       where: { user_id: user.user_id, is_active: true },
       include: [
         {
           model: Role,
           as: "role",
-          where: { is_active: true },
           include: [
             {
               model: RoleSubRole,
               as: "roleSubRoles",
-              where: { is_active: true },
-              required: false, // allow roles without subroles
               include: [
-                {
-                  model: SubRole,
-                  as: "subRole",
-                  where: { is_active: true },
-                  required: false,
-                },
+                { model: SubRole, as: "subRole" },
                 {
                   model: RoleSubRolePermission,
                   as: "permissions",
-                  include: [
-                    {
-                      model: Permission,
-                      as: "permission",
-                    },
-                  ],
+                  include: [{ model: Permission, as: "permission" }],
                 },
               ],
+            },
+
+            {
+              model: RolePermission,
+              as: "rolePermissions",
+              include: [{ model: Permission, as: "permission" }],
             },
           ],
         },
         {
           model: SubRole,
           as: "subRole",
-          where: { is_active: true },
           required: false,
+        },
+        {
+          model: Project,
+          as: "project",
+          attributes: ["project_id", "name", "description"],
+        },
+        {
+          model: HierarchyNode,
+          as: "hierarchyNode",
+          attributes: [
+            "hierarchy_node_id",
+            "name",
+            "level",
+            "parent_id",
+            "description",
+          ],
+        },
+        {
+          model: InstituteProject,
+          as: "instituteProject",
+          attributes: ["institute_project_id", "institute_id"],
         },
       ],
     });
 
-    // Format roles & permissions
-    const roles = projectRoles.map((pr) => ({
-      project_user_role_id: pr.project_user_role_id,
-      role: pr.role
-        ? {
-            role_id: pr.role.role_id,
-            name: pr.role.name,
-            subRoles: pr.role.roleSubRoles.map((rs) => ({
-              subRole: rs.subRole,
-              permissions: rs.permissions.map((p) => p.permission),
-            })),
-          }
-        : null,
-      subRole: pr.subRole,
-    }));
+    // EXTRACT ALL PERMISSIONS (system + project)
+  // Extract system permissions
+const systemPermissions =
+  user.roles?.flatMap((r) =>
+    r.rolePermissions?.map(
+      (p) => `${p.permission.resource}:${p.permission.action}`
+    ) || []
+  ) || [];
+
+// Extract project permissions
+const projectPermissions = projectRoles.flatMap((pr) =>
+  pr.role?.rolePermissions?.map(
+    (p) => `${p.permission.resource}:${p.permission.action}`
+  ) || []
+);
+
+
+    
+    const allPermissions = Array.from(
+      new Set([...systemPermissions, ...projectPermissions])
+    );
+
+   
+    const token = jwt.sign(
+      {
+        user_id: user.user_id,
+        email: user.email,
+        user_type: user.userType?.name || null,
+        permissions: allPermissions, 
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRATION_TIME || "12h" }
+    );
 
     return res.status(200).json({
       message: "Login successful",
       token,
+      permissions: allPermissions,
       user: {
         user_id: user.user_id,
         full_name: user.full_name,
         email: user.email,
-        phone_number: user.phone_number,
-        position: user.position,
-        profile_image: user.profile_image,
-        user_type: user.userType ? user.userType.name : null,
+        user_type: user.userType?.name || null,
         institute: user.institute
           ? {
               institute_id: user.institute.institute_id,
               name: user.institute.name,
             }
           : null,
+          permissions: allPermissions,
+          roles: user.roles?.map((r) => r.name) || [],
+        phone_number: user.phone_number,
+        position: user.position,
+        profile_image: user.profile_image,
+        // 🟢 Return project roles, formatted nicely for frontend
+        project_roles: projectRoles?.map((pr) => ({
+          project_user_role_id: pr.project_user_role_id,
+          project: pr.project
+            ? {
+                project_id: pr.project.project_id,
+                name: pr.project.name,
+                description: pr.project.description,
+              }
+            : null,
+          role: pr.role ? pr.role.name : null,
+          role_id: pr.role ? pr.role.role_id : null,
+          sub_role: pr.subRole ? pr.subRole.name : null,
+          sub_role_id: pr.subRole ? pr.subRole.sub_role_id : null,
+
+          hierarchy_node: pr.hierarchyNode
+            ? {
+                hierarchy_node_id: pr.hierarchyNode.hierarchy_node_id,
+                name: pr.hierarchyNode.name,
+                level: pr.hierarchyNode.level,
+                parent_id: pr.hierarchyNode.parent_id,
+                description: pr.hierarchyNode.description,
+              }
+            : null,
+
+          institute_project: pr.instituteProject
+            ? {
+                institute_project_id: pr.instituteProject.institute_project_id,
+                institute_id: pr.instituteProject.institute_id,
+              }
+            : null,
+        })),
       },
     });
   } catch (error) {
     console.error(error);
     res
       .status(500)
-      .json({ message: "Internal server error", error: error.message });
-  }
+      .json({ message: "Internal server error", error: error.message });
+  }
 };
-
 // Logout (token invalidation example using a blacklist)
 const logout = async (req, res) => {
   try {
@@ -179,41 +247,16 @@ const getCurrentUser = async (req, res) => {
           attributes: ["user_type_id", "name"],
         },
 
-        // 🟢 Include user project roles
+        // Include system roles (global roles)
         {
-          model: ProjectUserRole,
-          as: "projectRoles",
+          model: Role,
+          as: "roles",
+          through: { attributes: [] },
           include: [
             {
-              model: Project,
-              as: "project",
-              attributes: ["project_id", "name", "description"],
-            },
-            {
-              model: Role,
-              as: "role",
-              attributes: ["role_id", "name"],
-            },
-            {
-              model: SubRole,
-              as: "subRole",
-              attributes: ["sub_role_id", "name"],
-            },
-            {
-              model: HierarchyNode,
-              as: "hierarchyNode",
-              attributes: [
-                "hierarchy_node_id",
-                "name",
-                "level",
-                "parent_id",
-                "description",
-              ],
-            },
-            {
-              model: InstituteProject,
-              as: "instituteProject",
-              attributes: ["institute_project_id", "institute_id"],
+              model: RolePermission,
+              as: "rolePermissions",
+              include: [{ model: Permission, as: "permission" }],
             },
           ],
         },
@@ -222,7 +265,85 @@ const getCurrentUser = async (req, res) => {
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // Load project roles with permissions
+    const projectRoles = await ProjectUserRole.findAll({
+      where: { user_id: user.user_id, is_active: true },
+      include: [
+        {
+          model: Role,
+          as: "role",
+          include: [
+            {
+              model: RoleSubRole,
+              as: "roleSubRoles",
+              include: [
+                { model: SubRole, as: "subRole" },
+                {
+                  model: RoleSubRolePermission,
+                  as: "permissions",
+                  include: [{ model: Permission, as: "permission" }],
+                },
+              ],
+            },
+
+            {
+              model: RolePermission,
+              as: "rolePermissions",
+              include: [{ model: Permission, as: "permission" }],
+            },
+          ],
+        },
+        {
+          model: SubRole,
+          as: "subRole",
+          required: false,
+        },
+        {
+          model: Project,
+          as: "project",
+          attributes: ["project_id", "name", "description"],
+        },
+        {
+          model: HierarchyNode,
+          as: "hierarchyNode",
+          attributes: [
+            "hierarchy_node_id",
+            "name",
+            "level",
+            "parent_id",
+            "description",
+          ],
+        },
+        {
+          model: InstituteProject,
+          as: "instituteProject",
+          attributes: ["institute_project_id", "institute_id"],
+        },
+      ],
+    });
+
+    // EXTRACT ALL PERMISSIONS (system + project)
+    // Extract system permissions
+    const systemPermissions =
+      user.roles?.flatMap((r) =>
+        r.rolePermissions?.map(
+          (p) => `${p.permission.resource}:${p.permission.action}`
+        ) || []
+      ) || [];
+
+    // Extract project permissions
+    const projectPermissions = projectRoles.flatMap((pr) =>
+      pr.role?.rolePermissions?.map(
+        (p) => `${p.permission.resource}:${p.permission.action}`
+      ) || []
+    );
+
+    const allPermissions = Array.from(
+      new Set([...systemPermissions, ...projectPermissions])
+    );
+
     return res.status(200).json({
+      permissions: allPermissions,
       user: {
         user_id: user.user_id,
         full_name: user.full_name,
@@ -241,7 +362,7 @@ const getCurrentUser = async (req, res) => {
           : null,
 
         // 🟢 Return project roles, formatted nicely for frontend
-        project_roles: user.projectRoles?.map((pr) => ({
+        project_roles: projectRoles?.map((pr) => ({
           project_user_role_id: pr.project_user_role_id,
           project: pr.project
             ? {

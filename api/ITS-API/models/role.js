@@ -29,6 +29,18 @@ module.exports = (sequelize, DataTypes) => {
         otherKey: "user_id",
         as: "users",
       });
+
+      // Role belongs to User (created_by)
+      Role.belongsTo(models.User, {
+        foreignKey: "created_by",
+        as: "creator",
+      });
+
+      // Role belongs to User (updated_by)
+      Role.belongsTo(models.User, {
+        foreignKey: "updated_by",
+        as: "updater",
+      });
     }
   }
 

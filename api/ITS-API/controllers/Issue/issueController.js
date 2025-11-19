@@ -197,17 +197,31 @@ const getIssues = async (req, res) => {
 };
 
 // ================================
-// GET ALL ISSUES BY USER ID
+// GET ALL ISSUES BY USER ID (including escalated issues)
 // ================================
 const getIssuesByUserId = async (req, res) => {
   try {
     const { id: user_id } = req.params;
 
-    const whereClause = {};
-    if (user_id) whereClause.reported_by = user_id;
+    // 1️⃣ Get user's hierarchy nodes from project roles
+    const userProjectRoles = await ProjectUserRole.findAll({
+      where: { user_id, is_active: true },
+      include: [
+        {
+          model: HierarchyNode,
+          as: "hierarchyNode",
+          attributes: ["hierarchy_node_id", "name", "level"],
+        },
+      ],
+    });
 
-    const issues = await Issue.findAll({
-      where: whereClause,
+    const hierarchyNodeIds = userProjectRoles
+      .map((role) => role.hierarchyNode?.hierarchy_node_id)
+      .filter(Boolean);
+
+    // 2️⃣ Get issues reported by the user
+    const reportedIssues = await Issue.findAll({
+      where: { reported_by: user_id },
       include: [
         { model: Project, as: "project" },
         { model: IssueCategory, as: "category" },
@@ -229,7 +243,60 @@ const getIssuesByUserId = async (req, res) => {
       order: [["created_at", "DESC"]],
     });
 
-    res.status(200).json(issues);
+    // 3️⃣ Get escalated issues to user's hierarchy nodes
+    let escalatedIssues = [];
+    if (hierarchyNodeIds.length > 0) {
+      const escalatedIssueTiers = await IssueTier.findAll({
+        where: {
+          tier_level: { [Op.in]: hierarchyNodeIds },
+          status: { [Op.ne]: "closed" },
+        },
+        include: [
+          {
+            model: Issue,
+            as: "issue",
+            required: true,
+            where: { reported_by: { [Op.ne]: user_id } }, // Exclude issues reported by this user
+            include: [
+              { model: Project, as: "project" },
+              { model: IssueCategory, as: "category" },
+              { model: IssuePriority, as: "priority" },
+              { model: HierarchyNode, as: "hierarchyNode" },
+              { model: User, as: "reporter" },
+              { model: User, as: "assignee" },
+              {
+                model: IssueComment,
+                as: "comments",
+                include: [{ model: User, as: "author" }],
+              },
+              {
+                model: IssueAttachment,
+                as: "attachments",
+                include: [{ model: Attachment, as: "attachment" }],
+              },
+            ],
+          },
+        ],
+      });
+
+      escalatedIssues = escalatedIssueTiers.map((tier) => tier.issue);
+    }
+
+    // 4️⃣ Merge both results without duplicates
+    const issuesMap = new Map();
+
+    // Add reported issues
+    reportedIssues.forEach((issue) => issuesMap.set(issue.issue_id, issue));
+
+    // Add escalated issues (will overwrite if duplicate, but that's fine)
+    escalatedIssues.forEach((issue) => issuesMap.set(issue.issue_id, issue));
+
+    // Convert to array and sort by creation date
+    const allIssues = Array.from(issuesMap.values()).sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    );
+
+    res.status(200).json(allIssues);
   } catch (error) {
     console.error(error);
     res.status(500).json({
@@ -682,6 +749,7 @@ const acceptIssue = async (req, res) => {
 // ================================
 // UPDATE ISSUE (with attachments)
 // ================================
+
 const updateIssue = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -838,7 +906,7 @@ const resolveIssue = async (req, res) => {
   try {
     const { issue_id, resolution_note, solution_description } = req.body;
     const user_id = req.user?.user_id;
-    console.log("userrrrrrrrrrrrr", user_id);
+    console.log("user", user_id);
     const issue = await Issue.findByPk(issue_id);
     if (!issue) return res.status(404).json({ message: "Issue not found" });
 

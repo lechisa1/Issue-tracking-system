@@ -15,6 +15,12 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "escalated_by",
         as: "escalator",
       });
+
+      // IssueEscalation ↔ EscalationAttachments
+      IssueEscalation.hasMany(models.EscalationAttachment, {
+        foreignKey: "escalation_id",
+        as: "attachments",
+      });
     }
   }
 

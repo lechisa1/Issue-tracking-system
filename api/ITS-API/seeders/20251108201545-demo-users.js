@@ -7,23 +7,31 @@ module.exports = {
     const now = new Date();
 
     // ================================
-    // 1. Fetch user_type_id = external_user
+    // 1. Fetch user_type_ids for external_user and internal_user
     // ================================
-    const [userType] = await queryInterface.sequelize.query(`
-      SELECT user_type_id
+    const [userTypes] = await queryInterface.sequelize.query(`
+      SELECT user_type_id, name
       FROM user_types
-      WHERE name = 'external_user'
-      LIMIT 1
+      WHERE name IN ('external_user', 'internal_user')
     `);
 
-    if (!userType.length) {
+    if (userTypes.length < 2) {
       throw new Error(
-        "User type 'external_user' not found. Seed user_types first."
+        "User types 'external_user' and 'internal_user' not found. Seed user_types first."
       );
     }
 
-    const userTypeId = userType[0].user_type_id;
+    const externalUserType = userTypes.find(ut => ut.name === 'external_user');
+    const internalUserType = userTypes.find(ut => ut.name === 'internal_user');
 
+    if (!externalUserType || !internalUserType) {
+      throw new Error(
+        "Required user types not found. Seed user_types first."
+      );
+    }
+
+    const userTypeId = externalUserType.user_type_id;
+    const userTypeIdInternal = internalUserType.user_type_id;
     // ================================
     // 2. Fetch ONE institute_id
     // ================================
@@ -49,6 +57,23 @@ module.exports = {
     // 4. Insert demo users
     // ================================
     await queryInterface.bulkInsert("users", [
+       {
+        user_id: uuidv4(),
+        full_name: "AII System Admin",
+        email: "aii_system_admin@gmail.com",
+        password: passwordHash,
+        user_type_id: userTypeIdInternal,
+        institute_id: null,
+        position: "Aii System Admin",
+        phone_number: "251911000111",
+        profile_image: null,
+        is_first_logged_in: true,
+        last_login_at: null,
+        password_changed_at: null,
+        is_active: true,
+        created_at: now,
+        updated_at: now,
+      },
       {
         user_id: uuidv4(),
         full_name: "CCC Centeral Admin",

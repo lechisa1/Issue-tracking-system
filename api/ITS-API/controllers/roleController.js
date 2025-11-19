@@ -36,6 +36,8 @@ const createRole = async (req, res) => {
         is_active: true,
         created_at: new Date(),
         updated_at: new Date(),
+        created_by: req.user?.user_id || null,
+        updated_by: req.user?.user_id || null,
       },
       { transaction: t }
     );
@@ -194,6 +196,16 @@ const createRole = async (req, res) => {
           as: "rolePermissions",
           include: [{ model: Permission, as: "permission" }],
         },
+        {
+          model: require("../models").User,
+          as: "creator",
+          attributes: ["user_id", "full_name", "email"],
+        },
+        {
+          model: require("../models").User,
+          as: "updater",
+          attributes: ["user_id", "full_name", "email"],
+        },
       ],
     });
 
@@ -218,7 +230,10 @@ const createRole = async (req, res) => {
 const getRoles = async (req, res) => {
   try {
     const roles = await Role.findAll({
-      where: { is_active: true },
+      where: {
+        is_active: true,
+        created_by: req.user?.user_id,
+      },
       include: [
         {
           model: RoleSubRole,

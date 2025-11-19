@@ -54,10 +54,33 @@ const createUser = async (req, res) => {
       full_name,
       email,
       user_type_id,
-      institute_id,
       phone_number,
       hierarchy_node_id,
     } = req.body;
+    let institute_id = req.body.institute_id;
+
+    // ====== Determine final user type based on logged-in user ======
+    const loggedInUserId = req.user.user_id;
+    const loggedInUser = await User.findByPk(loggedInUserId, {
+      include: [
+        { model: UserType, as: "userType", attributes: ["name"] },
+        { model: Institute, as: "institute", attributes: ["institute_id"] }
+      ],
+      transaction: t,
+    });
+    const loggedInUserType = loggedInUser?.userType?.name;
+
+    let finalUserTypeId = user_type_id;
+    if (loggedInUserType === "external_user") {
+      const externalUserType = await UserType.findOne({
+        where: { name: "external_user" },
+        transaction: t,
+      });
+      if (externalUserType) {
+        finalUserTypeId = externalUserType.user_type_id;
+        institute_id = loggedInUser.institute?.institute_id; // Set institute from logged-in user
+      }
+    }
 
     // ====== Check existing email ======
     const existingUser = await User.findOne({
@@ -72,7 +95,7 @@ const createUser = async (req, res) => {
     }
 
     // ====== Validate user type ======
-    const userType = await UserType.findByPk(user_type_id, { transaction: t });
+    const userType = await UserType.findByPk(finalUserTypeId, { transaction: t });
     if (!userType) {
       await t.rollback();
       return res
@@ -125,7 +148,8 @@ const createUser = async (req, res) => {
     }
 
     // ====== Generate password ======
-    const password = generateRandomPassword();
+    // const password = generateRandomPassword();
+    const password = "Password123"
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // ====== Create User ======
@@ -136,7 +160,7 @@ const createUser = async (req, res) => {
         email,
         password: hashedPassword,
         phone_number,
-        user_type_id,
+        user_type_id: finalUserTypeId,
         institute_id: userType.name === "external_user" ? institute_id : null,
         hierarchy_node_id: hierarchy_node_id ?? null,
         is_first_logged_in: true,
@@ -293,6 +317,31 @@ const getUsers = async (req, res) => {
       search, // optional: for name/email search
     } = req.query;
 
+    // Get logged-in user's details
+    const loggedInUserId = req.user.user_id;
+    const loggedInUser = await User.findByPk(loggedInUserId, {
+      include: [
+        {
+          model: UserType,
+          as: "userType",
+          attributes: ["name"],
+        },
+        {
+          model: Institute,
+          as: "institute",
+          attributes: ["institute_id"],
+        },
+        {
+          model: ProjectUserRole,
+          as: "projectRoles",
+          attributes: ["project_id"],
+        },
+      ],
+    });
+
+    const loggedInUserType = loggedInUser?.userType?.name;
+    const projectIds = loggedInUser?.projectRoles?.map(pr => pr.project_id) || [];
+
     // ====== Build filters dynamically ======
     const whereClause = {};
 
@@ -300,6 +349,35 @@ const getUsers = async (req, res) => {
     if (user_type_id) whereClause.user_type_id = user_type_id;
     if (hierarchy_node_id) whereClause.hierarchy_node_id = hierarchy_node_id;
     if (is_active !== undefined) whereClause.is_active = is_active === "true";
+
+    // Build includes
+    const includes = [
+      {
+        model: Institute,
+        as: "institute",
+        attributes: ["institute_id", "name"],
+      },
+      {
+        model: HierarchyNode,
+        as: "hierarchyNode",
+        attributes: ["hierarchy_node_id", "name"],
+      },
+      {
+        model: UserType,
+        as: "userType",
+        attributes: ["user_type_id", "name"],
+        required: true, // Required for $ syntax filtering
+      },
+    ];
+
+    // Filter by user type based on logged-in user
+    if (loggedInUserType === "external_user") {
+      // For external users, fetch only external users in the same institute
+      whereClause["$userType.name$"] = "external_user";
+      whereClause.institute_id = loggedInUser.institute?.institute_id;
+    } else if (loggedInUserType === "internal_user") {
+      // For internal users, fetch all users (no additional type filter)
+    }
 
     if (search) {
       whereClause[Op.or] = [
@@ -309,26 +387,12 @@ const getUsers = async (req, res) => {
       ];
     }
 
+    // No additional project filtering for external users, as they see all in their institute
+
     // ====== Fetch users with associations ======
     const users = await User.findAll({
       where: whereClause,
-      include: [
-        {
-          model: Institute,
-          as: "institute",
-          attributes: ["institute_id", "name"],
-        },
-        {
-          model: UserType,
-          as: "userType",
-          attributes: ["user_type_id", "name"],
-        },
-        {
-          model: HierarchyNode,
-          as: "hierarchyNode",
-          attributes: ["hierarchy_node_id", "name"],
-        },
-      ],
+      include: includes,
       order: [["created_at", "DESC"]],
     });
 

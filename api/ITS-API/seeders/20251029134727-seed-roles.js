@@ -24,7 +24,15 @@ module.exports = {
       },
       {
         role_id: uuidv4(),
-        name: "Developer",
+        name: "Front-End Developer",
+        description: "Handles the technical implementation and resolution of issues, including coding and troubleshooting tasks.",
+        is_active: true,
+        created_at: now,
+        updated_at: now,
+      },
+       {
+        role_id: uuidv4(),
+        name: "Back-End Developer",
         description: "Handles the technical implementation and resolution of issues, including coding and troubleshooting tasks.",
         is_active: true,
         created_at: now,

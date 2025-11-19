@@ -76,16 +76,42 @@ const createProject = async (req, res) => {
 // Get all projects
 const getProjects = async (req, res) => {
   try {
-    const projects = await Project.findAll({
-      include: [
-        {
-          model: Institute,
-          as: "institutes",
-          through: { attributes: ["is_active"] },
-        },
-      ],
-    });
-    res.status(200).json(projects);
+    const { user } = req;
+
+    if (user.user_type === "external_user") {
+      // For external users, get only assigned projects
+      const assignments = await ProjectUserRole.findAll({
+        where: { user_id: user.user_id, is_active: true },
+        include: [
+          {
+            model: Project,
+            as: "project",
+            include: [
+              {
+                model: Institute,
+                as: "institutes",
+                through: { attributes: ["is_active"] },
+              },
+            ],
+          },
+        ],
+      });
+
+      const projects = assignments.map(assignment => assignment.project);
+      res.status(200).json(projects);
+    } else {
+      // For internal users, get all projects
+      const projects = await Project.findAll({
+        include: [
+          {
+            model: Institute,
+            as: "institutes",
+            through: { attributes: ["is_active"] },
+          },
+        ],
+      });
+      res.status(200).json(projects);
+    }
   } catch (error) {
     console.error(error);
     res

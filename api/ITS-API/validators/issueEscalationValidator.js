@@ -14,6 +14,7 @@ const escalateIssueSchema = Joi.object({
   escalated_by: Joi.string().uuid().required().messages({
     "any.required": "Escalated_by user ID is required.",
   }),
+  attachment_ids: Joi.array().items(Joi.string().uuid()).optional(),
 });
 
 // ✅ Middleware for validation

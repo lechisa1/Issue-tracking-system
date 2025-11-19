@@ -162,7 +162,7 @@ router.post("/", validateCreateUser, authenticateToken, createUser);
  *       500:
  *         description: Server error
  */
-router.get("/", getUsers);
+router.get("/", authenticateToken, getUsers);
 /**
  * @swagger
  * /api/users/user-types:
