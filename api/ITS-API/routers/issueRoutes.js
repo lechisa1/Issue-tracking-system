@@ -75,6 +75,13 @@ router.post(
 
   issueController.acceptIssue
 );
+
+router.post(
+  "/confirm",
+  authenticateToken,
+
+  issueController.confirmIssueResolved
+);
 /**
  * @swagger
  * /api/issues:
@@ -216,5 +223,37 @@ router.get(
 );
 
 router.delete("/:id", validateIssueIdParam, issueController.deleteIssue);
+
+/**
+ * @swagger
+ * /api/issues/escalated/null-tier:
+ *   get:
+ *     summary: Get all escalated issues where to_tier is null
+ *     tags: [Issues]
+ *     description: Returns issues that have been escalated but have no specified target tier (to_tier = null).
+ *     responses:
+ *       200:
+ *         description: List of escalated issues with null to_tier
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 count:
+ *                   type: number
+ *                 issues:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       500:
+ *         description: Internal server error
+ */
+router.get(
+  "/escalated/null-tier",
+  authenticateToken,
+  issueController.getEscalatedIssuesWithNullTier
+);
 
 module.exports = router;

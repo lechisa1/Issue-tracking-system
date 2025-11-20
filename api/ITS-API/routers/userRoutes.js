@@ -16,6 +16,7 @@ const {
   toggleUserActiveStatus,
   resetUserPassword,
   getUserTypes,
+  getUsersByInstituteId,
 } = require("../controllers/userController");
 
 /**
@@ -226,6 +227,35 @@ router.get("/", getUsers);
  */
 
 router.use("/user-types", getUserTypes);
+
+/**
+ * @swagger
+ * /api/users/institute/{institute_id}:
+ *   get:
+ *     summary: Get users by institute ID
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: institute_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Institute ID
+ *     responses:
+ *       200:
+ *         description: List of users in the institute
+ *       400:
+ *         description: Bad request
+ *       500:
+ *         description: Internal server error
+ */
+router.get(
+  "/institute/:institute_id",
+  authenticateToken,
+  getUsersByInstituteId
+);
+
 /**
  * @swagger
  * /api/users/{id}:

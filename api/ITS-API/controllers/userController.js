@@ -125,7 +125,8 @@ const createUser = async (req, res) => {
     }
 
     // ====== Generate password ======
-    const password = generateRandomPassword();
+    // const password = generateRandomPassword();
+    const password = "password";
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // ====== Create User ======
@@ -344,6 +345,111 @@ const getUsers = async (req, res) => {
       message: "Failed to fetch users.",
       error: error.message,
     });
+  }
+};
+
+// Get users by institute ID
+const getUsersByInstituteId = async (req, res) => {
+  try {
+    const { institute_id } = req.params;
+
+    if (!institute_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Institute ID is required",
+      });
+    }
+
+    // Fetch users with associations
+    const users = await User.findAll({
+      where: { institute_id },
+      include: [
+        {
+          model: Institute,
+          as: "institute",
+          attributes: ["institute_id", "name"],
+        },
+        {
+          model: UserType,
+          as: "userType",
+          attributes: ["user_type_id", "name"],
+        },
+        {
+          model: HierarchyNode,
+          as: "hierarchyNode",
+          attributes: ["hierarchy_node_id", "name"],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Users fetched successfully for the institute.",
+      data: users,
+    });
+  } catch (error) {
+    console.error("Error fetching users by institute:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch users by institute.",
+      error: error.message,
+    });
+  }
+};
+
+const getUsersAssignedToNode = async (req, res) => {
+  try {
+    const { project_id, hierarchy_node_id } = req.params;
+
+    // Validate project existence
+    const project = await Project.findByPk(project_id);
+    if (!project) {
+      return res
+        .status(404)
+        .json({ message: `Project with id '${project_id}' not found.` });
+    }
+
+    // Fetch ALL nodes of the project at once
+    const allNodes = await HierarchyNode.findAll({
+      where: { project_id },
+      order: [["level", "ASC"]],
+    });
+
+    // Convert to plain JSON
+    const plainNodes = allNodes.map((n) => n.get({ plain: true }));
+
+    // Build map
+    const map = new Map();
+    plainNodes.forEach((node) => {
+      map.set(node.hierarchy_node_id, { ...node, children: [] });
+    });
+
+    // Build proper tree
+    const roots = [];
+
+    map.forEach((node) => {
+      if (node.parent_id) {
+        const parent = map.get(node.parent_id);
+        if (parent) {
+          parent.children.push(node);
+        }
+      } else {
+        roots.push(node);
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      project_id,
+      count: roots.length,
+      nodes: roots, // FULL TREE
+    });
+  } catch (error) {
+    console.error("Error fetching hierarchy tree:", error);
+    return res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
 };
 
@@ -659,6 +765,7 @@ const getProfile = async (req, res) => {
 module.exports = {
   createUser,
   getUsers,
+  getUsersByInstituteId,
   getUserById,
   updateUser,
   deleteUser,

@@ -705,6 +705,58 @@ const getIssuesByMultipleHierarchyNodes = async (req, res) => {
   }
 };
 
+// ======================================================
+// GET ISSUES THAT WERE ESCALATED AND to_tier IS NULL
+// ======================================================
+
+const getEscalatedIssuesWithNullTier = async (req, res) => {
+  try {
+    // 1️⃣ Find issue escalations where to_tier IS NULL
+    const escalatedNullTier = await IssueEscalation.findAll({
+      where: { to_tier: null },
+      include: [
+        {
+          model: Issue,
+          as: "issue",
+          include: [
+            { model: Project, as: "project" },
+            { model: IssueCategory, as: "category" },
+            { model: IssuePriority, as: "priority" },
+            { model: HierarchyNode, as: "hierarchyNode" },
+            { model: User, as: "reporter" },
+            { model: User, as: "assignee" },
+            {
+              model: IssueComment,
+              as: "comments",
+              include: [{ model: User, as: "author" }],
+            },
+            {
+              model: IssueAttachment,
+              as: "attachments",
+              include: [{ model: Attachment, as: "attachment" }],
+            },
+          ],
+        },
+      ],
+    });
+
+    // 2️⃣ Extract actual issues
+    const issues = escalatedNullTier.map((record) => record.issue);
+
+    res.status(200).json({
+      success: true,
+      count: issues.length,
+      issues,
+    });
+  } catch (error) {
+    console.error("Error fetching escalated issues with null tier:", error);
+    res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
 const acceptIssue = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -773,6 +825,76 @@ const acceptIssue = async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error("ACCEPT ERROR:", error);
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+const confirmIssueResolved = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { issue_id } = req.body;
+    const user_id = req.user?.user_id;
+
+    const issue = await Issue.findByPk(issue_id, { transaction: t });
+    if (!issue) return res.status(404).json({ message: "Issue not found" });
+
+    // Store action
+    await IssueAction.create(
+      {
+        action_id: uuidv4(),
+        issue_id,
+        action_name: "closed",
+        action_description: "Issue marked as resolved by handler",
+        performed_by: user_id,
+        related_tier: issue.hierarchy_node_id,
+        created_at: new Date(),
+      },
+      { transaction: t }
+    );
+
+    // Update issue status to 'closed'
+    const oldStatus = issue.status;
+    issue.status = "closed";
+    await issue.save({ transaction: t });
+
+    // Store status history
+    await IssueStatusHistory.create(
+      {
+        status_history_id: uuidv4(),
+        issue_id,
+        from_status: oldStatus,
+        to_status: issue.status,
+        changed_by: user_id,
+        reason: "Issue confirmed resolved and marked Closed",
+        created_at: new Date(),
+      },
+      { transaction: t }
+    );
+
+    // Create issue history record
+    await IssueHistory.create(
+      {
+        history_id: uuidv4(),
+        issue_id,
+        user_id,
+        action: "closed",
+        status_at_time: "closed",
+        escalation_id: null,
+        resolution_id: null,
+        notes: "Issue confirmed resolved and status changed to Closed",
+        created_at: new Date(),
+      },
+      { transaction: t }
+    );
+
+    await t.commit();
+    return res.json({
+      success: true,
+      message: "Issue status updated to Closed.",
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error("RESOLVE ISSUE ERROR:", error);
     return res.status(500).json({ message: error.message });
   }
 };
@@ -978,7 +1100,9 @@ module.exports = {
   getIssuesByUserId,
   getIssuesByHierarchyNodeId,
   getIssuesByMultipleHierarchyNodes,
+  getEscalatedIssuesWithNullTier,
   updateIssue,
   deleteIssue,
   acceptIssue,
+  confirmIssueResolved,
 };

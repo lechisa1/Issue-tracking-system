@@ -1,4 +1,4 @@
-const { HierarchyNode, Project } = require("../models");
+const { HierarchyNode, Project, Institute } = require("../models");
 const { v4: uuidv4 } = require("uuid");
 
 // Create a hierarchy node (no recursion, single creation)
@@ -84,13 +84,57 @@ const getHierarchyNodes = async (req, res) => {
   }
 };
 
+// Get hierarchy nodes by project ID
+const getHierarchyNodesByProjectId = async (req, res) => {
+  try {
+    const { project_id } = req.params;
+
+    if (!project_id) {
+      return res.status(400).json({
+        message: "Project ID is required",
+      });
+    }
+
+    console.log(
+      "HierarchyNode model attributes:",
+      Object.keys(HierarchyNode.rawAttributes)
+    );
+
+    const nodes = await HierarchyNode.findAll({
+      where: { project_id },
+      include: [
+        { model: Project, as: "project" },
+        { model: HierarchyNode, as: "parent" },
+        { model: HierarchyNode, as: "children" },
+      ],
+    });
+
+    res.status(200).json(nodes);
+  } catch (error) {
+    console.error("Error fetching hierarchy nodes by project:", error);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+};
+
 // Get hierarchy node by ID
 const getHierarchyNodeById = async (req, res) => {
   try {
     const { id } = req.params;
     const node = await HierarchyNode.findByPk(id, {
       include: [
-        { model: Project, as: "project" },
+        {
+          model: Project,
+          as: "project",
+          include: [
+            {
+              model: Institute,
+              as: "institutes",
+              through: { attributes: ["is_active"] },
+            },
+          ],
+        },
         { model: HierarchyNode, as: "parent" },
         { model: HierarchyNode, as: "children" },
       ],
@@ -278,9 +322,11 @@ const getParentNodes = async (req, res) => {
   }
 };
 
+
 module.exports = {
   createHierarchyNode,
   getHierarchyNodes,
+  getHierarchyNodesByProjectId,
   getHierarchyNodeById,
   updateHierarchyNode,
   deleteHierarchyNode,

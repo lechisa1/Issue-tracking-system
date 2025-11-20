@@ -346,4 +346,42 @@ router.get(
   projectController.getProjectsAssignedToUser
 );
 
+// ==========================================================================
+// ✅ NEW ENDPOINT — GET PROJECTS BY INSTITUTE ID
+// ==========================================================================
+
+/**
+ * @swagger
+ * /api/projects/institute/{institute_id}:
+ *   get:
+ *     summary: Get all projects that belong to an institute
+ *     tags: [Projects]
+ *     parameters:
+ *       - in: path
+ *         name: institute_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Institute ID
+ *     responses:
+ *       200:
+ *         description: List of projects for the given institute
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Project'
+ *       404:
+ *         description: No projects found for this institute
+ *       500:
+ *         description: Internal server error
+ */
+router.get(
+  "/institute/:institute_id",
+  authenticateToken,
+  projectController.getProjectByInstituteId
+);
+
 module.exports = router;

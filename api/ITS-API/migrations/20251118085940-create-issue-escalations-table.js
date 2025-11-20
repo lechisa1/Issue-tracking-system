@@ -23,7 +23,7 @@ module.exports = {
 
       from_tier: {
         type: Sequelize.UUID,
-        allowNull: true,
+        allowNull: false,
       },
 
       to_tier: {

@@ -139,6 +139,69 @@ const getProjectById = async (req, res) => {
       .json({ message: "Internal server error", error: error.message });
   }
 };
+// Get all projects by institute ID
+const getProjectByInstituteId = async (req, res) => {
+  try {
+    const { institute_id } = req.params;
+
+    if (!institute_id) {
+      return res.status(400).json({ message: "Institute ID is required" });
+    }
+
+    const projects = await Project.findAll({
+      include: [
+        {
+          model: Institute,
+          as: "institutes",
+          where: { institute_id },
+          required: true, // Only return projects linked to this institute
+          through: { attributes: ["is_active"] },
+        },
+        {
+          model: ProjectUserRole,
+          as: "projectUserRoles",
+          include: [
+            {
+              model: User,
+              as: "user",
+              attributes: ["user_id", "full_name", "email"],
+            },
+            {
+              model: Role,
+              as: "role",
+              attributes: ["role_id", "name"],
+            },
+            {
+              model: SubRole,
+              as: "subRole",
+              attributes: ["sub_role_id", "name"],
+            },
+            {
+              model: HierarchyNode,
+              as: "hierarchyNode",
+              attributes: ["hierarchy_node_id", "name"],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!projects || projects.length === 0) {
+      return res.status(404).json({
+        message: "No projects found for this institute",
+      });
+    }
+
+    return res.status(200).json(projects);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
 const assignUserToProject = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -378,6 +441,7 @@ module.exports = {
   createProject,
   getProjects,
   getProjectById,
+  getProjectByInstituteId,
   updateProject,
   deleteProject,
   assignUserToProject,

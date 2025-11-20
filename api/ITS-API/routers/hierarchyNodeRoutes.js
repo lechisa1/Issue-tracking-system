@@ -224,4 +224,33 @@ router.get(
   hierarchyNodeController.getParentNodes
 );
 
+/**
+ * @swagger
+ * /api/hierarchy-nodes/project/{project_id}:
+ *   get:
+ *     summary: Get hierarchy nodes by project ID
+ *     tags: [HierarchyNodes]
+ *     parameters:
+ *       - in: path
+ *         name: project_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Project ID
+ *     responses:
+ *       200:
+ *         description: List of hierarchy nodes for the project
+ *       400:
+ *         description: Bad request
+ *       500:
+ *         description: Internal server error
+ */
+router.get(
+  "/project/:project_id",
+  authenticateToken,
+  hierarchyNodeController.getHierarchyNodesByProjectId
+);
+
+
 module.exports = router;

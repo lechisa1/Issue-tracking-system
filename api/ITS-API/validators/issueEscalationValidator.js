@@ -7,9 +7,7 @@ const escalateIssueSchema = Joi.object({
   from_tier: Joi.string().required().messages({
     "any.required": "From tier is required.",
   }),
-  to_tier: Joi.string().required().messages({
-    "any.required": "To tier is required.",
-  }),
+  to_tier: Joi.string().allow(null, "").optional(),
   reason: Joi.string().allow(null, "").optional(),
   escalated_by: Joi.string().uuid().required().messages({
     "any.required": "Escalated_by user ID is required.",
