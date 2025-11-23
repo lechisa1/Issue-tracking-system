@@ -181,4 +181,8 @@ router.get("/latest/:issue_id", controller.getLatestResolutionByIssueId);
  */
 router.delete("/id/:resolution_id", controller.deleteResolution);
 
+<<<<<<< HEAD
 module.exports = router;
+=======
+module.exports = router;
+>>>>>>> 2184e7acb5340e52b2f919264626e353996ae7ef

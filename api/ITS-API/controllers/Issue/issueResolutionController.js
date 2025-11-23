@@ -3,7 +3,6 @@ const {
   ResolutionAttachment,
   Issue,
   User,
-  IssueHistory,
   IssueTier,
   Attachment,
   IssueAction,
@@ -60,7 +59,6 @@ const resolveIssue = async (req, res) => {
       {
         status: "resolved",
         updated_at: new Date(),
-        resolved_at: new Date(),
       },
       {
         where: { issue_id },
@@ -74,7 +72,6 @@ const resolveIssue = async (req, res) => {
         issue_id,
       },
       order: [["assigned_at", "DESC"]],
-      transaction: t,
     });
 
     if (currentTier) {
@@ -99,24 +96,6 @@ const resolveIssue = async (req, res) => {
         action_description: `Issue marked as resolved by user`,
         performed_by: resolved_by,
         related_tier: currentTier?.tier_level || null,
-      },
-      { transaction: t }
-    );
-
-    // ==================================
-    // 8. CREATE IssueHistory ENTRY (NEW)
-    // ==================================
-    await IssueHistory.create(
-      {
-        history_id: uuidv4(),
-        issue_id,
-        user_id: resolved_by,
-        action: "resolved",
-        status_at_time: "resolved",
-        escalation_id: null,
-        resolution_id,
-        notes: `Issue resolved. Reason: ${reason}`,
-        created_at: new Date(),
       },
       { transaction: t }
     );

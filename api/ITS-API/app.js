@@ -24,7 +24,11 @@ const issuePriorities = require("./routers/issuePriorityRoutes");
 const issueRoutes = require("./routers/issueRoutes");
 const issueAssignmentRoutes = require("./routers/issueAssignmentRoutes");
 const issueEscalationRoutes = require("./routers/issueEscaltionRoute");
+
 const internalUserEscalationRoutes = require("./routers/internalUserEscalationRoutes");
+
+const issueResolutionRoutes = require("./routers/issueResolutionRoutes");
+
 
 const instituteRoute = require("./routers/instituteRoutes");
 const instituteProjectsRoute = require("./routers/instituteProjectRoutes");
@@ -141,9 +145,12 @@ app.use("/api/issue-priorities", issuePriorities);
 app.use("/api/issues", issueRoutes);
 app.use("/api/assignments", issueAssignmentRoutes);
 app.use("/api/issue-escalations", issueEscalationRoutes);
+
 app.use("/api/internal-user-escalations", internalUserEscalationRoutes);
 const internalHierarchyRoutes = require("./routers/internalHierarchy");
 app.use("/api/internal-hierarchy", internalHierarchyRoutes);
+
+app.use("/api/issue-resolutions", issueResolutionRoutes);
 
 app.use("/api/change-password", changePasswordRoutes);
 
