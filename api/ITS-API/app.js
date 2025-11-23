@@ -24,6 +24,7 @@ const issuePriorities = require("./routers/issuePriorityRoutes");
 const issueRoutes = require("./routers/issueRoutes");
 const issueAssignmentRoutes = require("./routers/issueAssignmentRoutes");
 const issueEscalationRoutes = require("./routers/issueEscaltionRoute");
+const internalUserEscalationRoutes = require("./routers/internalUserEscalationRoutes");
 
 const instituteRoute = require("./routers/instituteRoutes");
 const instituteProjectsRoute = require("./routers/instituteProjectRoutes");
@@ -140,6 +141,9 @@ app.use("/api/issue-priorities", issuePriorities);
 app.use("/api/issues", issueRoutes);
 app.use("/api/assignments", issueAssignmentRoutes);
 app.use("/api/issue-escalations", issueEscalationRoutes);
+app.use("/api/internal-user-escalations", internalUserEscalationRoutes);
+const internalHierarchyRoutes = require("./routers/internalHierarchy");
+app.use("/api/internal-hierarchy", internalHierarchyRoutes);
 
 app.use("/api/change-password", changePasswordRoutes);
 
@@ -168,7 +172,7 @@ app.use((err, req, res, next) => {
 // ================== Start App Server ==================
 const appPort = process.env.PORT || 4000;
 appServer.listen(appPort, () => {
-  console.log(` App server running at http:// 192.168.1.150:${appPort}`);
+  console.log(` App server running at http://192.168.0.38:${appPort}`);
 });
 
 // ================== Socket.IO Setup ==================

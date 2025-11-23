@@ -232,10 +232,8 @@ router.get("/id/:escalation_id", controller.getEscalationById);
 
 // Routes
 router.post("/", validateEscalateIssue, controller.escalateIssue);
-router.post("/automated", upload.array('attachments', 10), controller.automatedEscalation);
-router.post("/assign-qa", controller.assignToQATeam);
-router.post("/assign-developer", controller.assignToDeveloper);
 router.post("/mark-in-progress", require("../middlewares/authMiddleware").authenticateToken, controller.markAsInProgress);
+router.get("/issues-by-pairs/:pairs/user/:user_id", controller.getEscalatedIssuesWithNullTier);
 router.get("/:issue_id", controller.getEscalationsByIssueId);
 router.get("/history/:issue_id", controller.getEscalationHistoryByIssueId);
 router.get("/:escalation_id", controller.getEscalationById);

@@ -7,6 +7,7 @@ const {
   SubRole,
   RoleSubRole,
   RoleSubRolePermission,
+  InternalHierarchy,
   Permission,
   UserRoles,
   HierarchyNode,
@@ -47,6 +48,7 @@ const getUserTypes = async (req, res) => {
     });
   }
 };
+
 const createUser = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -64,7 +66,7 @@ const createUser = async (req, res) => {
     const loggedInUser = await User.findByPk(loggedInUserId, {
       include: [
         { model: UserType, as: "userType", attributes: ["name"] },
-        { model: Institute, as: "institute", attributes: ["institute_id"] }
+        { model: Institute, as: "institute", attributes: ["institute_id"] },
       ],
       transaction: t,
     });
@@ -78,7 +80,7 @@ const createUser = async (req, res) => {
       });
       if (externalUserType) {
         finalUserTypeId = externalUserType.user_type_id;
-        institute_id = loggedInUser.institute?.institute_id; // Set institute from logged-in user
+        institute_id = loggedInUser.institute?.institute_id; // force institute from logged-in user
       }
     }
 
@@ -114,9 +116,7 @@ const createUser = async (req, res) => {
       }
 
       // Validate institute existence
-      const institute = await Institute.findByPk(institute_id, {
-        transaction: t,
-      });
+      const institute = await Institute.findByPk(institute_id, { transaction: t });
       if (!institute) {
         await t.rollback();
         return res
@@ -135,25 +135,24 @@ const createUser = async (req, res) => {
     }
 
     // ====== Optional hierarchy validation ======
-    if (hierarchy_node_id) {
-      const node = await HierarchyNode.findByPk(hierarchy_node_id, {
-        transaction: t,
-      });
-      if (!node) {
-        await t.rollback();
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid hierarchy node ID." });
-      }
-    }
+if (hierarchy_node_id) {
+  console.log("Validating hierarchy_node_id:", hierarchy_node_id);
+
+  const node = await InternalHierarchy.findByPk(hierarchy_node_id, { transaction: t });
+  if (!node) {
+    await t.rollback();
+    return res.status(400).json({ success: false, message: "Invalid hierarchy node ID." });
+  }
+}
+
+
 
     // ====== Generate password ======
-    // const password = generateRandomPassword();
-    const password = "Password123"
+    const password = "Password123";
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // ====== Create User ======
-    const user = await User.create(
+    const newUser = await User.create(
       {
         user_id: uuidv4(),
         full_name,
@@ -162,7 +161,7 @@ const createUser = async (req, res) => {
         phone_number,
         user_type_id: finalUserTypeId,
         institute_id: userType.name === "external_user" ? institute_id : null,
-        hierarchy_node_id: hierarchy_node_id ?? null,
+        hierarchy_id: hierarchy_node_id ?? null,
         is_first_logged_in: true,
         is_active: true,
         created_at: new Date(),
@@ -188,8 +187,8 @@ const createUser = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "User registered globally (no roles assigned yet)",
-      data: user,
+      message: "User registered successfully (no roles assigned yet).",
+      data: newUser,
     });
   } catch (error) {
     if (!t.finished) await t.rollback();
@@ -197,6 +196,9 @@ const createUser = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+module.exports = { createUser };
+
 
 // =============== Update user ===============
 const updateUser = async (req, res) => {

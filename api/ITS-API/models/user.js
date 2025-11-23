@@ -36,6 +36,7 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "hierarchy_node_id",
         as: "hierarchyNode",
       });
+    
     }
   }
 

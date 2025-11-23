@@ -20,7 +20,7 @@ module.exports = {
       { resource: "roles", action: "delete" },
       { resource: "roles", action: "assign_permission" },
 
-      // Organization Management
+      // Organization Management 
       { resource: "organizations", action: "create" },
       { resource: "organizations", action: "read" },
       { resource: "organizations", action: "update" },
@@ -49,10 +49,16 @@ module.exports = {
       { resource: "issues", action: "resolve" },
       { resource: "issues", action: "escalate" },
       { resource: "issues", action: "view_own" },
-      { resource: "issues", action: "can_escalate_to_qal" },
-      { resource: "issues", action: "can_escalate_to_qam" },
-      { resource: "issues", action: "can_escalate_to_frontend" },
-      { resource: "issues", action: "can_escalate_to_backend" },
+
+      // Issue internal_escalation Specific
+      { resource: "internal_escalation", action: "can_escalate_to_qal" },
+      { resource: "internal_escalation", action: "can_escalate_to_qam" },
+      { resource: "internal_escalation", action: "can_escalate_to_frontend" },
+      { resource: "internal_escalation", action: "can_escalate_to_backend" },
+      { resource: "internal_escalation", action: "can_fix_return_to_qam" },
+      { resource: "internal_escalation", action: "can_fix_return_to_qal" },
+      { resource: "internal_escalation", action: "can_fix_return_to_central_admin" },
+    
 
       // Issue Priority & Category
       { resource: "issue_priorities", action: "create" },
