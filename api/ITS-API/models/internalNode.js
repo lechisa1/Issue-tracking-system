@@ -4,12 +4,6 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class InternalNode extends Model {
     static associate(models) {
-      // Belongs to Project
-      this.belongsTo(models.Project, {
-        foreignKey: "project_id",
-        as: "project",
-      });
-
       // Self-referencing for parent-child relationship
       this.belongsTo(models.InternalNode, {
         foreignKey: "parent_id",
@@ -29,10 +23,6 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
         field: "internal_node_id",
-      },
-      project_id: {
-        type: DataTypes.UUID,
-        allowNull: false,
       },
       parent_id: {
         type: DataTypes.UUID,

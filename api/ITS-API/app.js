@@ -21,6 +21,7 @@ const authRoute = require("./routers/authRoutes");
 
 const issueCategories = require("./routers/issueCategoryRoutes");
 const issuePriorities = require("./routers/issuePriorityRoutes");
+const issueFlowRoute = require("./routers/issueFlowRoute");
 
 const issueRoutes = require("./routers/issueRoutes");
 const issueAssignmentRoutes = require("./routers/issueAssignmentRoutes");
@@ -30,6 +31,7 @@ const issueResolutionRoutes = require("./routers/issueResolutionRoutes");
 const instituteRoute = require("./routers/instituteRoutes");
 const instituteProjectsRoute = require("./routers/instituteProjectRoutes");
 const hierarchyNodeRoute = require("./routers/hierarchyNodeRoutes");
+const internalNodeRoute = require("./routers/internalNodeRoute");
 const hierarchyNodeOrganizationRoute = require("./routers/hierarchyNodeOrganizationRoutes");
 
 const changePasswordRoutes = require("./routers/passwordChangeRoutes");
@@ -41,7 +43,7 @@ const permissionRoute = require("./routers/permissionRoutes");
 
 const issueGuideLines = require("./routers/issueReportingGuidelineRoutes");
 const getAssignedProjectRoute = require("./routers/getAssignedProjectRoute");
-const issueFlowRoute = require("./routers/issueFlowRoute");
+
 const app = express();
 const appServer = http.createServer(app);
 
@@ -143,6 +145,8 @@ app.use("/api/issues", issueRoutes);
 app.use("/api/assignments", issueAssignmentRoutes);
 app.use("/api/issue-escalations", issueEscalationRoutes);
 app.use("/api/issue-resolutions", issueResolutionRoutes);
+app.use("/api/internal-nodes", internalNodeRoute);
+// /api/internal-nodes
 
 app.use("/api/change-password", changePasswordRoutes);
 
@@ -150,7 +154,6 @@ app.use("/api/issue-attachments", issueFileAttachmentRoutes);
 app.use("/api/attachments", fileAttachmentRoutes);
 
 app.use("/api/permissions", permissionRoute);
-app.use("/api/issue-flow", issueFlowRoute);
 app.use("/api/issue-guidelines", issueGuideLines);
 
 app.use("/api/flow", getAssignedProjectRoute);
