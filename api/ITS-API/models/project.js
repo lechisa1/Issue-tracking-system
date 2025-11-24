@@ -24,6 +24,10 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "project_id",
         as: "projectUserRoles",
       });
+      this.hasMany(models.ProjectMaintenance, {
+        foreignKey: "project_id",
+        as: "maintenances",
+      });
     }
   }
 

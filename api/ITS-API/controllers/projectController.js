@@ -7,6 +7,7 @@ const {
   SubRole,
   User,
   InstituteProject,
+  ProjectMaintenance,
   sequelize,
 } = require("../models");
 const { v4: uuidv4 } = require("uuid");
@@ -14,7 +15,14 @@ const { v4: uuidv4 } = require("uuid");
 // Create a new project
 const createProject = async (req, res) => {
   try {
-    const { name, description, is_active, institute_id } = req.body;
+    const {
+      name,
+      description,
+      is_active,
+      institute_id,
+      maintenance_start,
+      maintenance_end,
+    } = req.body;
 
     // Check if project exists
     const existingProject = await Project.findOne({ where: { name } });
@@ -33,6 +41,16 @@ const createProject = async (req, res) => {
       is_active,
       institute_id: institute_id || null,
     });
+
+    // Create maintenance record if dates are provided
+    if (maintenance_start || maintenance_end) {
+      await ProjectMaintenance.create({
+        maintenance_id: uuidv4(),
+        project_id,
+        start_date: maintenance_start || null,
+        end_date: maintenance_end || null,
+      });
+    }
 
     // If institute_id is provided, create the association
     if (institute_id) {
@@ -128,6 +146,18 @@ const getProjectById = async (req, res) => {
             },
           ],
         },
+        // Maintenance
+        {
+          model: ProjectMaintenance,
+          as: "maintenances", // Make sure your Project model has hasMany(ProjectMaintenance, { as: "maintenances" })
+          attributes: [
+            "maintenance_id",
+            "start_date",
+            "end_date",
+            "created_at",
+            "updated_at",
+          ],
+        },
       ],
     });
     if (!project) return res.status(404).json({ message: "Project not found" });
@@ -181,6 +211,18 @@ const getProjectByInstituteId = async (req, res) => {
               as: "hierarchyNode",
               attributes: ["hierarchy_node_id", "name"],
             },
+          ],
+        },
+        // Maintenance
+        {
+          model: ProjectMaintenance,
+          as: "maintenances", // Make sure your Project model has hasMany(ProjectMaintenance, { as: "maintenances" })
+          attributes: [
+            "maintenance_id",
+            "start_date",
+            "end_date",
+            "created_at",
+            "updated_at",
           ],
         },
       ],
@@ -337,6 +379,55 @@ const updateProject = async (req, res) => {
   }
 };
 
+const updateProjectMaintenance = async (req, res) => {
+  try {
+    const { project_id } = req.params;
+    const { maintenance_start, maintenance_end } = req.body;
+
+    // Check if project exists
+    const project = await Project.findByPk(project_id);
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    // Find existing maintenance record for the project
+    const maintenance = await ProjectMaintenance.findOne({
+      where: { project_id },
+    });
+
+    if (!maintenance) {
+      return res.status(404).json({ message: "Maintenance record not found" });
+    }
+
+    // Validate dates if provided
+    if (
+      maintenance_start &&
+      maintenance_end &&
+      new Date(maintenance_start) > new Date(maintenance_end)
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Maintenance start cannot be after end date" });
+    }
+
+    // Update fields
+    if (maintenance_start) maintenance.start_date = maintenance_start;
+    if (maintenance_end) maintenance.end_date = maintenance_end;
+
+    await maintenance.save();
+
+    res.status(200).json({
+      message: "Project maintenance updated successfully",
+      maintenance,
+    });
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+};
+
 // Delete project
 const deleteProject = async (req, res) => {
   try {
@@ -418,6 +509,18 @@ const getProjectsAssignedToUser = async (req, res) => {
           as: "hierarchyNode",
           attributes: ["hierarchy_node_id", "name"],
         },
+        // Maintenance
+        // {
+        //   model: ProjectMaintenance,
+        //   as: "maintenances", // Make sure your Project model has hasMany(ProjectMaintenance, { as: "maintenances" })
+        //   attributes: [
+        //     "maintenance_id",
+        //     "start_date",
+        //     "end_date",
+        //     "created_at",
+        //     "updated_at",
+        //   ],
+        // },
       ],
       order: [["created_at", "DESC"]],
     });
@@ -443,6 +546,7 @@ module.exports = {
   getProjectById,
   getProjectByInstituteId,
   updateProject,
+  updateProjectMaintenance,
   deleteProject,
   assignUserToProject,
   removeUserFromProject,

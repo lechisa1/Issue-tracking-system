@@ -9,11 +9,25 @@ const createProjectSchema = Joi.object({
   description: Joi.string().trim().optional().messages({
     "string.base": "Description must be a string",
   }),
-  
+
   is_active: Joi.boolean().optional(),
   institute_id: Joi.string().guid({ version: "uuidv4" }).optional().messages({
     "string.guid": "Institute ID must be a valid UUID",
   }),
+  maintenance_start: Joi.date().optional().allow(null),
+  maintenance_end: Joi.date().optional().allow(null),
+}).custom((value, helpers) => {
+  const { maintenance_start, maintenance_end } = value;
+  if (
+    maintenance_start &&
+    maintenance_end &&
+    maintenance_start > maintenance_end
+  ) {
+    return helpers.message(
+      "Maintenance start must be before or equal to maintenance end"
+    );
+  }
+  return value;
 });
 // ===============================
 exports.validateAssignUserToProject = (req, res, next) => {

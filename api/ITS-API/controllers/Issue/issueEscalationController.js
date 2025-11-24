@@ -112,6 +112,12 @@ const escalateIssue = async (req, res) => {
       { transaction: t }
     );
 
+    // 9 update issue status
+    // Update issue status to 'in_progress'
+    const oldStatus = issue.status;
+    issue.status = "pending"; // <--- status update
+    await issue.save({ transaction: t });
+
     // COMMIT ALL
     await t.commit();
 

@@ -8,6 +8,7 @@ const {
   RoleSubRole,
   RoleSubRolePermission,
   Permission,
+  Project,
   UserRoles,
   HierarchyNode,
   sequelize,
@@ -402,54 +403,232 @@ const getUsersAssignedToNode = async (req, res) => {
   try {
     const { project_id, hierarchy_node_id } = req.params;
 
-    // Validate project existence
+    // Validate project
     const project = await Project.findByPk(project_id);
     if (!project) {
-      return res
-        .status(404)
-        .json({ message: `Project with id '${project_id}' not found.` });
+      return res.status(404).json({
+        success: false,
+        message: `Project with id '${project_id}' not found.`,
+      });
     }
 
-    // Fetch ALL nodes of the project at once
-    const allNodes = await HierarchyNode.findAll({
+    // Validate hierarchy node
+    const hierarchyNode = await HierarchyNode.findOne({
+      where: { hierarchy_node_id, project_id },
+    });
+
+    if (!hierarchyNode) {
+      return res.status(404).json({
+        success: false,
+        message: `Hierarchy node '${hierarchy_node_id}' not found in project '${project_id}'.`,
+      });
+    }
+
+    // Fetch assignments from junction table
+    const userAssignments = await ProjectUserRole.findAll({
+      where: {
+        project_id,
+        hierarchy_node_id,
+      },
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["user_id", "full_name", "email"],
+          include: [
+            {
+              model: Institute,
+              as: "institute",
+              attributes: ["institute_id", "name"],
+            },
+            {
+              model: UserType,
+              as: "userType",
+              attributes: ["user_type_id", "name"],
+            },
+          ],
+        },
+        {
+          model: Role,
+          as: "role",
+          attributes: ["role_id", "name"],
+        },
+        {
+          model: SubRole,
+          as: "subRole",
+          attributes: ["sub_role_id", "name"],
+        },
+        {
+          model: HierarchyNode,
+          as: "hierarchyNode",
+          attributes: ["hierarchy_node_id", "name"],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    // Transform and return
+    const users = userAssignments.map((assignment) => ({
+      project_user_role_id: assignment.project_user_role_id,
+      project_id: assignment.project_id,
+      user_id: assignment.user_id,
+      role_id: assignment.role_id,
+      sub_role_id: assignment.sub_role_id,
+      hierarchy_node_id: assignment.hierarchy_node_id,
+
+      user: assignment.user,
+      role: assignment.role,
+      sub_role: assignment.subRole,
+      hierarchyNode: assignment.hierarchyNode,
+
+      is_active: assignment.is_active,
+      assigned_at: assignment.created_at,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: "Users assigned to hierarchy node fetched successfully.",
+      project_id,
+      hierarchy_node_id,
+      count: users.length,
+      data: users,
+    });
+  } catch (error) {
+    console.error("Error fetching users assigned to node:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+const getUsersAssignedToProject = async (req, res) => {
+  try {
+    const { project_id } = req.params;
+
+    if (!project_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Project ID is required.",
+      });
+    }
+
+    const assignments = await ProjectUserRole.findAll({
       where: { project_id },
-      order: [["level", "ASC"]],
-    });
-
-    // Convert to plain JSON
-    const plainNodes = allNodes.map((n) => n.get({ plain: true }));
-
-    // Build map
-    const map = new Map();
-    plainNodes.forEach((node) => {
-      map.set(node.hierarchy_node_id, { ...node, children: [] });
-    });
-
-    // Build proper tree
-    const roots = [];
-
-    map.forEach((node) => {
-      if (node.parent_id) {
-        const parent = map.get(node.parent_id);
-        if (parent) {
-          parent.children.push(node);
-        }
-      } else {
-        roots.push(node);
-      }
+      include: [
+        {
+          model: User,
+          as: "user",
+          include: [
+            {
+              model: Institute,
+              as: "institute",
+              attributes: ["institute_id", "name"],
+            },
+            {
+              model: UserType,
+              as: "userType",
+              attributes: ["user_type_id", "name"],
+            },
+          ],
+        },
+        {
+          model: Role,
+          as: "role",
+          attributes: ["role_id", "name"],
+        },
+        {
+          model: HierarchyNode,
+          as: "hierarchyNode",
+          attributes: ["hierarchy_node_id", "name", "level", "parent_id"],
+        },
+      ],
+      order: [["created_at", "DESC"]],
     });
 
     return res.status(200).json({
       success: true,
-      project_id,
-      count: roots.length,
-      nodes: roots, // FULL TREE
+      message: "Users assigned to project fetched successfully.",
+      count: assignments.length,
+      data: assignments,
     });
   } catch (error) {
-    console.error("Error fetching hierarchy tree:", error);
-    return res
-      .status(500)
-      .json({ message: "Internal server error", error: error.message });
+    console.error("Error fetching assigned users:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch assigned users.",
+      error: error.message,
+    });
+  }
+};
+
+const getUsersNotAssignedToProject = async (req, res) => {
+  console.log("not assigned called");
+  try {
+    const { institute_id, project_id } = req.params;
+
+    if (!institute_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Institute ID is required",
+      });
+    }
+
+    if (!project_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Project ID is required.",
+      });
+    }
+
+    // 1. Get all assigned users for the project
+    const assignments = await ProjectUserRole.findAll({
+      where: { project_id },
+      attributes: ["user_id"], // we only need user_id
+    });
+
+    const assignedUserIds = assignments.map((a) => a.user_id);
+
+    // 2. Get all users from institute except assigned ones
+    const users = await User.findAll({
+      where: {
+        institute_id,
+        user_id: {
+          [Op.notIn]: assignedUserIds.length > 0 ? assignedUserIds : [null],
+        },
+      },
+      include: [
+        {
+          model: Institute,
+          as: "institute",
+          attributes: ["institute_id", "name"],
+        },
+        {
+          model: UserType,
+          as: "userType",
+          attributes: ["user_type_id", "name"],
+        },
+        {
+          model: HierarchyNode,
+          as: "hierarchyNode",
+          attributes: ["hierarchy_node_id", "name"],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Unassigned users fetched successfully.",
+      data: users,
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch users.",
+      error: error.message,
+    });
   }
 };
 
@@ -766,6 +945,9 @@ module.exports = {
   createUser,
   getUsers,
   getUsersByInstituteId,
+  getUsersAssignedToNode,
+  getUsersAssignedToProject,
+  getUsersNotAssignedToProject,
   getUserById,
   updateUser,
   deleteUser,

@@ -180,6 +180,11 @@ router.put(
   projectController.updateProject
 );
 
+router.put(
+  "/projects/:project_id/maintenance",
+  projectController.updateProjectMaintenance
+);
+
 /**
  * @swagger
  * /api/projects/{id}:

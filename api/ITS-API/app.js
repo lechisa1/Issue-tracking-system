@@ -1,4 +1,5 @@
 const express = require("express");
+require("./cronjobs");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const http = require("http");

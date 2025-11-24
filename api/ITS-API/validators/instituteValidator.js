@@ -6,9 +6,9 @@ const createInstituteSchema = Joi.object({
     "string.empty": "Institute name is required",
     "string.max": "Name must be at most 255 characters",
   }),
-  description: Joi.string().trim().optional().messages({
-    "string.base": "Description must be a string",
-  }),
+  // description: Joi.string().trim().optional().messages({
+  //   "string.base": "Description must be a string",
+  // }),
   is_active: Joi.boolean().optional().messages({
     "boolean.base": "Is active must be a boolean",
   }),
