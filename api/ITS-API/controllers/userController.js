@@ -7,7 +7,9 @@ const {
   SubRole,
   RoleSubRole,
   RoleSubRolePermission,
+  InternalProjectUserRole,
   Permission,
+  InternalNode,
   Project,
   UserRoles,
   HierarchyNode,
@@ -562,6 +564,61 @@ const getUsersAssignedToProject = async (req, res) => {
   }
 };
 
+const getInternalUsersAssignedToProject = async (req, res) => {
+  try {
+    const { project_id } = req.params;
+
+    if (!project_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Project ID is required.",
+      });
+    }
+
+    const assignments = await InternalProjectUserRole.findAll({
+      where: { project_id },
+      include: [
+        {
+          model: User,
+          as: "user",
+          include: [
+            {
+              model: UserType,
+              as: "userType",
+              attributes: ["user_type_id", "name"],
+            },
+          ],
+        },
+        {
+          model: Role,
+          as: "role",
+          attributes: ["role_id", "name"],
+        },
+        {
+          model: InternalNode,
+          as: "internalNode",
+          attributes: ["internal_node_id", "name", "level", "parent_id"],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Users assigned to project fetched successfully.",
+      count: assignments.length,
+      data: assignments,
+    });
+  } catch (error) {
+    console.error("Error fetching assigned users:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch assigned users.",
+      error: error.message,
+    });
+  }
+};
+
 const getUsersNotAssignedToProject = async (req, res) => {
   console.log("not assigned called");
   try {
@@ -621,6 +678,131 @@ const getUsersNotAssignedToProject = async (req, res) => {
       success: true,
       message: "Unassigned users fetched successfully.",
       data: users,
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch users.",
+      error: error.message,
+    });
+  }
+};
+
+const getInternalUsersNotAssignedToProject = async (req, res) => {
+  console.log("not assigned called");
+  try {
+    const { project_id } = req.params;
+
+    if (!project_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Project ID is required.",
+      });
+    }
+
+    // 1. Find already assigned internal users for this project
+    const assignments = await InternalProjectUserRole.findAll({
+      where: { project_id },
+      attributes: ["user_id"],
+    });
+
+    const assignedUserIds = assignments.map((a) => a.user_id);
+
+    console.log("assignedUserIds: ", assignedUserIds);
+    // 2. Get users where:
+    //    institute_id IS NULL
+    //    AND user_id NOT IN assignedUserIds
+    const users = await User.findAll({
+      where: {
+        institute_id: { [Op.is]: null }, // users with NULL institute_id
+        user_id: {
+          [Op.notIn]: assignedUserIds.length > 0 ? assignedUserIds : [], // avoid SQL error
+        },
+      },
+      include: [
+        {
+          model: InternalNode,
+          as: "internalNode",
+          attributes: ["internal_node_id", "name"],
+        },
+        {
+          model: UserType,
+          as: "userType",
+          attributes: ["user_type_id", "name"],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    console.log("users: ", users);
+
+    return res.status(200).json({
+      success: true,
+      message: "Unassigned internal users fetched successfully.",
+      data: users,
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch users.",
+      error: error.message,
+    });
+  }
+};
+
+const getProjectSubNodeUsers = async (req, res) => {
+  try {
+    const { project_id, Internal_node_id } = req.params;
+
+    if (!project_id || !Internal_node_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Project ID and Internal Node ID are required.",
+      });
+    }
+
+    // 1️⃣ Get direct children of this node
+    const children = await InternalNode.findAll({
+      where: { parent_id: Internal_node_id },
+      attributes: ["internal_node_id"],
+    });
+
+    const childNodeIds = children.map((c) => c.internal_node_id);
+    // Include the parent node itself
+    // childNodeIds.push(Internal_node_id);
+
+    // 2️⃣ Fetch assignments for users under these nodes
+    const assignments = await InternalProjectUserRole.findAll({
+      where: {
+        project_id,
+        internal_node_id: { [Op.in]: childNodeIds },
+      },
+      include: [
+        {
+          model: User,
+          as: "user", // ✅ must match association alias
+          attributes: ["user_id", "full_name", "email"],
+        },
+        {
+          model: Role,
+          as: "role", // ✅ must match association alias
+          attributes: ["role_id", "name"],
+        },
+        {
+          model: InternalNode,
+          as: "internalNode", // ✅ must match association alias
+          attributes: ["internal_node_id", "name", "level", "parent_id"],
+        },
+      ],
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Users under child nodes fetched successfully.",
+      assignments,
+      count: assignments.length,
     });
   } catch (error) {
     console.error("Error fetching users:", error);
@@ -1154,7 +1336,10 @@ module.exports = {
   getUsersByInstituteId,
   getUsersAssignedToNode,
   getUsersAssignedToProject,
+  getInternalUsersAssignedToProject,
   getUsersNotAssignedToProject,
+  getInternalUsersNotAssignedToProject,
+  getProjectSubNodeUsers,
   getUserById,
   updateUser,
   deleteUser,

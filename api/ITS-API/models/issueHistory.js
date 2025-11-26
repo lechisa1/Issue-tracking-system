@@ -25,6 +25,11 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "resolution_id",
         as: "resolution",
       });
+      // Optional FK to IssueAssignment (nullable)
+      // IssueHistory.belongsTo(models.IssueAssignment, {
+      //   foreignKey: "assignment_id",
+      //   as: "assignment",
+      // });
     }
   }
 
@@ -47,7 +52,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: false,
         comment:
-          "created | accepted | updated | assigned | escalated | resolved | reopened | commented",
+          "created | accepted | updated | assigned | escalated | resolved | reopened | commented | assigned",
       },
       status_at_time: {
         type: DataTypes.STRING,
@@ -61,6 +66,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.UUID,
         allowNull: true,
       },
+      // assignment_id: {
+      //   type: DataTypes.UUID,
+      //   allowNull: true,
+      // },
       notes: {
         type: DataTypes.TEXT,
         allowNull: true,

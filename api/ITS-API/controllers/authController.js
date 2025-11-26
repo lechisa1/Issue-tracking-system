@@ -10,6 +10,8 @@ const {
   SubRole,
   RoleSubRole,
   RoleSubRolePermission,
+  InternalProjectUserRole,
+  InternalNode,
   Permission,
 } = require("../models");
 const bcrypt = require("bcrypt");
@@ -280,6 +282,30 @@ const getCurrentUser = async (req, res) => {
             },
           ],
         },
+        // Internal Project Roles
+        {
+          model: InternalProjectUserRole,
+          as: "internalProjectUserRoles",
+          include: [
+            {
+              model: Project,
+              as: "project",
+              attributes: ["project_id", "name", "description"],
+            },
+            {
+              model: Role,
+              as: "role",
+              attributes: ["role_id", "name"],
+              required: false,
+            },
+            {
+              model: InternalNode,
+              as: "internalNode",
+              attributes: ["internal_node_id", "name", "level", "parent_id"],
+              required: false,
+            },
+          ],
+        },
       ],
     });
 
@@ -332,6 +358,16 @@ const getCurrentUser = async (req, res) => {
             ? {
                 institute_project_id: pr.instituteProject.institute_project_id,
                 institute_id: pr.instituteProject.institute_id,
+              }
+            : null,
+
+          // Internal node mapping for user
+          internal_node: user.internalNode
+            ? {
+                internal_node_id: user.internalNode.internal_node_id,
+                name: user.internalNode.name,
+                level: user.internalNode.level,
+                parent_id: user.internalNode.parent_id,
               }
             : null,
         })),

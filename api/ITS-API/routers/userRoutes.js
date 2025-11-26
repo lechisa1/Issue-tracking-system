@@ -21,6 +21,9 @@ const {
   getUsersAssignedToNode,
   getUsersAssignedToProject,
   getUsersNotAssignedToProject,
+  getInternalUsersNotAssignedToProject,
+  getInternalUsersAssignedToProject,
+  getProjectSubNodeUsers,
   validateResetToken,
   confirmPasswordReset,
 } = require("../controllers/userController");
@@ -301,6 +304,91 @@ router.get(
 
 /**
  * @swagger
+ * /api/users/project/{project_id}:
+ *   get:
+ *     summary: Get all users assigned to a project (any node)
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: project_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the project
+ *     responses:
+ *       200:
+ *         description: Users assigned to this project retrieved successfully
+ *       404:
+ *         description: Project not found
+ *       500:
+ *         description: Internal server error
+ */
+router.get(
+  "/project/:project_id",
+  authenticateToken,
+  getUsersAssignedToProject
+);
+
+router.get(
+  "/project/internal/:project_id",
+  authenticateToken,
+  getInternalUsersAssignedToProject
+);
+
+/**
+ * @swagger
+ * /api/users/not-assigned/{institute_id}/{project_id}:
+ *   get:
+ *     summary: Get all users from an institute who are NOT assigned to a specific project
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: institute_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the institute
+ *       - in: path
+ *         name: project_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the project
+ *     responses:
+ *       200:
+ *         description: Unassigned users retrieved successfully
+ *       400:
+ *         description: Missing required parameters
+ *       500:
+ *         description: Internal server error
+ */
+router.get(
+  "/not-assigned/:institute_id/:project_id",
+  authenticateToken,
+  getUsersNotAssignedToProject
+);
+
+router.get(
+  "/internal-not-assigned/:project_id",
+  authenticateToken,
+  getInternalUsersNotAssignedToProject
+);
+
+router.get(
+  "/project-subnode-users/:project_id/:Internal_node_id",
+  authenticateToken,
+  getProjectSubNodeUsers
+);
+
+/**
+ * @swagger
  * /api/users/{id}:
  *   get:
  *     summary: Retrieve user by ID
@@ -455,76 +543,6 @@ router.patch("/:id/toggle-status", authenticateToken, toggleUserActiveStatus);
  *       500:
  *         description: Server error
  */
-// Add these routes
-router.get("/find-by-email", findUserByEmail);
-router.post("/reset-password", resetUserPasswordByEmail);
-router.post("/reset-password/confirm", confirmPasswordReset); // Confirm with new password
-router.get("/reset-password/validate", validateResetToken);
-/**
- * @swagger
- * /api/users/project/{project_id}:
- *   get:
- *     summary: Get all users assigned to a project (any node)
- *     tags: [Users]
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: project_id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *         description: The ID of the project
- *     responses:
- *       200:
- *         description: Users assigned to this project retrieved successfully
- *       404:
- *         description: Project not found
- *       500:
- *         description: Internal server error
- */
-router.get(
-  "/project/:project_id",
-  authenticateToken,
-  getUsersAssignedToProject
-);
-
-/**
- * @swagger
- * /api/users/not-assigned/{institute_id}/{project_id}:
- *   get:
- *     summary: Get all users from an institute who are NOT assigned to a specific project
- *     tags: [Users]
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: institute_id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *         description: The ID of the institute
- *       - in: path
- *         name: project_id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *         description: The ID of the project
- *     responses:
- *       200:
- *         description: Unassigned users retrieved successfully
- *       400:
- *         description: Missing required parameters
- *       500:
- *         description: Internal server error
- */
-router.get(
-  "/not-assigned/:institute_id/:project_id",
-  authenticateToken,
-  getUsersNotAssignedToProject
-);
+router.post("/:id/reset-password", authenticateToken, resetUserPassword);
 
 module.exports = router;

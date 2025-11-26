@@ -21,6 +21,12 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "assigned_by",
         as: "assigner",
       });
+
+      // IssueAssignment ↔ AssignmentAttachments
+      IssueAssignment.hasMany(models.AssignmentAttachment, {
+        foreignKey: "assignment_id",
+        as: "attachments",
+      });
     }
   }
 

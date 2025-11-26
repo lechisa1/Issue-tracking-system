@@ -1,4 +1,9 @@
-const { InternalNode } = require("../models");
+const {
+  InternalNode,
+  InternalProjectUserRole,
+  Role,
+  User,
+} = require("../models");
 const { v4: uuidv4 } = require("uuid");
 
 // Create Internal Node
@@ -199,6 +204,114 @@ const getParentInternalNodes = async (req, res) => {
   }
 };
 
+//
+// Get internal nodes assigned to users for a specific project
+const getUserInternalNodesByProject = async (req, res) => {
+  try {
+    const { project_id } = req.params;
+    if (!project_id) {
+      return res.status(400).json({ message: "Project ID is required." });
+    }
+
+    // Get authenticated user ID from req.user (set by auth middleware)
+    const user_id = req.user.user_id;
+
+    console.log("Fetching assignments for project_id:", project_id);
+    console.log("Fetching assignments for user_id:", user_id);
+
+    // DEBUG: First check if there are any matching records
+    const count = await InternalProjectUserRole.count({
+      where: { project_id, user_id },
+    });
+    console.log("Direct count of matching records:", count);
+
+    // If no records found, return empty array immediately
+    if (count === 0) {
+      console.log("No assignments found for this user in this project");
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        assignments: [],
+      });
+    }
+
+    // Fetch assignments with includes
+    const assignments = await InternalProjectUserRole.findAll({
+      where: {
+        project_id: project_id,
+        user_id: user_id,
+      },
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["user_id", "full_name", "email"],
+        },
+        {
+          model: InternalNode,
+          as: "internalNode",
+          attributes: ["internal_node_id", "name", "level", "parent_id"],
+        },
+        {
+          model: Role,
+          as: "role",
+          attributes: ["role_id", "name"],
+        },
+      ],
+      // Remove paranoid: false unless you need soft-deleted records
+    });
+
+    console.log("Assignments fetched:", assignments.length);
+
+    // Map the results using the correct field names from your model
+    const result = assignments.map((assignment) => ({
+      assignment_id: assignment.internal_project_user_role_id, // This is the correct field name from your model
+      user: assignment.user
+        ? {
+            user_id: assignment.user.user_id,
+            full_name: assignment.user.full_name,
+            email: assignment.user.email,
+          }
+        : null,
+      role: assignment.role
+        ? {
+            role_id: assignment.role.role_id,
+            name: assignment.role.name,
+          }
+        : null,
+      internal_node: assignment.internalNode
+        ? {
+            internal_node_id: assignment.internalNode.internal_node_id,
+            name: assignment.internalNode.name,
+            level: assignment.internalNode.level,
+            parent_id: assignment.internalNode.parent_id,
+          }
+        : null,
+    }));
+
+    console.log("Mapped result count:", result.length);
+
+    if (result.length > 0) {
+      console.log(
+        "First assignment sample:",
+        JSON.stringify(result[0], null, 2)
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      count: result.length,
+      assignments: result,
+    });
+  } catch (error) {
+    console.error("Error fetching user internal nodes by project:", error);
+    return res.status(500).json({
+      message: error.message,
+      details: "Database query failed",
+    });
+  }
+};
+
 module.exports = {
   createInternalNode,
   getInternalNodes,
@@ -207,4 +320,5 @@ module.exports = {
   deleteInternalNode,
   getInternalTree,
   getParentInternalNodes,
+  getUserInternalNodesByProject,
 };
