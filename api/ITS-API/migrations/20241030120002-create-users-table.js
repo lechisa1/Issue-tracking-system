@@ -56,6 +56,16 @@ module.exports = {
         onUpdate: "CASCADE",
         onDelete: "SET NULL",
       },
+      internal_node_id: {
+        type: Sequelize.UUID,
+        allowNull: true,
+        references: {
+          model: "internal_nodes",
+          key: "internal_node_id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "SET NULL",
+      },
       position: {
         type: Sequelize.STRING(100),
         allowNull: true,

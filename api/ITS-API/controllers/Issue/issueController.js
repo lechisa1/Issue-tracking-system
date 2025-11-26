@@ -254,6 +254,7 @@ const getIssuesByUserId = async (req, res) => {
 const getIssueById = async (req, res) => {
   try {
     const { id } = req.params;
+    const userInstituteId = req.user?.institute_id || null;
     const issue = await Issue.findByPk(id, {
       include: [
         { model: Project, as: "project" },
@@ -317,7 +318,14 @@ const getIssueById = async (req, res) => {
           model: IssueHistory,
           as: "history",
           include: [
-            { model: User, as: "performed_by" },
+            {
+              model: User,
+              as: "performed_by", // If user has an institute → filter, otherwise show all
+              where: userInstituteId
+                ? { institute_id: userInstituteId }
+                : undefined,
+              required: userInstituteId ? true : false,
+            },
             {
               model: IssueEscalation,
               as: "escalation",

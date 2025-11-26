@@ -65,6 +65,23 @@ router.post(
 // Get all internal nodes
 router.get("/", authenticateToken, internalNodeController.getInternalNodes);
 
+// Get top-level (parent) internal nodes
+router.get(
+  "/parent-nodes",
+  authenticateToken,
+  internalNodeController.getParentInternalNodes
+);
+
+// Get internal nodes assigned to users for a specific project
+router.get(
+  "/project/:project_id/user-nodes",
+  authenticateToken,
+  internalNodeController.getUserInternalNodesByProject
+);
+
+// Get full internal tree
+router.get("/tree", authenticateToken, internalNodeController.getInternalTree);
+
 // Get internal node by ID
 router.get(
   "/:id",
@@ -89,15 +106,5 @@ router.delete(
   validateInternalNodeId,
   internalNodeController.deleteInternalNode
 );
-
-// Get top-level (parent) internal nodes
-router.get(
-  "/parent-nodes",
-  authenticateToken,
-  internalNodeController.getParentInternalNodes
-);
-
-// Get full internal tree
-router.get("/tree", authenticateToken, internalNodeController.getInternalTree);
 
 module.exports = router;

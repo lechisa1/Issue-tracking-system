@@ -70,6 +70,11 @@ const authenticateToken = async (req, res, next) => {
           ],
         },
         {
+          model: db.Institute,
+          as: "institute",
+        },
+
+        {
           model: db.UserType,
           as: "userType",
         },

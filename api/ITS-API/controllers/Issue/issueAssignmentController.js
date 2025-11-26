@@ -1,81 +1,130 @@
-const { IssueAssignment, Issue, User } = require("../../models");
+const {
+  IssueAssignment,
+  Issue,
+  User,
+  AssignmentAttachment,
+  IssueHistory,
+  Attachment,
+  IssueAction,
+  sequelize,
+} = require("../../models");
 const { v4: uuidv4 } = require("uuid");
 
-// Assign issue to developer
+// ------------------------------------------------------
+//  ASSIGN ISSUE
+// ------------------------------------------------------
 const assignIssue = async (req, res) => {
+  const t = await sequelize.transaction();
   try {
-    const { issue_id, assignee_id, assigned_by, remarks } = req.body;
+    const { issue_id, assignee_id, assigned_by, remarks, attachment_ids } =
+      req.body;
 
-    // Verify issue exists
-    const issue = await Issue.findByPk(issue_id);
-    if (!issue) {
-      return res.status(404).json({ message: "Issue not found." });
-    }
+    // 1. Validate Issue
+    const issue = await Issue.findByPk(issue_id, { transaction: t });
+    if (!issue) return res.status(404).json({ message: "Issue not found." });
 
-    // Verify assignee exists
-    const assignee = await User.findByPk(assignee_id);
-    if (!assignee) {
+    // 2. Validate assignee
+    const assignee = await User.findByPk(assignee_id, { transaction: t });
+    if (!assignee)
       return res.status(404).json({ message: "Assignee user not found." });
-    }
 
-    // Verify assigner exists
-    const assigner = await User.findByPk(assigned_by);
-    if (!assigner) {
+    // 3. Validate assigner
+    const assigner = await User.findByPk(assigned_by, { transaction: t });
+    if (!assigner)
       return res.status(404).json({ message: "Assigner user not found." });
-    }
 
     const assignment_id = uuidv4();
 
-    // Create assignment
-    const assignment = await IssueAssignment.create({
-      assignment_id,
-      issue_id,
-      assignee_id,
-      assigned_by,
-      assigned_at: new Date(),
-      status: "pending",
-      remarks: remarks || null,
-      created_at: new Date(),
-      updated_at: new Date(),
-    });
-
-    // Update issue's current assignee
-    await Issue.update(
-      { assigned_to: assignee_id, updated_at: new Date() },
-      { where: { issue_id } }
+    // 4. Create assignment
+    const assignment = await IssueAssignment.create(
+      {
+        assignment_id,
+        issue_id,
+        assignee_id,
+        assigned_by,
+        assigned_at: new Date(),
+        status: "pending",
+        remarks: remarks || null,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      { transaction: t }
     );
 
-    // Create action record
-    await IssueAction.create({
-      action_id: uuidv4(),
-      issue_id,
-      action_name: "Assigned to Developer",
-      action_description: `Issue assigned to ${assignee.full_name}`,
-      performed_by: assigned_by,
-      related_tier: "Developer",
-      created_at: new Date(),
-    });
+    // 5. Attach files if provided
+    if (attachment_ids?.length > 0) {
+      const attachments = attachment_ids.map((attachment_id) => ({
+        assignment_id,
+        attachment_id,
+        created_at: new Date(),
+      }));
 
-    // Return assignment with relations
+      await AssignmentAttachment.bulkCreate(attachments, { transaction: t });
+    }
+
+    // 7. Log action
+    await IssueAction.create(
+      {
+        action_id: uuidv4(),
+        issue_id,
+        action_name: "Assigned to Developer",
+        action_description: `Issue assigned to ${assignee.full_name}`,
+        performed_by: assigned_by,
+        related_tier: "Developer",
+        created_at: new Date(),
+      },
+      { transaction: t }
+    );
+
+    // ==================================
+    // 8. CREATE IssueHistory ENTRY (NEW)
+    // ==================================
+    await IssueHistory.create(
+      {
+        history_id: uuidv4(),
+        issue_id,
+        user_id: resolved_by,
+        action: "assigned",
+        status_at_time: "resolved",
+        escalation_id: null,
+        resolution_id,
+        notes: `Issue resolved. Reason: ${reason}`,
+        created_at: new Date(),
+      },
+      { transaction: t }
+    );
+
+    // COMMIT transaction
+    await t.commit();
+
+    // 8. Fetch full assignment with attachments
     const assignmentWithDetails = await IssueAssignment.findOne({
-      where: { assignment_id: assignment.assignment_id },
+      where: { assignment_id },
       include: [
         { model: Issue, as: "issue" },
         { model: User, as: "assignee" },
         { model: User, as: "assigner" },
+        {
+          model: AssignmentAttachment,
+          as: "attachments",
+          include: [{ model: Attachment, as: "attachment" }],
+        },
       ],
     });
 
-    res.status(201).json(assignmentWithDetails);
+    return res.status(201).json(assignmentWithDetails);
   } catch (error) {
-    console.error(error);
-    res
+    await t.rollback();
+    console.error("ASSIGNMENT ERROR:", error);
+    return res
       .status(500)
       .json({ message: "Internal server error", error: error.message });
   }
 };
 
-// Get assignments by issue ID
+// ------------------------------------------------------
+//  GET ASSIGNMENTS BY ISSUE ID
+// ------------------------------------------------------
 const getAssignmentsByIssueId = async (req, res) => {
   try {
     const { issue_id } = req.params;
@@ -85,20 +134,27 @@ const getAssignmentsByIssueId = async (req, res) => {
       include: [
         { model: User, as: "assignee" },
         { model: User, as: "assigner" },
+        {
+          model: AssignmentAttachment,
+          as: "attachments",
+          include: [{ model: Attachment, as: "attachment" }],
+        },
       ],
       order: [["assigned_at", "DESC"]],
     });
 
-    res.status(200).json(assignments);
+    return res.status(200).json(assignments);
   } catch (error) {
-    console.error(error);
-    res
+    console.error("FETCH ASSIGNMENTS ERROR:", error);
+    return res
       .status(500)
       .json({ message: "Internal server error", error: error.message });
   }
 };
 
-// Update assignment status
+// ------------------------------------------------------
+//  UPDATE ASSIGNMENT STATUS
+// ------------------------------------------------------
 const updateAssignmentStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -114,10 +170,24 @@ const updateAssignmentStatus = async (req, res) => {
 
     await assignment.save();
 
-    res.status(200).json(assignment);
+    // Return updated assignment with attachments
+    const updatedAssignment = await IssueAssignment.findOne({
+      where: { assignment_id: id },
+      include: [
+        { model: User, as: "assignee" },
+        { model: User, as: "assigner" },
+        {
+          model: AssignmentAttachment,
+          as: "attachments",
+          include: [{ model: Attachment, as: "attachment" }],
+        },
+      ],
+    });
+
+    return res.status(200).json(updatedAssignment);
   } catch (error) {
-    console.error(error);
-    res
+    console.error("UPDATE ASSIGNMENT ERROR:", error);
+    return res
       .status(500)
       .json({ message: "Internal server error", error: error.message });
   }

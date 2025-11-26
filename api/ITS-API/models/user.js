@@ -21,6 +21,11 @@ module.exports = (sequelize, DataTypes) => {
         as: "projectRoles",
       });
 
+      // Internal project roles association
+      User.hasMany(models.InternalProjectUserRole, {
+        foreignKey: "user_id",
+        as: "internalProjectUserRoles",
+      });
       // Issues reported by user
       User.hasMany(models.Issue, {
         foreignKey: "reported_by",
@@ -35,6 +40,10 @@ module.exports = (sequelize, DataTypes) => {
       User.belongsTo(models.HierarchyNode, {
         foreignKey: "hierarchy_node_id",
         as: "hierarchyNode",
+      });
+      User.belongsTo(models.InternalNode, {
+        foreignKey: "internal_node_id",
+        as: "internalNode",
       });
     }
   }
@@ -77,6 +86,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
       },
       hierarchy_node_id: { type: DataTypes.UUID, allowNull: true },
+      internal_node_id: { type: DataTypes.UUID, allowNull: true },
       profile_image: {
         type: DataTypes.STRING(255),
         allowNull: true,

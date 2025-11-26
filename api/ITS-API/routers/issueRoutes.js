@@ -119,7 +119,12 @@ router.get(
  *       404:
  *         description: Issue not found
  */
-router.get("/:id", validateIssueIdParam, issueController.getIssueById);
+router.get(
+  "/:id",
+  authenticateToken,
+  validateIssueIdParam,
+  issueController.getIssueById
+);
 
 /**
  * @swagger

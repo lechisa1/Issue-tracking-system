@@ -254,6 +254,56 @@ router.post(
   projectController.assignUserToProject
 );
 
+/**
+ * @swagger
+ * /api/projects/assign-internal-user:
+ *   post:
+ *     summary: Assign an internal user to a project with a role and optional internal node
+ *     tags: [Projects]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - project_id
+ *               - user_id
+ *               - role_id
+ *             properties:
+ *               project_id:
+ *                 type: string
+ *                 format: uuid
+ *                 description: The project ID
+ *               user_id:
+ *                 type: string
+ *                 format: uuid
+ *                 description: The user ID
+ *               role_id:
+ *                 type: string
+ *                 format: uuid
+ *                 description: The role ID
+ *               internal_node_id:
+ *                 type: string
+ *                 format: uuid
+ *                 nullable: true
+ *                 description: Optional internal node ID
+ *     responses:
+ *       201:
+ *         description: Internal user assigned successfully
+ *       400:
+ *         description: Validation or duplicate assignment error
+ *       404:
+ *         description: Project, user, or role not found
+ *       500:
+ *         description: Internal server error
+ */
+router.post(
+  "/assign-internal-user",
+  authenticateToken,
+  projectController.assignInternalUsersToProject
+);
+
 router.delete(
   "/:id",
   authenticateToken,
