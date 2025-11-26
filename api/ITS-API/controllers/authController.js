@@ -10,6 +10,8 @@ const {
   SubRole,
   RoleSubRole,
   RoleSubRolePermission,
+  InternalProjectUserRole,
+  InternalNode,
   Permission,
 } = require("../models");
 const bcrypt = require("bcrypt");
@@ -17,10 +19,48 @@ const jwt = require("jsonwebtoken");
 
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, phoneNumber, password } = req.body;
 
-    const user = await User.findOne({
-      where: { email },
+    console.log("Login attempt:", { email, phoneNumber }); // Debug log
+
+    // Validate that either email or phoneNumber is provided
+    if (!email && !phoneNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide either email or phone number",
+      });
+    }
+
+    if (email && phoneNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide either email or phone number, not both",
+      });
+    }
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: "Password is required",
+      });
+    }
+
+    let user;
+    let queryCondition = {};
+
+    // Find user by email or phone number
+    if (email) {
+      queryCondition = { email };
+    } else if (phoneNumber) {
+      // Clean phone number (remove non-digit characters)
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, "");
+      queryCondition = { phone_number: cleanPhoneNumber };
+    }
+
+    console.log("Query condition:", queryCondition); // Debug log
+
+    user = await User.findOne({
+      where: queryCondition,
       include: [
         {
           model: Institute,
@@ -35,21 +75,35 @@ const login = async (req, res) => {
       ],
     });
 
-    if (!user)
-      return res.status(401).json({ message: "Invalid email or password" });
-    if (!user.is_active)
-      return res.status(403).json({ message: "User is inactive" });
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
+
+    if (!user.is_active) {
+      return res.status(403).json({
+        success: false,
+        message: "User is inactive",
+      });
+    }
 
     // Compare password
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch)
-      return res.status(401).json({ message: "Invalid email or password" });
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
 
     // Generate JWT
     const token = jwt.sign(
       {
         user_id: user.user_id,
         email: user.email,
+        phone_number: user.phone_number,
         user_type: user.userType ? user.userType.name : null,
       },
       process.env.JWT_SECRET,
@@ -69,7 +123,7 @@ const login = async (req, res) => {
               model: RoleSubRole,
               as: "roleSubRoles",
               where: { is_active: true },
-              required: false, // allow roles without subroles
+              required: false,
               include: [
                 {
                   model: SubRole,
@@ -116,7 +170,11 @@ const login = async (req, res) => {
       subRole: pr.subRole,
     }));
 
+    // Update last login
+    await user.update({ last_login_at: new Date() });
+
     return res.status(200).json({
+      success: true,
       message: "Login successful",
       token,
       user: {
@@ -134,12 +192,19 @@ const login = async (req, res) => {
             }
           : null,
       },
+      roles,
     });
   } catch (error) {
-    console.error(error);
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: error.message });
+    console.error("Login error:", error);
+
+    // Make sure we haven't already sent a response
+    if (!res.headersSent) {
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
   }
 };
 
@@ -217,6 +282,30 @@ const getCurrentUser = async (req, res) => {
             },
           ],
         },
+        // Internal Project Roles
+        {
+          model: InternalProjectUserRole,
+          as: "internalProjectUserRoles",
+          include: [
+            {
+              model: Project,
+              as: "project",
+              attributes: ["project_id", "name", "description"],
+            },
+            {
+              model: Role,
+              as: "role",
+              attributes: ["role_id", "name"],
+              required: false,
+            },
+            {
+              model: InternalNode,
+              as: "internalNode",
+              attributes: ["internal_node_id", "name", "level", "parent_id"],
+              required: false,
+            },
+          ],
+        },
       ],
     });
 
@@ -269,6 +358,16 @@ const getCurrentUser = async (req, res) => {
             ? {
                 institute_project_id: pr.instituteProject.institute_project_id,
                 institute_id: pr.instituteProject.institute_id,
+              }
+            : null,
+
+          // Internal node mapping for user
+          internal_node: user.internalNode
+            ? {
+                internal_node_id: user.internalNode.internal_node_id,
+                name: user.internalNode.name,
+                level: user.internalNode.level,
+                parent_id: user.internalNode.parent_id,
               }
             : null,
         })),

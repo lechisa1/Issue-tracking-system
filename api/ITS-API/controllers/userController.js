@@ -7,7 +7,9 @@ const {
   SubRole,
   RoleSubRole,
   RoleSubRolePermission,
+  InternalProjectUserRole,
   Permission,
+  InternalNode,
   Project,
   UserRoles,
   HierarchyNode,
@@ -71,7 +73,19 @@ const createUser = async (req, res) => {
         .status(400)
         .json({ success: false, message: "User already exists." });
     }
+    // ====== Check existing phone number ======
+    const existingPhone = await User.findOne({
+      where: { phone_number },
+      transaction: t,
+    });
 
+    if (existingPhone) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Phone number already exists.",
+      });
+    }
     // ====== Validate user type ======
     const userType = await UserType.findByPk(user_type_id, { transaction: t });
     if (!userType) {
@@ -176,11 +190,12 @@ const createUser = async (req, res) => {
   }
 };
 
-// =============== Update user ===============
 const updateUser = async (req, res) => {
   const t = await sequelize.transaction();
+
   try {
     const { user_id } = req.params;
+
     const {
       full_name,
       email,
@@ -189,9 +204,10 @@ const updateUser = async (req, res) => {
       phone_number,
       hierarchy_node_id,
       is_active,
+      roles, // only for INTERNAL users
     } = req.body;
 
-    // ====== Find user ======
+    // ======================= FIND USER ==========================
     const user = await User.findByPk(user_id, { transaction: t });
     if (!user) {
       await t.rollback();
@@ -201,75 +217,148 @@ const updateUser = async (req, res) => {
       });
     }
 
-    // ====== Check for email duplication ======
+    // ======================= EMAIL UNIQUE =======================
     if (email && email !== user.email) {
-      const existingEmail = await User.findOne({
+      const exists = await User.findOne({
         where: { email },
         transaction: t,
       });
-      if (existingEmail) {
+      if (exists) {
         await t.rollback();
         return res.status(400).json({
           success: false,
-          message: "Email is already in use by another user.",
+          message: "Email already exists.",
         });
       }
     }
 
-    // ====== Validate user type ======
+    // ======================= PHONE UNIQUE =======================
+    if (phone_number && phone_number !== user.phone_number) {
+      const exists = await User.findOne({
+        where: { phone_number },
+        transaction: t,
+      });
+      if (exists) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Phone already exists.",
+        });
+      }
+    }
+
+    // ======================= USER TYPE LOGIC ====================
+    let finalUserType = user.user_type_id;
+    let finalUserTypeName = user.userType?.name;
+
     if (user_type_id) {
-      const userType = await UserType.findByPk(user_type_id, {
-        transaction: t,
-      });
-      if (!userType) {
+      const type = await UserType.findByPk(user_type_id, { transaction: t });
+      if (!type) {
         await t.rollback();
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid user type." });
+        return res.status(400).json({
+          success: false,
+          message: "Invalid user type.",
+        });
+      }
+
+      finalUserType = user_type_id;
+      finalUserTypeName = type.name;
+
+      // external_user MUST have institute
+      if (type.name === "external_user" && !institute_id) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Institute is required for external users.",
+        });
+      }
+
+      // internal_user MUST NOT have institute
+      if (type.name === "internal_user" && institute_id) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Internal users cannot have an institute.",
+        });
       }
     }
 
-    // ====== Optional institute validation ======
+    // ======================= VALIDATE INSTITUTE ==================
     if (institute_id) {
-      const institute = await Institute.findByPk(institute_id, {
-        transaction: t,
-      });
-      if (!institute) {
+      const inst = await Institute.findByPk(institute_id, { transaction: t });
+      if (!inst) {
         await t.rollback();
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid institute ID." });
+        return res.status(400).json({
+          success: false,
+          message: "Invalid institute ID.",
+        });
       }
     }
 
-    // ====== Optional hierarchy validation ======
+    // =================== VALIDATE HIERARCHY ======================
     if (hierarchy_node_id) {
       const node = await HierarchyNode.findByPk(hierarchy_node_id, {
         transaction: t,
       });
       if (!node) {
         await t.rollback();
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid hierarchy node ID." });
+        return res.status(400).json({
+          success: false,
+          message: "Invalid hierarchy node.",
+        });
       }
     }
 
-    // ====== Update user ======
+    // ======================= UPDATE USER =========================
     await user.update(
       {
         full_name: full_name ?? user.full_name,
         email: email ?? user.email,
         phone_number: phone_number ?? user.phone_number,
-        user_type_id: user_type_id ?? user.user_type_id,
-        institute_id: institute_id ?? null,
-        hierarchy_node_id: hierarchy_node_id ?? null,
+        user_type_id: finalUserType,
+        institute_id:
+          finalUserTypeName === "external_user" ? institute_id : null,
+        hierarchy_node_id: hierarchy_node_id ?? user.hierarchy_node_id,
         is_active: is_active ?? user.is_active,
         updated_at: new Date(),
       },
       { transaction: t }
     );
 
+    // =================== ROLE HANDLING ===========================
+
+    // =================== ROLE HANDLING ===========================
+
+    // INTERNAL USER — update roles only if roles array is provided
+    if (finalUserTypeName === "internal_user" && Array.isArray(roles)) {
+      // Remove old roles
+      await UserRoles.destroy({
+        where: { user_id },
+        transaction: t,
+      });
+
+      // Insert new roles
+      for (const roleId of roles) {
+        await UserRoles.create(
+          {
+            user_id,
+            role_id: roleId,
+            assigned_by: req.user?.user_id || null,
+          },
+          { transaction: t }
+        );
+      }
+    }
+
+    // EXTERNAL USER — must have NO roles
+    if (finalUserTypeName === "external_user") {
+      await UserRoles.destroy({
+        where: { user_id },
+        transaction: t,
+      });
+    }
+
+    // ======================= COMMIT ==============================
     await t.commit();
 
     return res.status(200).json({
@@ -280,7 +369,10 @@ const updateUser = async (req, res) => {
   } catch (error) {
     if (!t.finished) await t.rollback();
     console.error("Error updating user:", error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
@@ -562,17 +654,9 @@ const getUsersAssignedToProject = async (req, res) => {
   }
 };
 
-const getUsersNotAssignedToProject = async (req, res) => {
-  console.log("not assigned called");
+const getInternalUsersAssignedToProject = async (req, res) => {
   try {
-    const { institute_id, project_id } = req.params;
-
-    if (!institute_id) {
-      return res.status(400).json({
-        success: false,
-        message: "Institute ID is required",
-      });
-    }
+    const { project_id } = req.params;
 
     if (!project_id) {
       return res.status(400).json({
@@ -581,22 +665,87 @@ const getUsersNotAssignedToProject = async (req, res) => {
       });
     }
 
-    // 1. Get all assigned users for the project
+    const assignments = await InternalProjectUserRole.findAll({
+      where: { project_id },
+      include: [
+        {
+          model: User,
+          as: "user",
+          include: [
+            {
+              model: UserType,
+              as: "userType",
+              attributes: ["user_type_id", "name"],
+            },
+          ],
+        },
+        {
+          model: Role,
+          as: "role",
+          attributes: ["role_id", "name"],
+        },
+        {
+          model: InternalNode,
+          as: "internalNode",
+          attributes: ["internal_node_id", "name", "level", "parent_id"],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Users assigned to project fetched successfully.",
+      count: assignments.length,
+      data: assignments,
+    });
+  } catch (error) {
+    console.error("Error fetching assigned users:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch assigned users.",
+      error: error.message,
+    });
+  }
+};
+
+const getUsersNotAssignedToProject = async (req, res) => {
+  console.log("Fetching unassigned users...");
+  try {
+    const { institute_id, project_id } = req.params;
+
+    if (!institute_id || !project_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Institute ID and Project ID are required.",
+      });
+    }
+
+    // 1. Get all assigned users for this project
     const assignments = await ProjectUserRole.findAll({
       where: { project_id },
-      attributes: ["user_id"], // we only need user_id
+      attributes: ["user_id"],
     });
 
     const assignedUserIds = assignments.map((a) => a.user_id);
+    console.log("Assigned User IDs:", assignedUserIds);
 
-    // 2. Get all users from institute except assigned ones
+    // Build where clause
+    let whereClause = {
+      institute_id,
+    };
+
+    // If users have been assigned → exclude them
+    // If none assigned → do NOT add Op.notIn (it returns empty result)
+    if (assignedUserIds.length > 0) {
+      whereClause.user_id = {
+        [Op.notIn]: assignedUserIds,
+      };
+    }
+
+    // 2. Fetch users NOT assigned to the project
     const users = await User.findAll({
-      where: {
-        institute_id,
-        user_id: {
-          [Op.notIn]: assignedUserIds.length > 0 ? assignedUserIds : [null],
-        },
-      },
+      where: whereClause,
       include: [
         {
           model: Institute,
@@ -621,6 +770,131 @@ const getUsersNotAssignedToProject = async (req, res) => {
       success: true,
       message: "Unassigned users fetched successfully.",
       data: users,
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch users.",
+      error: error.message,
+    });
+  }
+};
+
+const getInternalUsersNotAssignedToProject = async (req, res) => {
+  console.log("not assigned called");
+  try {
+    const { project_id } = req.params;
+
+    if (!project_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Project ID is required.",
+      });
+    }
+
+    // 1. Find already assigned internal users for this project
+    const assignments = await InternalProjectUserRole.findAll({
+      where: { project_id },
+      attributes: ["user_id"],
+    });
+
+    const assignedUserIds = assignments.map((a) => a.user_id);
+
+    console.log("assignedUserIds: ", assignedUserIds);
+    // 2. Get users where:
+    //    institute_id IS NULL
+    //    AND user_id NOT IN assignedUserIds
+    const users = await User.findAll({
+      where: {
+        institute_id: { [Op.is]: null }, // users with NULL institute_id
+        user_id: {
+          [Op.notIn]: assignedUserIds.length > 0 ? assignedUserIds : [], // avoid SQL error
+        },
+      },
+      include: [
+        {
+          model: InternalNode,
+          as: "internalNode",
+          attributes: ["internal_node_id", "name"],
+        },
+        {
+          model: UserType,
+          as: "userType",
+          attributes: ["user_type_id", "name"],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    console.log("users: ", users);
+
+    return res.status(200).json({
+      success: true,
+      message: "Unassigned internal users fetched successfully.",
+      data: users,
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch users.",
+      error: error.message,
+    });
+  }
+};
+
+const getProjectSubNodeUsers = async (req, res) => {
+  try {
+    const { project_id, Internal_node_id } = req.params;
+
+    if (!project_id || !Internal_node_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Project ID and Internal Node ID are required.",
+      });
+    }
+
+    // 1️⃣ Get direct children of this node
+    const children = await InternalNode.findAll({
+      where: { parent_id: Internal_node_id },
+      attributes: ["internal_node_id"],
+    });
+
+    const childNodeIds = children.map((c) => c.internal_node_id);
+    // Include the parent node itself
+    // childNodeIds.push(Internal_node_id);
+
+    // 2️⃣ Fetch assignments for users under these nodes
+    const assignments = await InternalProjectUserRole.findAll({
+      where: {
+        project_id,
+        internal_node_id: { [Op.in]: childNodeIds },
+      },
+      include: [
+        {
+          model: User,
+          as: "user", // ✅ must match association alias
+          attributes: ["user_id", "full_name", "email"],
+        },
+        {
+          model: Role,
+          as: "role", // ✅ must match association alias
+          attributes: ["role_id", "name"],
+        },
+        {
+          model: InternalNode,
+          as: "internalNode", // ✅ must match association alias
+          attributes: ["internal_node_id", "name", "level", "parent_id"],
+        },
+      ],
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Users under child nodes fetched successfully.",
+      assignments,
+      count: assignments.length,
     });
   } catch (error) {
     console.error("Error fetching users:", error);
@@ -775,36 +1049,80 @@ const toggleUserActiveStatus = async (req, res) => {
   }
 };
 
-const resetUserPassword = async (req, res) => {
+// Add this route to find user by email first
+const findUserByEmail = async (req, res) => {
+  try {
+    const { email } = req.query;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const user = await User.findOne({
+      where: { email },
+      attributes: ["id"], // Only return the ID
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found with this email",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      user_id: user.id,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error finding user",
+      error: error.message,
+    });
+  }
+};
+
+const crypto = require("crypto");
+
+const resetUserPasswordByEmail = async (req, res) => {
   const t = await sequelize.transaction();
   try {
-    const { id } = req.params;
+    const { email } = req.body;
 
-    if (!isUuid(id)) {
+    if (!email) {
       await t.rollback();
       return res.status(400).json({
         success: false,
-        message: "Invalid user ID format.",
+        message: "Email is required",
       });
     }
 
-    const user = await User.findByPk(id, { transaction: t });
+    const user = await User.findOne({ where: { email }, transaction: t });
+
+    const successMessage =
+      "If your email exists in our system, you will receive password reset instructions shortly.";
+
     if (!user) {
       await t.rollback();
-      return res.status(404).json({
-        success: false,
-        message: "User not found.",
+      return res.status(200).json({
+        success: true,
+        message: successMessage,
       });
     }
 
-    // Generate and hash new password
-    const newPassword = generateRandomPassword();
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
+    // Save token to user using the new fields
     await user.update(
       {
-        password: hashedPassword,
-        is_first_logged_in: true,
+        reset_token: resetToken,
+        reset_token_expiry: resetTokenExpiry,
         updated_at: new Date(),
       },
       { transaction: t }
@@ -812,34 +1130,196 @@ const resetUserPassword = async (req, res) => {
 
     await t.commit();
 
-    // Send email notification
-    await sendEmail(
-      user.email,
-      `Password Reset - ${process.env.APP_NAME}`,
-      `
-      Dear ${user.full_name},
-      Your password has been reset successfully.
-      Email: ${user.email}
-      New Temporary Password: ${newPassword}
-      Please change your password after logging in.
-      `
-    );
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const resetLink = `${frontendUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(
+      user.email
+    )}`;
+
+    console.log("Reset link generated:", resetLink); // Debug log
+
+    // Send email with reset link
+    try {
+      await sendEmail(
+        user.email,
+        `Password Reset Request - ${process.env.APP_NAME}`,
+        `
+        Dear ${user.full_name},
+        
+        You requested to reset your password. Click the link below to create a new password:
+        
+        🔗 Reset Your Password: ${resetLink}
+        
+        This link will expire in 1 hour for security reasons.
+        
+        If you didn't request this reset, please ignore this email.
+        
+        Best regards,
+        ${process.env.APP_NAME} Team
+        `
+      );
+    } catch (emailErr) {
+      console.error("Error sending email:", emailErr.message);
+    }
 
     return res.status(200).json({
       success: true,
-      message:
-        "Password reset successfully. The new password has been sent via email.",
+      message: successMessage,
     });
   } catch (error) {
-    await t.rollback();
+    if (t.finished !== "commit") await t.rollback();
+    console.error("Reset password error:", error);
     return res.status(500).json({
       success: false,
-      message: "Error resetting user password",
+      message: "Error processing password reset request",
       error: error.message,
     });
   }
 };
 
+// Add this new function to handle the actual password reset
+const confirmPasswordReset = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { token, email, newPassword } = req.body;
+
+    if (!token || !email || !newPassword) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Token, email, and new password are required",
+      });
+    }
+
+    // Find user with valid token
+    const user = await User.findOne({
+      where: {
+        email: email,
+        reset_token: token,
+        reset_token_expiry: {
+          [Op.gt]: new Date(),
+        },
+      },
+      transaction: t,
+    });
+
+    if (!user) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired reset token",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update user with new password and clear reset token
+    await user.update(
+      {
+        password: hashedPassword,
+        reset_token: null,
+        reset_token_expiry: null,
+        is_first_logged_in: false,
+        updated_at: new Date(),
+      },
+      { transaction: t }
+    );
+
+    await t.commit();
+
+    // Send confirmation email
+    sendEmail(
+      user.email,
+      `Password Reset Successful - ${process.env.APP_NAME}`,
+      `
+      Dear ${user.full_name},
+      
+      Your password has been successfully reset.
+      
+      If you did not make this change, please contact support immediately.
+      
+      Best regards,
+      ${process.env.APP_NAME} Team
+      `
+    ).catch((err) => console.error("Confirmation email error:", err));
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successfully",
+    });
+  } catch (error) {
+    if (t.finished !== "commit") await t.rollback();
+    console.error("Confirm password reset error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error resetting password",
+      error: error.message,
+    });
+  }
+};
+const validateResetToken = async (req, res) => {
+  try {
+    const { token, email } = req.query;
+
+    console.log("🔍 Backend - Validating token:", {
+      token: token ? "present" : "missing",
+      email: email ? "present" : "missing",
+    });
+
+    if (!token || !email) {
+      console.log("❌ Missing token or email");
+      return res.status(400).json({
+        success: false,
+        valid: false,
+        message: "Token and email are required",
+      });
+    }
+
+    // Decode the email (it's URL encoded)
+    const decodedEmail = decodeURIComponent(email);
+    console.log("📧 Decoded email:", decodedEmail);
+
+    const user = await User.findOne({
+      where: {
+        email: decodedEmail,
+        reset_token: token,
+        reset_token_expiry: {
+          [Op.gt]: new Date(), // Check if token hasn't expired
+        },
+      },
+    });
+
+    console.log("👤 User found:", user ? "Yes" : "No");
+    if (user) {
+      console.log("⏰ Token expiry:", user.reset_token_expiry);
+      console.log("⏰ Current time:", new Date());
+      console.log(
+        "✅ Token is still valid:",
+        user.reset_token_expiry > new Date()
+      );
+    }
+
+    if (!user) {
+      return res.status(200).json({
+        success: false,
+        valid: false,
+        message: "Invalid or expired reset token",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      valid: true,
+      message: "Token is valid",
+    });
+  } catch (error) {
+    console.error("🚨 Token validation error:", error);
+    return res.status(500).json({
+      success: false,
+      valid: false,
+      message: "Error validating token",
+    });
+  }
+};
 const getProfile = async (req, res) => {
   try {
     const userId = req.user.user_id;
@@ -947,12 +1427,18 @@ module.exports = {
   getUsersByInstituteId,
   getUsersAssignedToNode,
   getUsersAssignedToProject,
+  getInternalUsersAssignedToProject,
   getUsersNotAssignedToProject,
+  getInternalUsersNotAssignedToProject,
+  getProjectSubNodeUsers,
   getUserById,
   updateUser,
   deleteUser,
   toggleUserActiveStatus,
-  resetUserPassword,
+  resetUserPasswordByEmail,
   getProfile,
   getUserTypes,
+  findUserByEmail,
+  confirmPasswordReset,
+  validateResetToken,
 };

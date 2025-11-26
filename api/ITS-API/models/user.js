@@ -21,6 +21,11 @@ module.exports = (sequelize, DataTypes) => {
         as: "projectRoles",
       });
 
+      // Internal project roles association
+      User.hasMany(models.InternalProjectUserRole, {
+        foreignKey: "user_id",
+        as: "internalProjectUserRoles",
+      });
       // Issues reported by user
       User.hasMany(models.Issue, {
         foreignKey: "reported_by",
@@ -35,6 +40,10 @@ module.exports = (sequelize, DataTypes) => {
       User.belongsTo(models.HierarchyNode, {
         foreignKey: "hierarchy_node_id",
         as: "hierarchyNode",
+      });
+      User.belongsTo(models.InternalNode, {
+        foreignKey: "internal_node_id",
+        as: "internalNode",
       });
     }
   }
@@ -72,11 +81,16 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.UUID,
         allowNull: true,
       },
+      isPhoneVerified: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
       position: {
         type: DataTypes.STRING(100),
         allowNull: true,
       },
       hierarchy_node_id: { type: DataTypes.UUID, allowNull: true },
+      internal_node_id: { type: DataTypes.UUID, allowNull: true },
       profile_image: {
         type: DataTypes.STRING(255),
         allowNull: true,
@@ -104,6 +118,30 @@ module.exports = (sequelize, DataTypes) => {
       updated_at: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
+      },
+      reset_token: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      reset_token_expiry: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      reset_otp: {
+        type: DataTypes.STRING(6),
+        allowNull: true,
+      },
+      reset_otp_expiry: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      otp_attempts: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+      },
+      last_otp_sent_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
       },
     },
     {

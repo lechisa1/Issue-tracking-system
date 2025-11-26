@@ -26,7 +26,11 @@ const {
 } = require("../../models");
 const { Op } = require("sequelize");
 const { v4: uuidv4 } = require("uuid");
-
+const {
+  createNotification,
+  sendEmailForNotification,
+  getUsersForHierarchyNode,
+} = require("../../services/notificationService");
 // ================================
 // CREATE ISSUE (with optional attachments)
 // ================================
@@ -117,9 +121,49 @@ const createIssue = async (req, res) => {
       }));
       await IssueAttachment.bulkCreate(links, { transaction: t });
     }
+    // Create notifications (DB) inside transaction
+    // -------------------------
+    // Recipients: assigned_to + users associated with hierarchy_node_id
+    const recipientsSet = new Set();
+    if (assigned_to) recipientsSet.add(assigned_to);
 
+    if (hierarchy_node_id) {
+      const nodeUsers = await getUsersForHierarchyNode(hierarchy_node_id);
+      nodeUsers.forEach((u) => recipientsSet.add(u.user_id));
+    }
+
+    // convert to array
+    const recipientIds = Array.from(recipientsSet).filter(Boolean);
+
+    // persist notifications in same transaction so they rollback on failure
+    for (const recipient_id of recipientIds) {
+      await createNotification({
+        recipient_id,
+        user_id: reported_by,
+        reference_type: "issue",
+        reference_id: issue.issue_id,
+        type: "issue_created",
+        title: `New issue: ${title}`,
+        body: `${req.user?.name || "A user"} created an issue: ${title}`,
+        payload: { issue_id: issue.issue_id, project_id },
+        transaction: t,
+      });
+    }
     await t.commit();
-
+    // send emails after commit (parallel, non-blocking for response)
+    (async () => {
+      try {
+        const notifications = await sequelize.models.Notification.findAll({
+          where: { reference_id: issue.issue_id, type: "issue_created" },
+        });
+        // send email notifications in parallel (but wait for them so we can log)
+        await Promise.allSettled(
+          notifications.map((n) => sendEmailForNotification(n))
+        );
+      } catch (err) {
+        console.error("Post-commit email send error (createIssue):", err);
+      }
+    })();
     // Return full issue details including attachments
     const issueWithDetails = await Issue.findOne({
       where: { issue_id: issue.issue_id },
@@ -254,6 +298,7 @@ const getIssuesByUserId = async (req, res) => {
 const getIssueById = async (req, res) => {
   try {
     const { id } = req.params;
+    const userInstituteId = req.user?.institute_id || null;
     const issue = await Issue.findByPk(id, {
       include: [
         { model: Project, as: "project" },
@@ -317,7 +362,14 @@ const getIssueById = async (req, res) => {
           model: IssueHistory,
           as: "history",
           include: [
-            { model: User, as: "performed_by" },
+            {
+              model: User,
+              as: "performed_by", // If user has an institute → filter, otherwise show all
+              where: userInstituteId
+                ? { institute_id: userInstituteId }
+                : undefined,
+              required: userInstituteId ? true : false,
+            },
             {
               model: IssueEscalation,
               as: "escalation",

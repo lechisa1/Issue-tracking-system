@@ -18,7 +18,7 @@ const createUserSchema = Joi.object({
     .messages({
       "string.empty": "Phone number is required.",
       "string.pattern.base":
-        "Phone number must be a valid Ethiopian format (e.g., +2519XXXXXXXX or 09XXXXXXXX).",
+        "Phone number must be a valid  format (e.g., +2519XXXXXXXX or 09XXXXXXXX).",
     }),
 
   user_type_id: Joi.string().guid({ version: "uuidv4" }).required().messages({
