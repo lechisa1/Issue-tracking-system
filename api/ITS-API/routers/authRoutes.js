@@ -4,7 +4,11 @@ const authController = require("../controllers/authController");
 const { validateLogin } = require("../validators/authValidator");
 const { authenticateToken } = require("../middlewares/authMiddleware");
 const passwordResetSMSController = require("../controllers/passwordResetSMS");
-
+const {
+  resetUserPasswordByEmail,
+  validateResetToken,
+  confirmPasswordReset,
+} = require("../controllers/userController");
 router.post(
   "/password-reset/sms/request",
   passwordResetSMSController.requestReset
@@ -14,6 +18,9 @@ router.post(
   "/password-reset/sms/reset",
   passwordResetSMSController.resetPassword
 );
+router.post("/password-reset/email/request", resetUserPasswordByEmail);
+router.post("/password-reset/email/reset", confirmPasswordReset);
+router.get("/password-reset/email/validate", validateResetToken);
 /**
  * @swagger
  * tags:

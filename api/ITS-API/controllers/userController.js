@@ -73,7 +73,19 @@ const createUser = async (req, res) => {
         .status(400)
         .json({ success: false, message: "User already exists." });
     }
+    // ====== Check existing phone number ======
+    const existingPhone = await User.findOne({
+      where: { phone_number },
+      transaction: t,
+    });
 
+    if (existingPhone) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Phone number already exists.",
+      });
+    }
     // ====== Validate user type ======
     const userType = await UserType.findByPk(user_type_id, { transaction: t });
     if (!userType) {
@@ -178,11 +190,12 @@ const createUser = async (req, res) => {
   }
 };
 
-// =============== Update user ===============
 const updateUser = async (req, res) => {
   const t = await sequelize.transaction();
+
   try {
     const { user_id } = req.params;
+
     const {
       full_name,
       email,
@@ -191,9 +204,10 @@ const updateUser = async (req, res) => {
       phone_number,
       hierarchy_node_id,
       is_active,
+      roles, // only for INTERNAL users
     } = req.body;
 
-    // ====== Find user ======
+    // ======================= FIND USER ==========================
     const user = await User.findByPk(user_id, { transaction: t });
     if (!user) {
       await t.rollback();
@@ -203,75 +217,148 @@ const updateUser = async (req, res) => {
       });
     }
 
-    // ====== Check for email duplication ======
+    // ======================= EMAIL UNIQUE =======================
     if (email && email !== user.email) {
-      const existingEmail = await User.findOne({
+      const exists = await User.findOne({
         where: { email },
         transaction: t,
       });
-      if (existingEmail) {
+      if (exists) {
         await t.rollback();
         return res.status(400).json({
           success: false,
-          message: "Email is already in use by another user.",
+          message: "Email already exists.",
         });
       }
     }
 
-    // ====== Validate user type ======
+    // ======================= PHONE UNIQUE =======================
+    if (phone_number && phone_number !== user.phone_number) {
+      const exists = await User.findOne({
+        where: { phone_number },
+        transaction: t,
+      });
+      if (exists) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Phone already exists.",
+        });
+      }
+    }
+
+    // ======================= USER TYPE LOGIC ====================
+    let finalUserType = user.user_type_id;
+    let finalUserTypeName = user.userType?.name;
+
     if (user_type_id) {
-      const userType = await UserType.findByPk(user_type_id, {
-        transaction: t,
-      });
-      if (!userType) {
+      const type = await UserType.findByPk(user_type_id, { transaction: t });
+      if (!type) {
         await t.rollback();
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid user type." });
+        return res.status(400).json({
+          success: false,
+          message: "Invalid user type.",
+        });
+      }
+
+      finalUserType = user_type_id;
+      finalUserTypeName = type.name;
+
+      // external_user MUST have institute
+      if (type.name === "external_user" && !institute_id) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Institute is required for external users.",
+        });
+      }
+
+      // internal_user MUST NOT have institute
+      if (type.name === "internal_user" && institute_id) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Internal users cannot have an institute.",
+        });
       }
     }
 
-    // ====== Optional institute validation ======
+    // ======================= VALIDATE INSTITUTE ==================
     if (institute_id) {
-      const institute = await Institute.findByPk(institute_id, {
-        transaction: t,
-      });
-      if (!institute) {
+      const inst = await Institute.findByPk(institute_id, { transaction: t });
+      if (!inst) {
         await t.rollback();
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid institute ID." });
+        return res.status(400).json({
+          success: false,
+          message: "Invalid institute ID.",
+        });
       }
     }
 
-    // ====== Optional hierarchy validation ======
+    // =================== VALIDATE HIERARCHY ======================
     if (hierarchy_node_id) {
       const node = await HierarchyNode.findByPk(hierarchy_node_id, {
         transaction: t,
       });
       if (!node) {
         await t.rollback();
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid hierarchy node ID." });
+        return res.status(400).json({
+          success: false,
+          message: "Invalid hierarchy node.",
+        });
       }
     }
 
-    // ====== Update user ======
+    // ======================= UPDATE USER =========================
     await user.update(
       {
         full_name: full_name ?? user.full_name,
         email: email ?? user.email,
         phone_number: phone_number ?? user.phone_number,
-        user_type_id: user_type_id ?? user.user_type_id,
-        institute_id: institute_id ?? null,
-        hierarchy_node_id: hierarchy_node_id ?? null,
+        user_type_id: finalUserType,
+        institute_id:
+          finalUserTypeName === "external_user" ? institute_id : null,
+        hierarchy_node_id: hierarchy_node_id ?? user.hierarchy_node_id,
         is_active: is_active ?? user.is_active,
         updated_at: new Date(),
       },
       { transaction: t }
     );
 
+    // =================== ROLE HANDLING ===========================
+
+    // =================== ROLE HANDLING ===========================
+
+    // INTERNAL USER — update roles only if roles array is provided
+    if (finalUserTypeName === "internal_user" && Array.isArray(roles)) {
+      // Remove old roles
+      await UserRoles.destroy({
+        where: { user_id },
+        transaction: t,
+      });
+
+      // Insert new roles
+      for (const roleId of roles) {
+        await UserRoles.create(
+          {
+            user_id,
+            role_id: roleId,
+            assigned_by: req.user?.user_id || null,
+          },
+          { transaction: t }
+        );
+      }
+    }
+
+    // EXTERNAL USER — must have NO roles
+    if (finalUserTypeName === "external_user") {
+      await UserRoles.destroy({
+        where: { user_id },
+        transaction: t,
+      });
+    }
+
+    // ======================= COMMIT ==============================
     await t.commit();
 
     return res.status(200).json({
@@ -282,7 +369,10 @@ const updateUser = async (req, res) => {
   } catch (error) {
     if (!t.finished) await t.rollback();
     console.error("Error updating user:", error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
@@ -620,40 +710,42 @@ const getInternalUsersAssignedToProject = async (req, res) => {
 };
 
 const getUsersNotAssignedToProject = async (req, res) => {
-  console.log("not assigned called");
+  console.log("Fetching unassigned users...");
   try {
     const { institute_id, project_id } = req.params;
 
-    if (!institute_id) {
+    if (!institute_id || !project_id) {
       return res.status(400).json({
         success: false,
-        message: "Institute ID is required",
+        message: "Institute ID and Project ID are required.",
       });
     }
 
-    if (!project_id) {
-      return res.status(400).json({
-        success: false,
-        message: "Project ID is required.",
-      });
-    }
-
-    // 1. Get all assigned users for the project
+    // 1. Get all assigned users for this project
     const assignments = await ProjectUserRole.findAll({
       where: { project_id },
-      attributes: ["user_id"], // we only need user_id
+      attributes: ["user_id"],
     });
 
     const assignedUserIds = assignments.map((a) => a.user_id);
+    console.log("Assigned User IDs:", assignedUserIds);
 
-    // 2. Get all users from institute except assigned ones
+    // Build where clause
+    let whereClause = {
+      institute_id,
+    };
+
+    // If users have been assigned → exclude them
+    // If none assigned → do NOT add Op.notIn (it returns empty result)
+    if (assignedUserIds.length > 0) {
+      whereClause.user_id = {
+        [Op.notIn]: assignedUserIds,
+      };
+    }
+
+    // 2. Fetch users NOT assigned to the project
     const users = await User.findAll({
-      where: {
-        institute_id,
-        user_id: {
-          [Op.notIn]: assignedUserIds.length > 0 ? assignedUserIds : [null],
-        },
-      },
+      where: whereClause,
       include: [
         {
           model: Institute,
@@ -1038,7 +1130,6 @@ const resetUserPasswordByEmail = async (req, res) => {
 
     await t.commit();
 
-    
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
     const resetLink = `${frontendUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(
       user.email
@@ -1105,7 +1196,7 @@ const confirmPasswordReset = async (req, res) => {
         email: email,
         reset_token: token,
         reset_token_expiry: {
-          [Op.gt]: new Date(), 
+          [Op.gt]: new Date(),
         },
       },
       transaction: t,
@@ -1119,7 +1210,6 @@ const confirmPasswordReset = async (req, res) => {
       });
     }
 
-  
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     // Update user with new password and clear reset token
@@ -1166,7 +1256,6 @@ const confirmPasswordReset = async (req, res) => {
     });
   }
 };
-
 const validateResetToken = async (req, res) => {
   try {
     const { token, email } = req.query;
@@ -1203,10 +1292,13 @@ const validateResetToken = async (req, res) => {
     if (user) {
       console.log("⏰ Token expiry:", user.reset_token_expiry);
       console.log("⏰ Current time:", new Date());
+      console.log(
+        "✅ Token is still valid:",
+        user.reset_token_expiry > new Date()
+      );
     }
 
     if (!user) {
-     
       return res.status(200).json({
         success: false,
         valid: false,
@@ -1214,14 +1306,13 @@ const validateResetToken = async (req, res) => {
       });
     }
 
-  
     return res.status(200).json({
       success: true,
       valid: true,
       message: "Token is valid",
     });
   } catch (error) {
-   
+    console.error("🚨 Token validation error:", error);
     return res.status(500).json({
       success: false,
       valid: false,

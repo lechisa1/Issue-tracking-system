@@ -15,7 +15,7 @@ const {
   getUserById,
   deleteUser,
   toggleUserActiveStatus,
-  resetUserPasswordByEmail,
+
   getUserTypes,
   getUsersByInstituteId,
   getUsersAssignedToNode,
@@ -24,8 +24,6 @@ const {
   getInternalUsersNotAssignedToProject,
   getInternalUsersAssignedToProject,
   getProjectSubNodeUsers,
-  validateResetToken,
-  confirmPasswordReset,
 } = require("../controllers/userController");
 
 /**
@@ -543,6 +541,6 @@ router.patch("/:id/toggle-status", authenticateToken, toggleUserActiveStatus);
  *       500:
  *         description: Server error
  */
-router.post("/:id/reset-password", authenticateToken, resetUserPassword);
+// router.post("/:id/reset-password", authenticateToken, resetUserPassword);
 
 module.exports = router;
