@@ -10,16 +10,19 @@ const { authenticateToken } = require("../middlewares/authMiddleware");
 const {
   createUser,
   updateUser,
+  findUserByEmail,
   getUsers,
   getUserById,
   deleteUser,
   toggleUserActiveStatus,
-  resetUserPassword,
+  resetUserPasswordByEmail,
   getUserTypes,
   getUsersByInstituteId,
   getUsersAssignedToNode,
   getUsersAssignedToProject,
   getUsersNotAssignedToProject,
+  validateResetToken,
+  confirmPasswordReset,
 } = require("../controllers/userController");
 
 /**
@@ -452,8 +455,11 @@ router.patch("/:id/toggle-status", authenticateToken, toggleUserActiveStatus);
  *       500:
  *         description: Server error
  */
-router.post("/:id/reset-password", authenticateToken, resetUserPassword);
-
+// Add these routes
+router.get("/find-by-email", findUserByEmail);
+router.post("/reset-password", resetUserPasswordByEmail);
+router.post("/reset-password/confirm", confirmPasswordReset); // Confirm with new password
+router.get("/reset-password/validate", validateResetToken);
 /**
  * @swagger
  * /api/users/project/{project_id}:

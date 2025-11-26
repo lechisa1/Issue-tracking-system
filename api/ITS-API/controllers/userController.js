@@ -775,36 +775,80 @@ const toggleUserActiveStatus = async (req, res) => {
   }
 };
 
-const resetUserPassword = async (req, res) => {
+// Add this route to find user by email first
+const findUserByEmail = async (req, res) => {
+  try {
+    const { email } = req.query;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const user = await User.findOne({
+      where: { email },
+      attributes: ["id"], // Only return the ID
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found with this email",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      user_id: user.id,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error finding user",
+      error: error.message,
+    });
+  }
+};
+
+const crypto = require("crypto");
+
+const resetUserPasswordByEmail = async (req, res) => {
   const t = await sequelize.transaction();
   try {
-    const { id } = req.params;
+    const { email } = req.body;
 
-    if (!isUuid(id)) {
+    if (!email) {
       await t.rollback();
       return res.status(400).json({
         success: false,
-        message: "Invalid user ID format.",
+        message: "Email is required",
       });
     }
 
-    const user = await User.findByPk(id, { transaction: t });
+    const user = await User.findOne({ where: { email }, transaction: t });
+
+    const successMessage =
+      "If your email exists in our system, you will receive password reset instructions shortly.";
+
     if (!user) {
       await t.rollback();
-      return res.status(404).json({
-        success: false,
-        message: "User not found.",
+      return res.status(200).json({
+        success: true,
+        message: successMessage,
       });
     }
 
-    // Generate and hash new password
-    const newPassword = generateRandomPassword();
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
+    // Save token to user using the new fields
     await user.update(
       {
-        password: hashedPassword,
-        is_first_logged_in: true,
+        reset_token: resetToken,
+        reset_token_expiry: resetTokenExpiry,
         updated_at: new Date(),
       },
       { transaction: t }
@@ -812,34 +856,197 @@ const resetUserPassword = async (req, res) => {
 
     await t.commit();
 
-    // Send email notification
-    await sendEmail(
-      user.email,
-      `Password Reset - ${process.env.APP_NAME}`,
-      `
-      Dear ${user.full_name},
-      Your password has been reset successfully.
-      Email: ${user.email}
-      New Temporary Password: ${newPassword}
-      Please change your password after logging in.
-      `
-    );
+    
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const resetLink = `${frontendUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(
+      user.email
+    )}`;
+
+    console.log("Reset link generated:", resetLink); // Debug log
+
+    // Send email with reset link
+    try {
+      await sendEmail(
+        user.email,
+        `Password Reset Request - ${process.env.APP_NAME}`,
+        `
+        Dear ${user.full_name},
+        
+        You requested to reset your password. Click the link below to create a new password:
+        
+        🔗 Reset Your Password: ${resetLink}
+        
+        This link will expire in 1 hour for security reasons.
+        
+        If you didn't request this reset, please ignore this email.
+        
+        Best regards,
+        ${process.env.APP_NAME} Team
+        `
+      );
+    } catch (emailErr) {
+      console.error("Error sending email:", emailErr.message);
+    }
 
     return res.status(200).json({
       success: true,
-      message:
-        "Password reset successfully. The new password has been sent via email.",
+      message: successMessage,
     });
   } catch (error) {
-    await t.rollback();
+    if (t.finished !== "commit") await t.rollback();
+    console.error("Reset password error:", error);
     return res.status(500).json({
       success: false,
-      message: "Error resetting user password",
+      message: "Error processing password reset request",
       error: error.message,
     });
   }
 };
 
+// Add this new function to handle the actual password reset
+const confirmPasswordReset = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { token, email, newPassword } = req.body;
+
+    if (!token || !email || !newPassword) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Token, email, and new password are required",
+      });
+    }
+
+    // Find user with valid token
+    const user = await User.findOne({
+      where: {
+        email: email,
+        reset_token: token,
+        reset_token_expiry: {
+          [Op.gt]: new Date(), 
+        },
+      },
+      transaction: t,
+    });
+
+    if (!user) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired reset token",
+      });
+    }
+
+  
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update user with new password and clear reset token
+    await user.update(
+      {
+        password: hashedPassword,
+        reset_token: null,
+        reset_token_expiry: null,
+        is_first_logged_in: false,
+        updated_at: new Date(),
+      },
+      { transaction: t }
+    );
+
+    await t.commit();
+
+    // Send confirmation email
+    sendEmail(
+      user.email,
+      `Password Reset Successful - ${process.env.APP_NAME}`,
+      `
+      Dear ${user.full_name},
+      
+      Your password has been successfully reset.
+      
+      If you did not make this change, please contact support immediately.
+      
+      Best regards,
+      ${process.env.APP_NAME} Team
+      `
+    ).catch((err) => console.error("Confirmation email error:", err));
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successfully",
+    });
+  } catch (error) {
+    if (t.finished !== "commit") await t.rollback();
+    console.error("Confirm password reset error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error resetting password",
+      error: error.message,
+    });
+  }
+};
+
+const validateResetToken = async (req, res) => {
+  try {
+    const { token, email } = req.query;
+
+    console.log("🔍 Backend - Validating token:", {
+      token: token ? "present" : "missing",
+      email: email ? "present" : "missing",
+    });
+
+    if (!token || !email) {
+      console.log("❌ Missing token or email");
+      return res.status(400).json({
+        success: false,
+        valid: false,
+        message: "Token and email are required",
+      });
+    }
+
+    // Decode the email (it's URL encoded)
+    const decodedEmail = decodeURIComponent(email);
+    console.log("📧 Decoded email:", decodedEmail);
+
+    const user = await User.findOne({
+      where: {
+        email: decodedEmail,
+        reset_token: token,
+        reset_token_expiry: {
+          [Op.gt]: new Date(), // Check if token hasn't expired
+        },
+      },
+    });
+
+    console.log("👤 User found:", user ? "Yes" : "No");
+    if (user) {
+      console.log("⏰ Token expiry:", user.reset_token_expiry);
+      console.log("⏰ Current time:", new Date());
+    }
+
+    if (!user) {
+     
+      return res.status(200).json({
+        success: false,
+        valid: false,
+        message: "Invalid or expired reset token",
+      });
+    }
+
+  
+    return res.status(200).json({
+      success: true,
+      valid: true,
+      message: "Token is valid",
+    });
+  } catch (error) {
+   
+    return res.status(500).json({
+      success: false,
+      valid: false,
+      message: "Error validating token",
+    });
+  }
+};
 const getProfile = async (req, res) => {
   try {
     const userId = req.user.user_id;
@@ -952,7 +1159,10 @@ module.exports = {
   updateUser,
   deleteUser,
   toggleUserActiveStatus,
-  resetUserPassword,
+  resetUserPasswordByEmail,
   getProfile,
   getUserTypes,
+  findUserByEmail,
+  confirmPasswordReset,
+  validateResetToken,
 };

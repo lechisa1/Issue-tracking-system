@@ -3,6 +3,17 @@ const router = express.Router();
 const authController = require("../controllers/authController");
 const { validateLogin } = require("../validators/authValidator");
 const { authenticateToken } = require("../middlewares/authMiddleware");
+const passwordResetSMSController = require("../controllers/passwordResetSMS");
+
+router.post(
+  "/password-reset/sms/request",
+  passwordResetSMSController.requestReset
+);
+router.post("/password-reset/sms/verify", passwordResetSMSController.verifyOTP);
+router.post(
+  "/password-reset/sms/reset",
+  passwordResetSMSController.resetPassword
+);
 /**
  * @swagger
  * tags:

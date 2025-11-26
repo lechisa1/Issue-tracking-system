@@ -10,7 +10,11 @@ const {
   IssueAction,
   sequelize,
 } = require("../../models");
-
+const {
+  createNotification,
+  sendEmailForNotification,
+  getUsersForHierarchyNode,
+} = require("../../services/notificationService");
 const { v4: uuidv4 } = require("uuid");
 
 // ------------------------------------------------------
@@ -117,10 +121,53 @@ const escalateIssue = async (req, res) => {
     const oldStatus = issue.status;
     issue.status = "pending"; // <--- status update
     await issue.save({ transaction: t });
+    // Create notifications inside transaction
+    // Recipients: users for the to_tier (treat to_tier as hierarchy_node_id)
+    // -------------------------
+    let recipientIds = [];
+    if (to_tier) {
+      const nodeUsers = await getUsersForHierarchyNode(to_tier);
+      recipientIds = nodeUsers.map((u) => u.user_id);
+    }
 
+    // also optionally notify the original assignee and the reporter (but excluded creator in other lists)
+    if (issue.assigned_to) recipientIds.push(issue.assigned_to);
+    if (issue.reported_by) recipientIds.push(issue.reported_by);
+
+    // dedupe
+    recipientIds = Array.from(new Set(recipientIds)).filter(Boolean);
+
+    for (const recipient_id of recipientIds) {
+      await createNotification({
+        recipient_id,
+        user_id: escalated_by,
+        reference_type: "escalation",
+        reference_id: escalation_id,
+        type: "issue_escalated",
+        title: `Issue escalated: ${issue.title || issue.issue_id}`,
+        body: `Issue escalated from tier ${from_tier} to ${to_tier}. Reason: ${reason}`,
+        payload: { issue_id, escalation_id, from_tier, to_tier },
+        transaction: t,
+      });
+    }
     // COMMIT ALL
     await t.commit();
-
+    // After commit, send emails for the notifications created
+    (async () => {
+      try {
+        const notifications = await sequelize.models.Notification.findAll({
+          where: {
+            reference_id: escalation_id,
+            type: "issue_escalated",
+          },
+        });
+        await Promise.allSettled(
+          notifications.map((n) => sendEmailForNotification(n))
+        );
+      } catch (err) {
+        console.error("Post-commit email send error (escalateIssue):", err);
+      }
+    })();
     // Return escalation with details
     const fullEscalation = await IssueEscalation.findOne({
       where: { escalation_id },
