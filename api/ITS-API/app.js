@@ -21,7 +21,6 @@ const authRoute = require("./routers/authRoutes");
 
 const issueCategories = require("./routers/issueCategoryRoutes");
 const issuePriorities = require("./routers/issuePriorityRoutes");
-const issueFlowRoute = require("./routers/issueFlowRoute");
 
 const issueRoutes = require("./routers/issueRoutes");
 const issueAssignmentRoutes = require("./routers/issueAssignmentRoutes");

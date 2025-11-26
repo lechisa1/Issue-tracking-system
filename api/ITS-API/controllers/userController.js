@@ -620,7 +620,7 @@ const getInternalUsersAssignedToProject = async (req, res) => {
 };
 
 const getUsersNotAssignedToProject = async (req, res) => {
-  console.log("not assigned called");
+  console.log("not external one assigned called");
   try {
     const { institute_id, project_id } = req.params;
 
@@ -645,15 +645,18 @@ const getUsersNotAssignedToProject = async (req, res) => {
     });
 
     const assignedUserIds = assignments.map((a) => a.user_id);
+    console.log("assignedUserIds: ", assignedUserIds);
 
+    const whereClause = {
+      institute_id,
+    };
+
+    if (assignedUserIds.length > 0) {
+      whereClause.user_id = { [Op.notIn]: assignedUserIds };
+    }
     // 2. Get all users from institute except assigned ones
     const users = await User.findAll({
-      where: {
-        institute_id,
-        user_id: {
-          [Op.notIn]: assignedUserIds.length > 0 ? assignedUserIds : [null],
-        },
-      },
+      where: whereClause,
       include: [
         {
           model: Institute,

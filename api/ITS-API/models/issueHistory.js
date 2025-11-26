@@ -26,10 +26,10 @@ module.exports = (sequelize, DataTypes) => {
         as: "resolution",
       });
       // Optional FK to IssueAssignment (nullable)
-      // IssueHistory.belongsTo(models.IssueAssignment, {
-      //   foreignKey: "assignment_id",
-      //   as: "assignment",
-      // });
+      IssueHistory.belongsTo(models.IssueAssignment, {
+        foreignKey: "assignment_id",
+        as: "assignment",
+      });
     }
   }
 
