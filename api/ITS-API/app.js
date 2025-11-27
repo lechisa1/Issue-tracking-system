@@ -101,10 +101,8 @@ app.use(
 
 // ================== CORS Configuration ==================
 const allowedOrigins = [
-  "http://localhost:5173", // <--- ADD THIS
-  "http://localhost:3000",
-  "http://localhost:3001",
-  "http://localhost:4000",
+  "http://196.188.240.103:4037",
+  "http://localhost:4037",
   process.env.FRONTEND_URL,
 ];
 
@@ -186,9 +184,10 @@ app.use((err, req, res, next) => {
 });
 
 // ================== Start App Server ==================
-const appPort = process.env.PORT || 4000;
-appServer.listen(appPort, () => {
-  console.log(` App server running at http://localhost:${appPort}`);
+const appPort = process.env.PORT || 4038;
+appServer.listen(appPort, "0.0.0.0", () => {
+  console.log(`App server running at http://0.0.0.0:${appPort}`);
+
 });
 
 // ================== Socket.IO Setup ==================
@@ -214,8 +213,8 @@ io.on("connection", (socket) => {
 });
 
 const socketPort = process.env.SOCKET_PORT || 5000;
-socketServer.listen(socketPort, () => {
-  console.log(`Socket.IO server running at http://localhost:${socketPort}`);
+socketServer.listen(socketPort, "0.0.0.0", () => {
+  console.log(`Socket.IO server running at http://0.0.0.0:${socketPort}`);
 });
 
 // Make Socket.IO accessible globally
