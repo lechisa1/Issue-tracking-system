@@ -2,16 +2,28 @@ const {
   IssueEscalation,
   Issue,
   User,
+  UserType,
   IssueTier,
   Attachment,
-  IssueHistory,
   EscalationAttachment,
   IssueEscalationHistory,
   IssueAction,
+  IssueStatusHistory,
+  ProjectUserRole,
+  Role,
+  HierarchyNode,
+  Permission,
+  RolePermission,
+  Project,
+  IssueCategory,
+  IssuePriority,
+  IssueComment,
+  IssueAttachment,
   sequelize,
 } = require("../../models");
 
 const { v4: uuidv4 } = require("uuid");
+const { Op } = require("sequelize");
 
 // ------------------------------------------------------
 //  ESCALATE ISSUE
@@ -40,6 +52,99 @@ const escalateIssue = async (req, res) => {
         .status(404)
         .json({ message: "User (escalated_by) not found." });
 
+    // 2.1 Check if escalator is at top level (parent_id is null)
+    const escalatorRoles = await ProjectUserRole.findAll({
+      where: { user_id: escalated_by, project_id: issue.project_id },
+      include: [
+        {
+          model: HierarchyNode,
+          as: "hierarchyNode"
+        }
+      ]
+    });
+
+    const isTopLevel = escalatorRoles.some(role => role.hierarchyNode?.parent_id === null);
+
+    if (isTopLevel) {
+      // Fetch all users assigned to the project, including their roles and permissions
+  
+      // Preferred: ask Sequelize to only return users that have a ProjectUserRole for this project
+      const projectUsers = await User.findAll({
+        where: { is_active: true },
+        include: [
+          {
+            model: UserType,
+            as: "userType",
+            where: { name: 'internal_user' }
+          },
+          {
+            model: ProjectUserRole,
+            as: "projectRoles",
+            where: { project_id: issue.project_id },
+            include: [
+              {
+                model: Role,
+                as: "role",
+                include: [
+                  {
+                    model: RolePermission,
+                    as: "rolePermissions",
+                    include: [{ model: Permission, as: "permission" }]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      });
+
+   
+
+      console.log("Filtered Project Users (same project):", projectUsers);
+    
+// console.log("Project Users with Roles and Permissions:", projectUsers);
+
+      // Find the user with can_escalate_to_qam permission
+      const qalUser = projectUsers.find(user =>
+        user.projectRoles.some(projectRole =>
+          projectRole.role?.rolePermissions?.some(rp =>
+            rp.permission?.action === "can_escalate_to_qam"
+          )
+        )
+      );
+console.log("Found QAL User:", qalUser);
+      
+
+      if (qalUser) {
+        // Assign issue to QAL instead of creating escalation
+        await issue.update({
+          assigned_to: qalUser.user_id,
+          status: "in_progress",
+          updated_at: new Date()
+        }, { transaction: t });
+
+        // Log Action
+        await IssueAction.create(
+          {
+            action_id: uuidv4(),
+            issue_id,
+            action_name: "Escalated to QAL",
+            action_description: `Escalated from ${from_tier} to Quality Assurance Leader`,
+            performed_by: escalated_by,
+            related_tier: "Quality Assurance Leader",
+          },
+          { transaction: t }
+        );
+
+        await t.commit();
+
+        return res.status(200).json({
+          message: "Issue escalated to Quality Assurance Leader",
+          assigned_to: qalUser.user_id
+        });
+      }
+    }
+
     const escalation_id = uuidv4();
 
     // 3. Create escalation
@@ -67,6 +172,18 @@ const escalateIssue = async (req, res) => {
       await EscalationAttachment.bulkCreate(links, { transaction: t });
     }
 
+    // 5. History
+    // await IssueEscalationHistory.create(
+    //   {
+    //     issue_escalation_history_id: uuidv4(),
+    //     issue_id,
+    //     from_tier,
+    //     to_tier,
+    //     escalated_by,
+    //   },
+    //   { transaction: t }
+    // );
+
     // 6. Create tier entry (for new tier assignment)
     await IssueTier.create(
       {
@@ -90,24 +207,6 @@ const escalateIssue = async (req, res) => {
         action_description: `Escalated from ${from_tier} to ${to_tier}`,
         performed_by: escalated_by,
         related_tier: from_tier,
-      },
-      { transaction: t }
-    );
-
-    // ==================================
-    // 8. CREATE IssueHistory ENTRY (NEW)
-    // ==================================
-    await IssueHistory.create(
-      {
-        history_id: uuidv4(),
-        issue_id: issue_id,
-        user_id: escalated_by,
-        action: "escalated",
-        status_at_time: issue.status, // Issue status doesn't change here
-        escalation_id: escalation_id,
-        resolution_id: null,
-        notes: `Escalated from tier ${from_tier} to tier ${to_tier}. Reason: ${reason}`,
-        created_at: new Date(),
       },
       { transaction: t }
     );
@@ -239,11 +338,158 @@ const deleteEscalation = async (req, res) => {
   }
 };
 
-// ------------------------------------------------------
+
+
+
+const getEscalatedIssuesWithNullTierFiltered = async (req, res) => {
+  try {
+    const { pairs, user_id } = req.params;
+
+    // Build where clause for IssueEscalation
+    const whereClause = {
+      to_tier: null,
+    };
+
+    // If pairs param provided, parse and filter (assuming pairs is comma separated string of tiers)
+    if (pairs) {
+      const pairsArray = pairs.split(',').map(pair => pair.trim());
+      // Here pairs filtering logic can be applied based on domain logic
+      // For now, as example, assuming pairsArray are from_tier values to filter
+      if (pairsArray.length > 0) {
+        whereClause.from_tier = {
+          [sequelize.Op.in]: pairsArray
+        };
+      }
+    }
+
+    // Query IssueEscalation with filters and includes
+    const escalatedNullTier = await IssueEscalation.findAll({
+      where: whereClause,
+      include: [
+        {
+          model: Issue,
+          as: "issue",
+          include: [
+            { model: Project, as: "project" },
+            { model: IssueCategory, as: "category" },
+            { model: IssuePriority, as: "priority" },
+            { model: HierarchyNode, as: "hierarchyNode" },
+            { model: User, as: "reporter" },
+            { model: User, as: "assignee" },
+            {
+              model: IssueComment,
+              as: "comments",
+              include: [{ model: User, as: "author" }],
+            },
+            {
+              model: IssueAttachment,
+              as: "attachments",
+              include: [{ model: Attachment, as: "attachment" }],
+            },
+          ],
+        },
+        {
+          model: User,
+          as: "escalator"
+        }
+      ],
+    });
+
+    // Filter by user_id if provided (checks if user is reporter, assignee, or escalator)
+    let filteredRecords = escalatedNullTier;
+    if (user_id) {
+      filteredRecords = escalatedNullTier.filter(record => {
+        const issue = record.issue;
+        return (
+          (issue.reporter && issue.reporter.user_id === user_id) ||
+          (issue.assignee && issue.assignee.user_id === user_id) ||
+          (record.escalator && record.escalator.user_id === user_id)
+        );
+      });
+    }
+
+    // Extract issues
+    const issues = filteredRecords.map(record => record.issue);
+
+    res.status(200).json({
+      success: true,
+      count: issues.length,
+      issues,
+    });
+  } catch (error) {
+    console.error("Error fetching escalated issues with null tier:", error);
+    res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+
+
+
+
+// Mark issue as in progress
+const markAsInProgress = async (req, res) => {
+  const t = await sequelize.transaction();
+
+  try {
+    const { issue_id } = req.body;
+    const user_id = req.user?.user_id;
+
+    console.log("user id" , user_id)
+
+    const issue = await Issue.findByPk(issue_id);
+    if (!issue) return res.status(404).json({ message: "Issue not found" });
+
+    const oldStatus = issue.status;
+
+    // Update issue status to in_progress
+    await issue.update({
+      status: "in_progress",
+      updated_at: new Date()
+    }, { transaction: t });
+
+    // Create status history record
+    const statusHistory = await IssueStatusHistory.create({
+      status_history_id: uuidv4(),
+      issue_id,
+      from_status: oldStatus,
+      to_status: "in_progress",
+      changed_by: user_id,
+      reason: "Marked as in progress",
+      created_at: new Date()
+    }, { transaction: t });
+
+    console.log(statusHistory , "statusHistory")
+
+    // Create action record
+    await IssueAction.create({
+      action_id: uuidv4(),
+      issue_id,
+      action_name: "marked_as_in_progress",
+      action_description: "Issue marked as in progress",
+      performed_by: user_id,
+      created_at: new Date()
+    }, { transaction: t });
+
+    await t.commit();
+    return res.json({ success: true, message: "Issue marked as in progress" });
+  } catch (error) {
+    await t.rollback();
+    console.error("MARK AS IN PROGRESS ERROR:", error);
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+// Update module exports
 module.exports = {
   escalateIssue,
+
+  markAsInProgress,
   getEscalationsByIssueId,
   getEscalationHistoryByIssueId,
   getEscalationById,
   deleteEscalation,
+  
 };

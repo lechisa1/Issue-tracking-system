@@ -118,6 +118,7 @@ const authenticateToken = async (req, res, next) => {
       full_name: user.full_name,
       institute_id: user.institute_id,
       user_type_id: user.user_type_id,
+      internal_hierarchy_id: user.internal_hierarchy_id,
       user_type: user.userType?.name,
       roles: Array.from(roles),
       permissions: Array.from(permissions),

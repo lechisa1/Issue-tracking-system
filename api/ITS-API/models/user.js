@@ -36,7 +36,10 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "hierarchy_node_id",
         as: "hierarchyNode",
       });
-    
+         User.belongsTo(models.InternalHierarchy, {
+        foreignKey: "internal_hierarchy_id",
+        as: "internalHierarchy",
+      });
     }
   }
 

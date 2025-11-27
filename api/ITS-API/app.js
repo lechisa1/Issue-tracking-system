@@ -53,6 +53,8 @@ const appServer = http.createServer(app);
 // app.use(devAuthBypass);
 // app.use(express.json());
 
+
+
 app.use(
   express.json({
     verify: (req, res, buf) => {
@@ -148,6 +150,8 @@ app.use("/api/issue-escalations", issueEscalationRoutes);
 
 app.use("/api/internal-user-escalations", internalUserEscalationRoutes);
 const internalHierarchyRoutes = require("./routers/internalHierarchy");
+
+
 app.use("/api/internal-hierarchy", internalHierarchyRoutes);
 
 app.use("/api/issue-resolutions", issueResolutionRoutes);

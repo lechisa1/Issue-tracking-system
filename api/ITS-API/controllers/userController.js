@@ -134,22 +134,19 @@ const createUser = async (req, res) => {
       }
     }
 
-    // ====== Optional hierarchy validation ======
-if (hierarchy_node_id) {
-  console.log("Validating hierarchy_node_id:", hierarchy_node_id);
-
-  const node = await InternalHierarchy.findByPk(hierarchy_node_id, { transaction: t });
-  if (!node) {
-    await t.rollback();
-    return res.status(400).json({ success: false, message: "Invalid hierarchy node ID." });
-  }
-}
-
-
+    // ====== Remove invalid hierarchy_node_id references ======
+    if (hierarchy_node_id) {
+      const node = await InternalHierarchy.findByPk(hierarchy_node_id, { transaction: t });
+      if (!node) {
+        console.warn(`Hierarchy node ID ${hierarchy_node_id} is invalid and will be set to null`);
+        req.body.hierarchy_node_id = null;
+      }
+    }
 
     // ====== Generate password ======
     const password = "Password123";
     const hashedPassword = await bcrypt.hash(password, 10);
+    console.log("Generated hierarchy_node_id:", hierarchy_node_id);
 
     // ====== Create User ======
     const newUser = await User.create(
@@ -161,7 +158,7 @@ if (hierarchy_node_id) {
         phone_number,
         user_type_id: finalUserTypeId,
         institute_id: userType.name === "external_user" ? institute_id : null,
-        hierarchy_id: hierarchy_node_id ?? null,
+        internal_hierarchy_id: hierarchy_node_id ?? null,
         is_first_logged_in: true,
         is_active: true,
         created_at: new Date(),
@@ -197,6 +194,7 @@ if (hierarchy_node_id) {
   }
 };
 
+
 module.exports = { createUser };
 
 
@@ -214,6 +212,16 @@ const updateUser = async (req, res) => {
       hierarchy_node_id,
       is_active,
     } = req.body;
+
+    // ====== Remove invalid hierarchy_node_id references ======
+    if (hierarchy_node_id) {
+      const node = await HierarchyNode.findByPk(hierarchy_node_id, { transaction: t });
+      if (!node) {
+        console.warn(`Hierarchy node ID ${hierarchy_node_id} is invalid and will be set to null`);
+        // set to null to remove invalid references
+        req.body.hierarchy_node_id = null;
+      }
+    }
 
     // ====== Find user ======
     const user = await User.findByPk(user_id, { transaction: t });
@@ -266,19 +274,6 @@ const updateUser = async (req, res) => {
       }
     }
 
-    // ====== Optional hierarchy validation ======
-    if (hierarchy_node_id) {
-      const node = await HierarchyNode.findByPk(hierarchy_node_id, {
-        transaction: t,
-      });
-      if (!node) {
-        await t.rollback();
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid hierarchy node ID." });
-      }
-    }
-
     // ====== Update user ======
     await user.update(
       {
@@ -287,7 +282,7 @@ const updateUser = async (req, res) => {
         phone_number: phone_number ?? user.phone_number,
         user_type_id: user_type_id ?? user.user_type_id,
         institute_id: institute_id ?? null,
-        hierarchy_node_id: hierarchy_node_id ?? null,
+        hierarchy_node_id: req.body.hierarchy_node_id ?? null,
         is_active: is_active ?? user.is_active,
         updated_at: new Date(),
       },

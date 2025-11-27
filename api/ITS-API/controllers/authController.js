@@ -12,6 +12,7 @@ const {
   RoleSubRole,
   RoleSubRolePermission,
   Permission,
+  InternalHierarchy,
 } = require("../models");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
@@ -33,12 +34,16 @@ const login = async (req, res) => {
           as: "userType",
           attributes: ["user_type_id", "name"],
         },
-
+        {
+          model: InternalHierarchy,
+          as: "internalHierarchy",
+          attributes: ["internal_hierarchy_id", "name", "code", "parent_id", "is_active"],
+        },
         // Include system roles (global roles)
         {
           model: Role,
           as: "roles",
-          through: { attributes: [] }, 
+          through: { attributes: [] },
           include: [
             {
               model: RolePermission,
@@ -165,6 +170,15 @@ const projectPermissions = projectRoles.flatMap((pr) =>
               name: user.institute.name,
             }
           : null,
+        internal_hierarchy: user.internalHierarchy
+          ? {
+              internal_hierarchy_id: user.internalHierarchy.internal_hierarchy_id,
+              name: user.internalHierarchy.name,
+              code: user.internalHierarchy.code,
+              parent_id: user.internalHierarchy.parent_id,
+              is_active: user.internalHierarchy.is_active,
+            }
+          : null,
           permissions: allPermissions,
           roles: user.roles?.map((r) => r.name) || [],
         phone_number: user.phone_number,
@@ -246,7 +260,11 @@ const getCurrentUser = async (req, res) => {
           as: "userType",
           attributes: ["user_type_id", "name"],
         },
-
+        {
+          model: InternalHierarchy,
+          as: "internalHierarchy",
+          attributes: ["internal_hierarchy_id", "name", "code", "parent_id", "is_active"],
+        },
         // Include system roles (global roles)
         {
           model: Role,
@@ -358,6 +376,16 @@ const getCurrentUser = async (req, res) => {
           ? {
               institute_id: user.institute.institute_id,
               name: user.institute.name,
+            }
+          : null,
+
+        internal_hierarchy: user.internalHierarchy
+          ? {
+              internal_hierarchy_id: user.internalHierarchy.internal_hierarchy_id,
+              name: user.internalHierarchy.name,
+              code: user.internalHierarchy.code,
+              parent_id: user.internalHierarchy.parent_id,
+              is_active: user.internalHierarchy.is_active,
             }
           : null,
 

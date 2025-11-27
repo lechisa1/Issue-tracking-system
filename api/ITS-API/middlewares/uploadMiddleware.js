@@ -1,48 +1,40 @@
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
-const allowedTypes = [
-  "audio/mpeg",
-  "audio/wav",
-  "audio/ogg",
-  "application/pdf",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "text/csv",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "image/jpeg",
-  "image/png",
-];
+// Create uploads directory if it doesn't exist
+const uploadDir = path.join(__dirname, '..', 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
-const tempUploadDir = path.join(__dirname, "../public/uploads/temp");
-if (!fs.existsSync(tempUploadDir))
-  fs.mkdirSync(tempUploadDir, { recursive: true });
-
+// Multer storage options
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, tempUploadDir),
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     const ext = path.extname(file.originalname);
-    const baseName = path
-      .basename(file.originalname, ext)
-      .replace(/\s+/g, "_")
-      .replace(/[^\w\-]/g, "");
-    cb(null, `${uniqueSuffix}_${baseName}${ext}`);
+    const basename = path.basename(file.originalname, ext);
+    cb(null, basename + '-' + Date.now() + ext);
   },
 });
 
+// File filter to accept certain file types e.g., images, pdf, docs
 const fileFilter = (req, file, cb) => {
-  if (allowedTypes.includes(file.mimetype)) cb(null, true);
-  else cb(new Error(`Unsupported file format: ${file.originalname}`), false);
+  const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|xls|xlsx|txt/;
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (allowedTypes.test(ext)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Unsupported file type'), false);
+  }
 };
 
 const upload = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: 100 * 1024 * 1024 },
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
 });
 
-// Export the upload object itself so we can use different methods
 module.exports = upload;

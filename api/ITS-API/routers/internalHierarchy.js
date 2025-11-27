@@ -7,6 +7,7 @@ const {
   createInternalHierarchy,
   updateInternalHierarchy,
   deleteInternalHierarchy,
+  getInternalHierarchiesWithUsers,
 } = require("../controllers/internalHierarchyController");
 
 const {
@@ -18,6 +19,7 @@ const { authenticateToken } = require("../middlewares/authMiddleware");
 
 
 router.get("/", authenticateToken, getInternalHierarchies);
+router.get("/with-users", authenticateToken, getInternalHierarchiesWithUsers);
 router.get("/:id", authenticateToken, getInternalHierarchyById);
 
 router.post(
@@ -26,6 +28,8 @@ router.post(
   validateCreateHierarchy,
   createInternalHierarchy
 );
+
+
 
 router.put(
   "//:id",

@@ -2,12 +2,12 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.addColumn('users', 'hierarchy_id', {
+    await queryInterface.addColumn('users', 'internal_hierarchy_id', {
       type: Sequelize.UUID,
-      allowNull: true, // only required for internal users
+      allowNull: true,
       references: {
-        model: 'internal_hierarchies', // table name
-        key: 'id',
+        model: 'internal_hierarchies',
+        key: 'internal_hierarchy_id',
       },
       onUpdate: 'CASCADE',
       onDelete: 'SET NULL',
@@ -15,6 +15,6 @@ module.exports = {
   },
 
   async down(queryInterface) {
-    await queryInterface.removeColumn('users', 'hierarchy_id');
+    await queryInterface.removeColumn('users', 'internal_hierarchy_id');
   }
 };

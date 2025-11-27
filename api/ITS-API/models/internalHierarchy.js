@@ -4,7 +4,7 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class InternalHierarchy extends Model {
     static associate(models) {
-      // Parent -> Child
+      // Parent-Child Hierarchy
       InternalHierarchy.belongsTo(models.InternalHierarchy, {
         foreignKey: "parent_id",
         as: "parent",
@@ -15,9 +15,9 @@ module.exports = (sequelize, DataTypes) => {
         as: "children",
       });
 
-      // Relation to Users
+      // One hierarchy node has many users
       InternalHierarchy.hasMany(models.User, {
-        foreignKey: "hierarchy_node_id", // match users table
+        foreignKey: "internal_hierarchy_id",
         as: "users",
       });
     }
@@ -25,7 +25,7 @@ module.exports = (sequelize, DataTypes) => {
 
   InternalHierarchy.init(
     {
-      id: {
+      internal_hierarchy_id: {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
@@ -36,7 +36,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       code: {
         type: DataTypes.STRING(20),
-        allowNull: true, // QAL, QAM, DEV, etc.
+        allowNull: true,
         unique: true,
       },
       parent_id: {
