@@ -51,17 +51,33 @@ const appServer = http.createServer(app);
 // app.use(devAuthBypass);
 // app.use(express.json());
 
+// app.use(
+//   express.json({
+//     verify: (req, res, buf) => {
+//       try {
+//         JSON.parse(buf);
+//       } catch (e) {
+//         res.status(400).json({
+//           message:
+//             "Invalid JSON format. Please ensure all property names are double-quoted and JSON is valid.",
+//         });
+//         throw e;
+//       }
+//     },
+//   })
+// );
+
 app.use(
   express.json({
     verify: (req, res, buf) => {
       try {
         JSON.parse(buf);
       } catch (e) {
-        res.status(400).json({
-          message:
-            "Invalid JSON format. Please ensure all property names are double-quoted and JSON is valid.",
-        });
-        throw e;
+        // Don't throw the error after sending response
+        const error = new Error("Invalid JSON payload");
+        error.status = 400;
+        error.expose = true;
+        throw error;
       }
     },
   })

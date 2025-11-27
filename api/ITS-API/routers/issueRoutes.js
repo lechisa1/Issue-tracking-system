@@ -93,6 +93,8 @@ router.post(
  *         description: List of issues
  */
 router.get("/", validateGetIssuesQuery, issueController.getIssues);
+router.get("/assigned/:user_id", issueController.getAssignedIssues);
+
 router.get(
   "/user/:id",
   validateIssueIdParam,

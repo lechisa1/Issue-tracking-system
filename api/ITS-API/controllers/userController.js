@@ -504,6 +504,90 @@ const getUsersAssignedToNode = async (req, res) => {
     });
   }
 };
+const getInternalUsersAssignedToNode = async (req, res) => {
+  try {
+    const { project_id, internal_node_id } = req.params;
+
+    // Validate project
+    const project = await Project.findByPk(project_id);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: `Project with id '${project_id}' not found.`,
+      });
+    }
+
+    // Validate hierarchy node
+    const internalNode = await InternalNode.findOne({
+      where: { internal_node_id },
+    });
+
+    if (!internalNode) {
+      return res.status(404).json({
+        success: false,
+        message: `Internal node '${internal_node_id}' not found in project '${project_id}'.`,
+      });
+    }
+
+    // Fetch assignments from junction table
+    const userAssignments = await InternalProjectUserRole.findAll({
+      where: {
+        project_id,
+        internal_node_id,
+      },
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["user_id", "full_name", "email"],
+        },
+        {
+          model: Role,
+          as: "role",
+          attributes: ["role_id", "name"],
+        },
+        {
+          model: InternalNode,
+          as: "internalNode",
+          attributes: ["internal_node_id", "name"],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    // Transform and return
+    const users = userAssignments.map((assignment) => ({
+      project_user_role_id: assignment.project_user_role_id,
+      project_id: assignment.project_id,
+      user_id: assignment.user_id,
+      role_id: assignment.role_id,
+      internal_node_id: assignment.internal_node_id,
+
+      user: assignment.user,
+      role: assignment.role,
+      internalNode: assignment.internalNode,
+
+      is_active: assignment.is_active,
+      assigned_at: assignment.created_at,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: "Users assigned to hierarchy node fetched successfully.",
+      project_id,
+      internal_node_id,
+      count: users.length,
+      data: users,
+    });
+  } catch (error) {
+    console.error("Error fetching users assigned to node:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
 const getUsersAssignedToProject = async (req, res) => {
   try {
     const { project_id } = req.params;
@@ -1131,6 +1215,7 @@ module.exports = {
   getUsers,
   getUsersByInstituteId,
   getUsersAssignedToNode,
+  getInternalUsersAssignedToNode,
   getUsersAssignedToProject,
   getInternalUsersAssignedToProject,
   getUsersNotAssignedToProject,

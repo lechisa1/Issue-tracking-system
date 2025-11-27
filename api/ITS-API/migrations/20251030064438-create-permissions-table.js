@@ -34,7 +34,7 @@ module.exports = {
       },
     });
 
-    // Add composite unique constraint
+    // Add unique constraint (resource + action)
     await queryInterface.addConstraint("permissions", {
       fields: ["resource", "action"],
       type: "unique",
@@ -43,9 +43,6 @@ module.exports = {
   },
 
   async down(queryInterface, Sequelize) {
-    // Use CASCADE to automatically drop dependent objects
-    await queryInterface.sequelize.query(`
-    DROP TABLE IF EXISTS permissions CASCADE;
-  `);
+    await queryInterface.dropTable("permissions");
   },
 };

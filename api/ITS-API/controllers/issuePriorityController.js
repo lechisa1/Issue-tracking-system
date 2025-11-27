@@ -1,13 +1,17 @@
 const { v4: uuidv4 } = require("uuid");
 const { IssuePriority } = require("../models");
-const { prioritySchema, idParamSchema } = require("../validators/issuePriorityValidator");
+const {
+  prioritySchema,
+  idParamSchema,
+} = require("../validators/issuePriorityValidator");
 const { Op } = require("sequelize");
 
 //======Create Priority==============
 exports.createPriority = async (req, res) => {
   try {
-   
-    const { error, value } = prioritySchema.validate(req.body, { abortEarly: false });
+    const { error, value } = prioritySchema.validate(req.body, {
+      abortEarly: false,
+    });
     if (error) {
       return res.status(400).json({
         message: "Validation failed",
@@ -21,7 +25,6 @@ exports.createPriority = async (req, res) => {
       return res.status(409).json({ message: "Priority name already exists" });
     }
 
-   
     const priority = await IssuePriority.create({
       priority_id: uuidv4(),
       ...value,
@@ -63,7 +66,6 @@ exports.getAllPriorities = async (req, res) => {
 // ========Get Priority by ID==============
 exports.getPriorityById = async (req, res) => {
   try {
-    
     const { error } = idParamSchema.validate(req.params);
     if (error) {
       return res.status(400).json({
@@ -73,7 +75,9 @@ exports.getPriorityById = async (req, res) => {
     }
 
     const { id } = req.params;
-    const priority = await IssuePriority.findOne({ where: { priority_id: id } });
+    const priority = await IssuePriority.findOne({
+      where: { priority_id: id },
+    });
     if (!priority) {
       return res.status(404).json({ message: "Priority not found" });
     }
@@ -93,7 +97,6 @@ exports.getPriorityById = async (req, res) => {
 // ===========Update Priority===============
 exports.updatePriority = async (req, res) => {
   try {
-    
     const { error: idError } = idParamSchema.validate(req.params);
     if (idError) {
       return res.status(400).json({
@@ -103,7 +106,9 @@ exports.updatePriority = async (req, res) => {
     }
 
     // Validate body
-    const { error: bodyError, value } = prioritySchema.validate(req.body, { abortEarly: false });
+    const { error: bodyError, value } = prioritySchema.validate(req.body, {
+      abortEarly: false,
+    });
     if (bodyError) {
       return res.status(400).json({
         message: "Validation failed",
@@ -113,12 +118,13 @@ exports.updatePriority = async (req, res) => {
 
     const { id } = req.params;
 
-    const priority = await IssuePriority.findOne({ where: { priority_id: id } });
+    const priority = await IssuePriority.findOne({
+      where: { priority_id: id },
+    });
     if (!priority) {
       return res.status(404).json({ message: "Priority not found" });
     }
 
-    
     const nameExists = await IssuePriority.findOne({
       where: {
         name: value.name,
@@ -127,12 +133,16 @@ exports.updatePriority = async (req, res) => {
     });
 
     if (nameExists) {
-      return res.status(409).json({ message: "Another priority with this name already exists" });
+      return res
+        .status(409)
+        .json({ message: "Another priority with this name already exists" });
     }
 
     await priority.update({
       name: value.name,
       description: value.description,
+      color_value: value.color_value,
+      response_time: value.response_time,
       updated_at: new Date(),
     });
 
@@ -161,7 +171,9 @@ exports.deletePriority = async (req, res) => {
     }
 
     const { id } = req.params;
-    const priority = await IssuePriority.findOne({ where: { priority_id: id } });
+    const priority = await IssuePriority.findOne({
+      where: { priority_id: id },
+    });
     if (!priority) {
       return res.status(404).json({ message: "Priority not found" });
     }

@@ -64,6 +64,17 @@ module.exports = {
         onDelete: "SET NULL",
       },
 
+      assignment_id: {
+        type: Sequelize.UUID,
+        allowNull: true,
+        references: {
+          model: "issue_assignments",
+          key: "assignment_id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "SET NULL",
+      },
+
       notes: {
         type: Sequelize.TEXT,
         allowNull: true,

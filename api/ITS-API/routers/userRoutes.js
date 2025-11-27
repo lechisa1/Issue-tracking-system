@@ -23,6 +23,7 @@ const {
   getInternalUsersNotAssignedToProject,
   getInternalUsersAssignedToProject,
   getProjectSubNodeUsers,
+  getInternalUsersAssignedToNode,
 } = require("../controllers/userController");
 
 /**
@@ -297,6 +298,12 @@ router.get(
   "/project/:project_id/node/:hierarchy_node_id",
   authenticateToken,
   getUsersAssignedToNode
+);
+
+router.get(
+  "/project/internal/:project_id/node/:internal_node_id",
+  authenticateToken,
+  getInternalUsersAssignedToNode
 );
 
 /**

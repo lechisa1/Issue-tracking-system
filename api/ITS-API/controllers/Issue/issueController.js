@@ -15,6 +15,7 @@ const {
   Project,
   EscalationAttachment,
   ResolutionAttachment,
+  AssignmentAttachment,
   IssueResolution,
   IssueSolution,
   IssueSolutionAttachment,
@@ -248,6 +249,57 @@ const getIssuesByUserId = async (req, res) => {
   }
 };
 
+// ============================================
+// GET ISSUES ASSIGNED TO A USER
+// ============================================
+const getAssignedIssues = async (req, res) => {
+  try {
+    const { user_id } = req.params;
+
+    if (!user_id) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    // Fetch assignments + related issues
+    const assignments = await IssueAssignment.findAll({
+      where: { assignee_id: user_id },
+      include: [
+        {
+          model: Issue,
+          as: "issue",
+          include: [
+            { model: Project, as: "project" },
+            { model: IssueCategory, as: "category" },
+            { model: IssuePriority, as: "priority" },
+            { model: HierarchyNode, as: "hierarchyNode" },
+            { model: User, as: "reporter" },
+            {
+              model: IssueAttachment,
+              as: "attachments",
+              include: [{ model: Attachment, as: "attachment" }],
+            },
+          ],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    // Extract ONLY the issues
+    const issues = assignments.map((a) => a.issue);
+    res.status(200).json({
+      success: true,
+      count: issues.length,
+      issues,
+    });
+  } catch (error) {
+    console.error("GET ASSIGNED ISSUES ERROR:", error);
+    return res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
 // ================================
 // GET ISSUE BY ID
 // ================================
@@ -308,6 +360,20 @@ const getIssueById = async (req, res) => {
             { model: User, as: "resolver" },
             {
               model: ResolutionAttachment,
+              as: "attachments",
+              include: [{ model: Attachment, as: "attachment" }],
+            },
+          ],
+        },
+        // Assignment & their attachments
+        {
+          model: IssueAssignment,
+          as: "assignments",
+          include: [
+            { model: User, as: "assigner" },
+            { model: User, as: "assignee" },
+            {
+              model: AssignmentAttachment,
               as: "attachments",
               include: [{ model: Attachment, as: "attachment" }],
             },
@@ -1106,6 +1172,7 @@ module.exports = {
   getIssues,
   getIssueById,
   getIssuesByUserId,
+  getAssignedIssues,
   getIssuesByHierarchyNodeId,
   getIssuesByMultipleHierarchyNodes,
   getEscalatedIssuesWithNullTier,

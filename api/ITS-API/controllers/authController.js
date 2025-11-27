@@ -248,6 +248,8 @@ const getCurrentUser = async (req, res) => {
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    console.log("user is me: ", user);
+
     return res.status(200).json({
       user: {
         user_id: user.user_id,
@@ -307,6 +309,30 @@ const getCurrentUser = async (req, res) => {
                 parent_id: user.internalNode.parent_id,
               }
             : null,
+        })),
+        // 🟢 ADD THIS: Return internal project roles
+        internal_project_roles: user.internalProjectUserRoles?.map((ipr) => ({
+          internal_project_user_role_id: ipr.internal_project_user_role_id,
+          project: ipr.project
+            ? {
+                project_id: ipr.project.project_id,
+                name: ipr.project.name,
+                description: ipr.project.description,
+              }
+            : null,
+          role: ipr.role ? ipr.role.name : null,
+          role_id: ipr.role ? ipr.role.role_id : null,
+          internal_node: ipr.internalNode
+            ? {
+                internal_node_id: ipr.internalNode.internal_node_id,
+                name: ipr.internalNode.name,
+                level: ipr.internalNode.level,
+                parent_id: ipr.internalNode.parent_id,
+              }
+            : null,
+          is_active: ipr.is_active,
+          created_at: ipr.created_at,
+          updated_at: ipr.updated_at,
         })),
       },
     });
