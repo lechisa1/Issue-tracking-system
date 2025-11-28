@@ -2,6 +2,7 @@ const {
   User,
   UserType,
   Institute,
+  UserPosition,
   ProjectUserRole,
   Role,
   SubRole,
@@ -51,6 +52,34 @@ const getUserTypes = async (req, res) => {
     });
   }
 };
+const getUserPositions = async (req, res) => {
+  try {
+    const userPositions = await UserPosition.findAll({
+      attributes: [
+        "user_position_id",
+        "name",
+        "description",
+        "created_at",
+        "updated_at",
+      ],
+      order: [["name", "ASC"]],
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "User positions fetched successfully",
+      data: userPositions,
+    });
+  } catch (error) {
+    console.error("Error fetching user positions:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch user positions",
+      error: error.message,
+    });
+  }
+};
+
 const createUser = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -58,6 +87,7 @@ const createUser = async (req, res) => {
       full_name,
       email,
       user_type_id,
+      user_position_id,
       institute_id,
       phone_number,
       hierarchy_node_id,
@@ -105,6 +135,13 @@ const createUser = async (req, res) => {
           message: "Institute ID is required for external users.",
         });
       }
+      if (!user_position_id) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Position is required for external users.",
+        });
+      }
 
       // Validate institute existence
       const institute = await Institute.findByPk(institute_id, {
@@ -115,6 +152,16 @@ const createUser = async (req, res) => {
         return res
           .status(400)
           .json({ success: false, message: "Invalid institute ID." });
+      }
+      // Validate institute existence
+      const position = await UserPosition.findByPk(user_position_id, {
+        transaction: t,
+      });
+      if (!position) {
+        await t.rollback();
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid Position ID." });
       }
     } else {
       // internal_user or others must not have institute_id
@@ -155,6 +202,8 @@ const createUser = async (req, res) => {
         phone_number,
         user_type_id,
         institute_id: userType.name === "external_user" ? institute_id : null,
+        user_position_id:
+          userType.name === "external_user" ? user_position_id : null,
         hierarchy_node_id: hierarchy_node_id ?? null,
         is_first_logged_in: true,
         is_active: true,
@@ -414,6 +463,7 @@ const getUsers = async (req, res) => {
     const {
       institute_id,
       user_type_id,
+      user_position_id,
       hierarchy_node_id,
       is_active,
       search, // optional: for name/email search
@@ -424,6 +474,7 @@ const getUsers = async (req, res) => {
 
     if (institute_id) whereClause.institute_id = institute_id;
     if (user_type_id) whereClause.user_type_id = user_type_id;
+    if (user_position_id) whereClause.user_position_id = user_position_id;
     if (hierarchy_node_id) whereClause.hierarchy_node_id = hierarchy_node_id;
     if (is_active !== undefined) whereClause.is_active = is_active === "true";
 
@@ -614,6 +665,90 @@ const getUsersAssignedToNode = async (req, res) => {
       message: "Users assigned to hierarchy node fetched successfully.",
       project_id,
       hierarchy_node_id,
+      count: users.length,
+      data: users,
+    });
+  } catch (error) {
+    console.error("Error fetching users assigned to node:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+const getInternalUsersAssignedToNode = async (req, res) => {
+  try {
+    const { project_id, internal_node_id } = req.params;
+
+    // Validate project
+    const project = await Project.findByPk(project_id);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: `Project with id '${project_id}' not found.`,
+      });
+    }
+
+    // Validate hierarchy node
+    const internalNode = await InternalNode.findOne({
+      where: { internal_node_id },
+    });
+
+    if (!internalNode) {
+      return res.status(404).json({
+        success: false,
+        message: `Internal node '${internal_node_id}' not found in project '${project_id}'.`,
+      });
+    }
+
+    // Fetch assignments from junction table
+    const userAssignments = await InternalProjectUserRole.findAll({
+      where: {
+        project_id,
+        internal_node_id,
+      },
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["user_id", "full_name", "email"],
+        },
+        {
+          model: Role,
+          as: "role",
+          attributes: ["role_id", "name"],
+        },
+        {
+          model: InternalNode,
+          as: "internalNode",
+          attributes: ["internal_node_id", "name"],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    // Transform and return
+    const users = userAssignments.map((assignment) => ({
+      project_user_role_id: assignment.project_user_role_id,
+      project_id: assignment.project_id,
+      user_id: assignment.user_id,
+      role_id: assignment.role_id,
+      internal_node_id: assignment.internal_node_id,
+
+      user: assignment.user,
+      role: assignment.role,
+      internalNode: assignment.internalNode,
+
+      is_active: assignment.is_active,
+      assigned_at: assignment.created_at,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: "Users assigned to hierarchy node fetched successfully.",
+      project_id,
+      internal_node_id,
       count: users.length,
       data: users,
     });
@@ -1557,6 +1692,7 @@ module.exports = {
   getUsers,
   getUsersByInstituteId,
   getUsersAssignedToNode,
+  getInternalUsersAssignedToNode,
   getUsersAssignedToProject,
   getInternalUsersAssignedToProject,
   getUsersNotAssignedToProject,

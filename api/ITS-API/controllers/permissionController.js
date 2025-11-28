@@ -1,10 +1,11 @@
 const { Permission } = require("../models");
 
 // ====== Get all permissions ======
-exports.getPermissions = async (req, res) => {
+const getPermissions = async (req, res) => {
   try {
     const permissions = await Permission.findAll({
       order: [["resource", "ASC"]],
+      // order: [["created_at", "DESC"]],
     });
 
     res.status(200).json({
@@ -19,7 +20,7 @@ exports.getPermissions = async (req, res) => {
 };
 
 // ====== Activate permission ======
-exports.activatePermission = async (req, res) => {
+const activatePermission = async (req, res) => {
   try {
     const { permission_id } = req.params;
 
@@ -45,7 +46,7 @@ exports.activatePermission = async (req, res) => {
 };
 
 // ====== Deactivate permission ======
-exports.deactivatePermission = async (req, res) => {
+const deactivatePermission = async (req, res) => {
   try {
     const { permission_id } = req.params;
 
@@ -71,7 +72,7 @@ exports.deactivatePermission = async (req, res) => {
 };
 
 // ====== Toggle permission ======
-exports.togglePermission = async (req, res) => {
+const togglePermission = async (req, res) => {
   try {
     const { permission_id } = req.params;
 
@@ -96,4 +97,11 @@ exports.togglePermission = async (req, res) => {
     console.error("Error toggling permission:", error);
     res.status(500).json({ success: false, message: error.message });
   }
+};
+
+module.exports = {
+  getPermissions,
+  activatePermission,
+  deactivatePermission,
+  togglePermission,
 };

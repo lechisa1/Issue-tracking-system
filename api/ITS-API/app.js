@@ -21,7 +21,6 @@ const authRoute = require("./routers/authRoutes");
 
 const issueCategories = require("./routers/issueCategoryRoutes");
 const issuePriorities = require("./routers/issuePriorityRoutes");
-const issueFlowRoute = require("./routers/issueFlowRoute");
 
 const issueRoutes = require("./routers/issueRoutes");
 const issueAssignmentRoutes = require("./routers/issueAssignmentRoutes");
@@ -55,17 +54,33 @@ const appServer = http.createServer(app);
 // app.use(devAuthBypass);
 // app.use(express.json());
 
+// app.use(
+//   express.json({
+//     verify: (req, res, buf) => {
+//       try {
+//         JSON.parse(buf);
+//       } catch (e) {
+//         res.status(400).json({
+//           message:
+//             "Invalid JSON format. Please ensure all property names are double-quoted and JSON is valid.",
+//         });
+//         throw e;
+//       }
+//     },
+//   })
+// );
+
 app.use(
   express.json({
     verify: (req, res, buf) => {
       try {
         JSON.parse(buf);
       } catch (e) {
-        res.status(400).json({
-          message:
-            "Invalid JSON format. Please ensure all property names are double-quoted and JSON is valid.",
-        });
-        throw e;
+        // Don't throw the error after sending response
+        const error = new Error("Invalid JSON payload");
+        error.status = 400;
+        error.expose = true;
+        throw error;
       }
     },
   })

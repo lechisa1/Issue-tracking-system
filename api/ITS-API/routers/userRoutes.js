@@ -24,6 +24,8 @@ const {
   getInternalUsersNotAssignedToProject,
   getInternalUsersAssignedToProject,
   getProjectSubNodeUsers,
+  getInternalUsersAssignedToNode,
+  getUserPositions,
 } = require("../controllers/userController");
 
 /**
@@ -235,6 +237,8 @@ router.get("/", getUsers);
 
 router.use("/user-types", getUserTypes);
 
+router.use("/user-positions", getUserPositions);
+
 /**
  * @swagger
  * /api/users/institute/{institute_id}:
@@ -298,6 +302,12 @@ router.get(
   "/project/:project_id/node/:hierarchy_node_id",
   authenticateToken,
   getUsersAssignedToNode
+);
+
+router.get(
+  "/project/internal/:project_id/node/:internal_node_id",
+  authenticateToken,
+  getInternalUsersAssignedToNode
 );
 
 /**

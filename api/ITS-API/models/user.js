@@ -9,6 +9,10 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "user_type_id",
         as: "userType",
       });
+      User.belongsTo(models.UserPosition, {
+        foreignKey: "user_position_id",
+        as: "userPosition",
+      });
 
       User.belongsTo(models.Institute, {
         foreignKey: "institute_id",
@@ -80,6 +84,10 @@ module.exports = (sequelize, DataTypes) => {
       user_type_id: {
         type: DataTypes.UUID,
         allowNull: false,
+      },
+      user_position_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
       },
       institute_id: {
         type: DataTypes.UUID,
