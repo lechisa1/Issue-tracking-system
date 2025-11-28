@@ -76,7 +76,7 @@ const createEscalation = async (req, res) => {
         internal_issue_escalation_id: escalation.escalation_id,
         uploaded_by: escalated_by,
         file_name: file.originalname,
-        file_path: "/" + file.path.split("uploads").pop().replace(/\\/g, "/"),
+        file_path: "/uploads" + file.path.split("uploads").pop().replace(/\\/g, "/"),
         mime_type: file.mimetype,
         file_size: file.size,
       }));
