@@ -43,6 +43,9 @@ const permissionRoute = require("./routers/permissionRoutes");
 const issueGuideLines = require("./routers/issueReportingGuidelineRoutes");
 const getAssignedProjectRoute = require("./routers/getAssignedProjectRoute");
 
+const notificationRoute = require("./routers/notificationsRoute");
+
+// const otpRoutes = require("./routers/otpRoutes");
 const app = express();
 const appServer = http.createServer(app);
 
@@ -113,17 +116,26 @@ app.use(
 
 // ================== CORS Configuration ==================
 const allowedOrigins = [
+  "http://localhost:5173", // <--- ADD THIS
   "http://localhost:3000",
   "http://localhost:3001",
   "http://localhost:4000",
   process.env.FRONTEND_URL,
 ];
+
 const corsOptions = {
-  origin: true, // Allow all origins for development
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log("❌ CORS BLOCKED:", origin);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true,
-  optionsSuccessStatus: 204,
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
 };
+
 app.use(cors(corsOptions));
 
 // ================== Database Connection ==================
@@ -172,6 +184,8 @@ app.use("/api/permissions", permissionRoute);
 app.use("/api/issue-guidelines", issueGuideLines);
 
 app.use("/api/flow", getAssignedProjectRoute);
+
+app.use("/api/notifications", notificationRoute);
 // ================== Root Endpoint ==================
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to Issue Tracking System API 🚀" });

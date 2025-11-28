@@ -49,6 +49,10 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "internal_node_id",
         as: "internalNode",
       });
+      User.hasMany(models.UserRoles, {
+        foreignKey: "user_id",
+        as: "userRoles",
+      });
     }
   }
 
@@ -89,6 +93,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.UUID,
         allowNull: true,
       },
+      isPhoneVerified: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
       position: {
         type: DataTypes.STRING(100),
         allowNull: true,
@@ -122,6 +130,30 @@ module.exports = (sequelize, DataTypes) => {
       updated_at: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
+      },
+      reset_token: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      reset_token_expiry: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      reset_otp: {
+        type: DataTypes.STRING(6),
+        allowNull: true,
+      },
+      reset_otp_expiry: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      otp_attempts: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+      },
+      last_otp_sent_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
       },
     },
     {
