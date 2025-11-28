@@ -10,6 +10,7 @@ const {
   InternalProjectUserRole,
   Permission,
   InternalNode,
+
   Project,
   UserRoles,
   HierarchyNode,
@@ -192,9 +193,9 @@ const createUser = async (req, res) => {
 
 const updateUser = async (req, res) => {
   const t = await sequelize.transaction();
-
+  console.log("ccccccccccccccccccccccccccccccccccccc");
   try {
-    const { user_id } = req.params;
+    const user_id = req.params.id;
 
     const {
       full_name,
@@ -204,11 +205,27 @@ const updateUser = async (req, res) => {
       phone_number,
       hierarchy_node_id,
       is_active,
-      roles, // only for INTERNAL users
+      roles, // roles for BOTH user types
     } = req.body;
 
-    // ======================= FIND USER ==========================
-    const user = await User.findByPk(user_id, { transaction: t });
+    // ======================= FIND USER WITH ASSOCIATIONS ==========================
+    const user = await User.findOne({
+      where: { user_id },
+      include: [
+        { model: UserType, as: "userType" },
+        { model: Institute, as: "institute" },
+        { model: Role, as: "roles", through: { attributes: [] } },
+        {
+          model: UserRoles,
+          as: "userRoles",
+          include: [{ model: Role, as: "role" }],
+        },
+        { model: HierarchyNode, as: "hierarchyNode" },
+      ],
+      transaction: t,
+    });
+
+    console.log("userrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr", user);
     if (!user) {
       await t.rollback();
       return res.status(404).json({
@@ -216,6 +233,13 @@ const updateUser = async (req, res) => {
         message: "User not found.",
       });
     }
+
+    console.log("Found user:", user.user_id, user.full_name);
+    console.log("User type:", user.userType?.name);
+    console.log(
+      "Current roles:",
+      user.user_roles?.map((ur) => ur.role_id)
+    );
 
     // ======================= EMAIL UNIQUE =======================
     if (email && email !== user.email) {
@@ -325,46 +349,54 @@ const updateUser = async (req, res) => {
       { transaction: t }
     );
 
-    // =================== ROLE HANDLING ===========================
+    // =================== ROLE HANDLING FOR BOTH USER TYPES ===========================
+    if (Array.isArray(roles)) {
+      console.log("Updating roles:", roles);
 
-    // =================== ROLE HANDLING ===========================
-
-    // INTERNAL USER — update roles only if roles array is provided
-    if (finalUserTypeName === "internal_user" && Array.isArray(roles)) {
       // Remove old roles
       await UserRoles.destroy({
         where: { user_id },
         transaction: t,
       });
 
-      // Insert new roles
-      for (const roleId of roles) {
-        await UserRoles.create(
-          {
-            user_id,
-            role_id: roleId,
-            assigned_by: req.user?.user_id || null,
-          },
-          { transaction: t }
-        );
-      }
-    }
+      // Insert new roles if any are provided
+      if (roles.length > 0) {
+        const roleAssignments = roles.map((roleId) => ({
+          user_id,
+          role_id: roleId,
+          assigned_by: req.user?.user_id || null,
+          assigned_at: new Date(),
+        }));
 
-    // EXTERNAL USER — must have NO roles
-    if (finalUserTypeName === "external_user") {
-      await UserRoles.destroy({
-        where: { user_id },
-        transaction: t,
-      });
+        await UserRoles.bulkCreate(roleAssignments, { transaction: t });
+      }
+
+      console.log(`Updated ${roles.length} roles for user ${user_id}`);
     }
 
     // ======================= COMMIT ==============================
     await t.commit();
 
+    // ======================= FETCH UPDATED USER WITH ASSOCIATIONS ====================
+    const updatedUser = await User.findOne({
+      where: { user_id },
+      include: [
+        { model: UserType, as: "userType" },
+        { model: Institute, as: "institute" },
+        { model: Role, as: "roles", through: { attributes: [] } },
+        {
+          model: UserRoles,
+          as: "userRoles",
+          include: [{ model: Role, as: "role" }],
+        },
+        { model: HierarchyNode, as: "hierarchyNode" },
+      ],
+    });
+
     return res.status(200).json({
       success: true,
       message: "User updated successfully.",
-      data: user,
+      data: updatedUser,
     });
   } catch (error) {
     if (!t.finished) await t.rollback();
@@ -709,6 +741,78 @@ const getInternalUsersAssignedToProject = async (req, res) => {
   }
 };
 
+// const getUsersNotAssignedToProject = async (req, res) => {
+//   console.log("Fetching unassigned users...");
+//   try {
+//     const { institute_id, project_id } = req.params;
+
+//     if (!institute_id || !project_id) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Institute ID and Project ID are required.",
+//       });
+//     }
+
+//     // 1. Get all assigned users for this project
+//     const assignments = await ProjectUserRole.findAll({
+//       where: { project_id },
+//       attributes: ["user_id"],
+//     });
+
+//     const assignedUserIds = assignments.map((a) => a.user_id);
+//     console.log("Assigned User IDs:", assignedUserIds);
+
+//     // Build where clause
+//     let whereClause = {
+//       institute_id,
+//     };
+
+//     // If users have been assigned → exclude them
+//     // If none assigned → do NOT add Op.notIn (it returns empty result)
+//     if (assignedUserIds.length > 0) {
+//       whereClause.user_id = {
+//         [Op.notIn]: assignedUserIds,
+//       };
+//     }
+
+//     // 2. Fetch users NOT assigned to the project
+//     const users = await User.findAll({
+//       where: whereClause,
+//       include: [
+//         {
+//           model: Institute,
+//           as: "institute",
+//           attributes: ["institute_id", "name"],
+//         },
+//         {
+//           model: UserType,
+//           as: "userType",
+//           attributes: ["user_type_id", "name"],
+//         },
+//         {
+//           model: HierarchyNode,
+//           as: "hierarchyNode",
+//           attributes: ["hierarchy_node_id", "name"],
+//         },
+//       ],
+//       order: [["created_at", "DESC"]],
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Unassigned users fetched successfully.",
+//       data: users,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching users:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch users.",
+//       error: error.message,
+//     });
+//   }
+// };
+
 const getUsersNotAssignedToProject = async (req, res) => {
   console.log("Fetching unassigned users...");
   try {
@@ -721,31 +825,22 @@ const getUsersNotAssignedToProject = async (req, res) => {
       });
     }
 
-    // 1. Get all assigned users for this project
+    // Get assigned user-role pairs for this project
     const assignments = await ProjectUserRole.findAll({
       where: { project_id },
-      attributes: ["user_id"],
+      attributes: ["user_id", "role_id"],
     });
 
-    const assignedUserIds = assignments.map((a) => a.user_id);
-    console.log("Assigned User IDs:", assignedUserIds);
+    // Create a map to quickly check assigned roles per user
+    const assignedRolesMap = {};
+    assignments.forEach((a) => {
+      if (!assignedRolesMap[a.user_id]) assignedRolesMap[a.user_id] = new Set();
+      assignedRolesMap[a.user_id].add(a.role_id);
+    });
 
-    // Build where clause
-    let whereClause = {
-      institute_id,
-    };
-
-    // If users have been assigned → exclude them
-    // If none assigned → do NOT add Op.notIn (it returns empty result)
-    if (assignedUserIds.length > 0) {
-      whereClause.user_id = {
-        [Op.notIn]: assignedUserIds,
-      };
-    }
-
-    // 2. Fetch users NOT assigned to the project
+    // Fetch all users of the institute with their roles
     const users = await User.findAll({
-      where: whereClause,
+      where: { institute_id },
       include: [
         {
           model: Institute,
@@ -762,14 +857,32 @@ const getUsersNotAssignedToProject = async (req, res) => {
           as: "hierarchyNode",
           attributes: ["hierarchy_node_id", "name"],
         },
+        {
+          model: UserRoles,
+          as: "userRoles",
+          include: [
+            {
+              model: Role,
+              as: "role",
+              attributes: ["role_id", "name"],
+            },
+          ],
+        },
       ],
       order: [["created_at", "DESC"]],
+    });
+
+    // Filter users: keep only users with at least one unassigned role
+    const unassignedUsers = users.filter((user) => {
+      const assignedRoles = assignedRolesMap[user.user_id] || new Set();
+      // Check if user has any role not assigned yet
+      return user.userRoles.some((ur) => !assignedRoles.has(ur.role_id));
     });
 
     return res.status(200).json({
       success: true,
       message: "Unassigned users fetched successfully.",
-      data: users,
+      data: unassignedUsers,
     });
   } catch (error) {
     console.error("Error fetching users:", error);
@@ -930,6 +1043,18 @@ const getUserById = async (req, res) => {
           as: "hierarchyNode",
           attributes: ["hierarchy_node_id", "name"],
         },
+        {
+          model: UserRoles,
+          as: "userRoles", // <-- corrected here
+          attributes: ["user_role_id", "role_id", "assigned_by", "assigned_at"],
+          include: [
+            {
+              model: Role,
+              as: "role",
+              attributes: ["role_id", "name", "description"],
+            },
+          ],
+        },
       ],
     });
 
@@ -940,10 +1065,16 @@ const getUserById = async (req, res) => {
       });
     }
 
+    // Transform the data to include roles in a more accessible format
+    const userData = user.toJSON();
+
+    // Extract roles from userRoles association
+    userData.roles = userData.userRoles?.map((userRole) => userRole.role) || [];
+
     return res.status(200).json({
       success: true,
       message: "User fetched successfully.",
-      data: user,
+      data: userData,
     });
   } catch (error) {
     console.error("Error fetching user:", error);

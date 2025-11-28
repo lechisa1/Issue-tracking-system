@@ -30,8 +30,9 @@ const {
   createNotification,
   sendEmailForNotification,
   getUsersForHierarchyNode,
+  getUsersWithSameParentHierarchy,
 } = require("../../services/notificationService");
-// ================================
+
 // CREATE ISSUE (with optional attachments)
 // ================================
 const createIssue = async (req, res) => {
@@ -50,7 +51,7 @@ const createIssue = async (req, res) => {
       url_path,
       issue_description,
       issue_occured_time,
-      attachment_ids, // optional array of attachment IDs
+      attachment_ids,
     } = req.body;
 
     const issue_id = uuidv4();
@@ -77,9 +78,7 @@ const createIssue = async (req, res) => {
       { transaction: t }
     );
 
-    // ================================
-    // CREATE ISSUE HISTORY (NEW)
-    // ================================
+    // Create issue history
     await IssueHistory.create(
       {
         history_id: uuidv4(),
@@ -121,22 +120,65 @@ const createIssue = async (req, res) => {
       }));
       await IssueAttachment.bulkCreate(links, { transaction: t });
     }
-    // Create notifications (DB) inside transaction
-    // -------------------------
-    // Recipients: assigned_to + users associated with hierarchy_node_id
-    const recipientsSet = new Set();
-    if (assigned_to) recipientsSet.add(assigned_to);
 
-    if (hierarchy_node_id) {
-      const nodeUsers = await getUsersForHierarchyNode(hierarchy_node_id);
-      nodeUsers.forEach((u) => recipientsSet.add(u.user_id));
+    // ================================
+    // NOTIFICATION LOGIC - UPDATED
+    // ================================
+    const recipientsSet = new Set();
+
+    // 1. Add assigned user if exists
+    if (assigned_to) {
+      recipientsSet.add(assigned_to);
+      console.log(`👤 Added assigned user: ${assigned_to}`);
     }
 
-    // convert to array
-    const recipientIds = Array.from(recipientsSet).filter(Boolean);
+    // 2. Add users who share the same parent hierarchy as reporter
+    if (hierarchy_node_id) {
+      console.log(
+        `🔍 Finding users with same parent hierarchy for node: ${hierarchy_node_id}`
+      );
 
-    // persist notifications in same transaction so they rollback on failure
+      const siblingUsers = await getUsersWithSameParentHierarchy(
+        reported_by,
+        hierarchy_node_id
+      );
+      console.log(
+        "👥 Users found with same parent hierarchy:",
+        siblingUsers.map((u) => ({ user_id: u.user_id, name: u.name }))
+      );
+
+      siblingUsers.forEach((u) => {
+        // Exclude the reporter from receiving their own notification
+        if (u.user_id !== reported_by) {
+          recipientsSet.add(u.user_id);
+          console.log(`👥 Added sibling user: ${u.user_id} (${u.name})`);
+        }
+      });
+
+      // Fallback: If no sibling users found, notify users in the same hierarchy node
+      if (siblingUsers.length === 0) {
+        console.log(
+          "⚠️ No sibling users found, notifying same hierarchy node users"
+        );
+        const sameNodeUsers = await getUsersForHierarchyNode(hierarchy_node_id);
+        sameNodeUsers.forEach((u) => {
+          if (u.user_id !== reported_by) {
+            recipientsSet.add(u.user_id);
+            console.log(`🔄 Added same node user: ${u.user_id} (${u.name})`);
+          }
+        });
+      }
+    }
+
+    // Convert to array and filter out reporter
+    const recipientIds = Array.from(recipientsSet).filter(
+      (id) => id !== reported_by && id
+    );
+    console.log("🔔 Final notification recipients:", recipientIds);
+
+    // Create notifications for all recipients
     for (const recipient_id of recipientIds) {
+      console.log(`📩 Creating notification for recipient_id=${recipient_id}`);
       await createNotification({
         recipient_id,
         user_id: reported_by,
@@ -149,14 +191,31 @@ const createIssue = async (req, res) => {
         transaction: t,
       });
     }
+
     await t.commit();
-    // send emails after commit (parallel, non-blocking for response)
+    console.log("🟢 Transaction committed successfully.");
+
+    // Log saved notifications
+    const notifications = await sequelize.models.Notification.findAll({
+      where: { reference_id: issue.issue_id, type: "issue_created" },
+    });
+
+    console.log(
+      "📬 Saved notifications:",
+      notifications.map((n) => ({
+        id: n.notification_id,
+        recipient: n.recipient_id,
+        reference: n.reference_id,
+        type: n.type,
+      }))
+    );
+
+    // Send email notifications (non-blocking)
     (async () => {
       try {
         const notifications = await sequelize.models.Notification.findAll({
           where: { reference_id: issue.issue_id, type: "issue_created" },
         });
-        // send email notifications in parallel (but wait for them so we can log)
         await Promise.allSettled(
           notifications.map((n) => sendEmailForNotification(n))
         );
@@ -164,7 +223,8 @@ const createIssue = async (req, res) => {
         console.error("Post-commit email send error (createIssue):", err);
       }
     })();
-    // Return full issue details including attachments
+
+    // Return full issue details
     const issueWithDetails = await Issue.findOne({
       where: { issue_id: issue.issue_id },
       include: [
@@ -177,12 +237,7 @@ const createIssue = async (req, res) => {
         {
           model: IssueAttachment,
           as: "attachments",
-          include: [
-            {
-              model: Attachment,
-              as: "attachment",
-            },
-          ],
+          include: [{ model: Attachment, as: "attachment" }],
         },
       ],
     });
@@ -190,7 +245,7 @@ const createIssue = async (req, res) => {
     res.status(201).json(issueWithDetails);
   } catch (error) {
     await t.rollback();
-    console.error(error);
+    console.error("Error creating issue:", error);
     res.status(500).json({
       message: "Internal server error",
       error: error.message,
@@ -550,10 +605,11 @@ const getIssuesByMultipleHierarchyNodes = async (req, res) => {
   try {
     const { pairs, user_id } = req.params;
 
-    if (!pairs || !user_id)
+    if (!pairs || !user_id) {
       return res
         .status(400)
         .json({ message: "Pairs and user_id are required" });
+    }
 
     let pairsArray;
     try {
@@ -567,37 +623,45 @@ const getIssuesByMultipleHierarchyNodes = async (req, res) => {
     const validPairs = pairsArray.filter(
       (p) => p.project_id && p.hierarchy_node_id
     );
-    if (validPairs.length === 0)
+    if (validPairs.length === 0) {
       return res.status(400).json({
         message:
           "No valid pairs provided. Each pair must have project_id and hierarchy_node_id",
       });
+    }
 
-    // ------------------------------------------------------------
-    // 1️⃣ Get levels of all requested hierarchy nodes
-    // ------------------------------------------------------------
+    // 1️⃣ Fetch hierarchy nodes for given pairs
     const hierarchyNodes = await HierarchyNode.findAll({
       where: { hierarchy_node_id: validPairs.map((p) => p.hierarchy_node_id) },
     });
 
     const hierarchyLevels = hierarchyNodes.map((n) => n.level);
 
-    // ------------------------------------------------------------
-    // 2️⃣ Find all hierarchy_node_ids at those levels (siblings)
-    // ------------------------------------------------------------
+    // 2️⃣ Find sibling nodes (same level)
     const siblingNodes = await HierarchyNode.findAll({
       where: { level: { [Op.in]: hierarchyLevels } },
     });
     const siblingNodeIds = siblingNodes.map((n) => n.hierarchy_node_id);
 
-    // ------------------------------------------------------------
-    // 3️⃣ GET DIRECT ISSUES (all siblings)
-    // ------------------------------------------------------------
+    // 3️⃣ Find parent nodes of the requested nodes
+    const parentNodeIds = hierarchyNodes
+      .map((n) => n.parent_hierarchy_node_id)
+      .filter(Boolean);
+
+    // 4️⃣ Combine siblings and parents
+    const nodesToInclude = Array.from(
+      new Set([...siblingNodeIds, ...parentNodeIds])
+    );
+
+    // 5️⃣ Fetch direct issues (siblings + parents)
     const directIssues = await Issue.findAll({
       where: {
         project_id: validPairs.map((p) => p.project_id),
-        hierarchy_node_id: { [Op.in]: siblingNodeIds },
-        reported_by: { [Op.ne]: user_id },
+        hierarchy_node_id: { [Op.in]: nodesToInclude },
+        [Op.or]: [
+          { reported_by: { [Op.ne]: user_id } }, // Siblings: exclude self
+          { hierarchy_node_id: parentNodeIds }, // Parents: include self-reported issues
+        ],
       },
       include: [
         { model: Project, as: "project" },
@@ -620,12 +684,10 @@ const getIssuesByMultipleHierarchyNodes = async (req, res) => {
       order: [["created_at", "DESC"]],
     });
 
-    // ------------------------------------------------------------
-    // 4️⃣ GET ESCALATED ISSUES (from IssueTier)
-    // ------------------------------------------------------------
+    // 6️⃣ Fetch escalated issues from IssueTier
     const escalatedIssueTiers = await IssueTier.findAll({
       where: {
-        tier_level: { [Op.in]: siblingNodeIds },
+        tier_level: { [Op.in]: nodesToInclude },
         status: { [Op.ne]: "closed" },
       },
       include: [
@@ -633,7 +695,7 @@ const getIssuesByMultipleHierarchyNodes = async (req, res) => {
           model: Issue,
           as: "issue",
           required: true,
-          where: { reported_by: { [Op.ne]: user_id } }, // <<<< EXCLUDE CREATOR
+          where: { reported_by: { [Op.ne]: user_id } }, // exclude creator
           include: [
             { model: Project, as: "project" },
             { model: IssueCategory, as: "category" },
@@ -655,62 +717,19 @@ const getIssuesByMultipleHierarchyNodes = async (req, res) => {
         },
       ],
     });
-    // const escalatedIssueTiers = await IssueTier.findAll({
-    //   where: {
-    //     tier_level: {
-    //       [Op.in]: validPairs.map((p) => p.hierarchy_node_id),
-    //     },
-    //     status: { [Op.ne]: "closed" },
-    //   },
-    //   include: [
-    //     {
-    //       model: Issue,
-    //       as: "issue",
-    //       where: {
-    //         reported_by: { [Op.ne]: user_id },
-    //       },
-    //       include: [
-    //         { model: Project, as: "project" },
-    //         { model: IssueCategory, as: "category" },
-    //         { model: IssuePriority, as: "priority" },
-    //         { model: HierarchyNode, as: "hierarchyNode" },
-    //         { model: User, as: "reporter" },
-    //         { model: User, as: "assignee" },
-    //         {
-    //           model: IssueComment,
-    //           as: "comments",
-    //           include: [{ model: User, as: "author" }],
-    //         },
-    //         {
-    //           model: IssueAttachment,
-    //           as: "attachments",
-    //           include: [{ model: Attachment, as: "attachment" }],
-    //         },
-    //       ],
-    //     },
-    //   ],
-    // });
 
-    // Extract Issues from IssueTier
-    // ------------------------------------------------------------
-    // 2️⃣ GET ESCALATED ISSUES FROM IssueEscalation
-    //    - to_tier matches hierarchy_node_id
-    // ------------------------------------------------------------
+    // 7️⃣ Fetch escalated issues from IssueEscalation
     const escalatedIssuesEscalation = await IssueEscalation.findAll({
       where: {
         [Op.or]: validPairs.map((pair) => ({
           to_tier: pair.hierarchy_node_id,
-          // Optional: you can filter by project if needed
-          // project_id: pair.project_id
         })),
       },
       include: [
         {
           model: Issue,
           as: "issue",
-          where: {
-            reported_by: { [Op.ne]: user_id },
-          },
+          where: { reported_by: { [Op.ne]: user_id } },
           include: [
             { model: Project, as: "project" },
             { model: IssueCategory, as: "category" },
@@ -735,15 +754,17 @@ const getIssuesByMultipleHierarchyNodes = async (req, res) => {
 
     const escalatedIssues = escalatedIssuesEscalation.map((t) => t.issue);
 
-    // ------------------------------------------------------------
-    // 5️⃣ MERGE BOTH RESULTS WITHOUT DUPLICATES
-    // ------------------------------------------------------------
+    // 8️⃣ Merge direct and escalated issues without duplicates
     const issuesMap = new Map();
     directIssues.forEach((issue) => issuesMap.set(issue.issue_id, issue));
     escalatedIssues.forEach((issue) => issuesMap.set(issue.issue_id, issue));
+    escalatedIssueTiers.forEach((t) =>
+      issuesMap.set(t.issue.issue_id, t.issue)
+    );
 
     const finalIssues = Array.from(issuesMap.values());
 
+    // 9️⃣ Return final result
     res.status(200).json({
       success: true,
       count: finalIssues.length,
