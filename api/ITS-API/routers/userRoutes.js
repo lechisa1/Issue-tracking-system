@@ -24,6 +24,7 @@ const {
   getInternalUsersAssignedToProject,
   getProjectSubNodeUsers,
   getInternalUsersAssignedToNode,
+  getUserPositions,
 } = require("../controllers/userController");
 
 /**
@@ -234,6 +235,8 @@ router.get("/", getUsers);
  */
 
 router.use("/user-types", getUserTypes);
+
+router.use("/user-positions", getUserPositions);
 
 /**
  * @swagger

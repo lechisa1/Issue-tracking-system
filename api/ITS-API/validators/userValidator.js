@@ -26,6 +26,14 @@ const createUserSchema = Joi.object({
     "any.required": "User type ID is required.",
   }),
 
+  user_position_id: Joi.string()
+    .guid({ version: "uuidv4" })
+    .allow(null)
+    .optional()
+    .messages({
+      "string.guid": "Position ID must be a valid UUID.",
+    }),
+
   institute_id: Joi.string()
     .guid({ version: "uuidv4" })
     .allow(null)

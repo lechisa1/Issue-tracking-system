@@ -2,6 +2,7 @@ const {
   User,
   UserType,
   Institute,
+  UserPosition,
   ProjectUserRole,
   Role,
   SubRole,
@@ -50,6 +51,34 @@ const getUserTypes = async (req, res) => {
     });
   }
 };
+const getUserPositions = async (req, res) => {
+  try {
+    const userPositions = await UserPosition.findAll({
+      attributes: [
+        "user_position_id",
+        "name",
+        "description",
+        "created_at",
+        "updated_at",
+      ],
+      order: [["name", "ASC"]],
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "User positions fetched successfully",
+      data: userPositions,
+    });
+  } catch (error) {
+    console.error("Error fetching user positions:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch user positions",
+      error: error.message,
+    });
+  }
+};
+
 const createUser = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -57,6 +86,7 @@ const createUser = async (req, res) => {
       full_name,
       email,
       user_type_id,
+      user_position_id,
       institute_id,
       phone_number,
       hierarchy_node_id,
@@ -92,6 +122,13 @@ const createUser = async (req, res) => {
           message: "Institute ID is required for external users.",
         });
       }
+      if (!user_position_id) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Position is required for external users.",
+        });
+      }
 
       // Validate institute existence
       const institute = await Institute.findByPk(institute_id, {
@@ -102,6 +139,16 @@ const createUser = async (req, res) => {
         return res
           .status(400)
           .json({ success: false, message: "Invalid institute ID." });
+      }
+      // Validate institute existence
+      const position = await UserPosition.findByPk(user_position_id, {
+        transaction: t,
+      });
+      if (!position) {
+        await t.rollback();
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid Position ID." });
       }
     } else {
       // internal_user or others must not have institute_id
@@ -142,6 +189,8 @@ const createUser = async (req, res) => {
         phone_number,
         user_type_id,
         institute_id: userType.name === "external_user" ? institute_id : null,
+        user_position_id:
+          userType.name === "external_user" ? user_position_id : null,
         hierarchy_node_id: hierarchy_node_id ?? null,
         is_first_logged_in: true,
         is_active: true,
@@ -292,6 +341,7 @@ const getUsers = async (req, res) => {
     const {
       institute_id,
       user_type_id,
+      user_position_id,
       hierarchy_node_id,
       is_active,
       search, // optional: for name/email search
@@ -302,6 +352,7 @@ const getUsers = async (req, res) => {
 
     if (institute_id) whereClause.institute_id = institute_id;
     if (user_type_id) whereClause.user_type_id = user_type_id;
+    if (user_position_id) whereClause.user_position_id = user_position_id;
     if (hierarchy_node_id) whereClause.hierarchy_node_id = hierarchy_node_id;
     if (is_active !== undefined) whereClause.is_active = is_active === "true";
 
@@ -1228,4 +1279,5 @@ module.exports = {
   resetUserPassword,
   getProfile,
   getUserTypes,
+  getUserPositions,
 };
