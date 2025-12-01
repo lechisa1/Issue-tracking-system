@@ -9,8 +9,10 @@ const {
   RoleSubRole,
   RoleSubRolePermission,
   InternalProjectUserRole,
+  ProjectMetricUser,
   Permission,
   InternalNode,
+  ProjectMetric,
   Project,
   UserRoles,
   HierarchyNode,
@@ -88,6 +90,8 @@ const createUser = async (req, res) => {
       user_type_id,
       user_position_id,
       institute_id,
+      role_id,
+      project_metrics_ids,
       phone_number,
       hierarchy_node_id,
     } = req.body;
@@ -174,6 +178,36 @@ const createUser = async (req, res) => {
       }
     }
 
+    // ====== Validate role if provided ======
+    if (role_id) {
+      const role = await Role.findByPk(role_id, { transaction: t });
+      if (!role) {
+        await t.rollback();
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid role ID." });
+      }
+    }
+
+    // ====== Validate metrics if provided ======
+    if (
+      project_metrics_ids &&
+      Array.isArray(project_metrics_ids) &&
+      project_metrics_ids.length > 0
+    ) {
+      const metrics = await ProjectMetric.findAll({
+        where: { project_metric_id: project_metrics_ids },
+        transaction: t,
+      });
+
+      if (metrics.length !== project_metrics_ids.length) {
+        await t.rollback();
+        return res
+          .status(404)
+          .json({ success: false, message: "One or more metrics not found." });
+      }
+    }
+
     // ====== Generate password ======
     // const password = generateRandomPassword();
     const password = "password";
@@ -199,6 +233,39 @@ const createUser = async (req, res) => {
       },
       { transaction: t }
     );
+
+    // ====== Assign role if provided ======
+    if (role_id) {
+      await UserRoles.create(
+        {
+          user_role_id: uuidv4(),
+          user_id: user.user_id,
+          role_id: role_id,
+          assigned_by: req.user?.user_id || null, // Assuming you have auth middleware
+          assigned_at: new Date(),
+          is_active: true,
+        },
+        { transaction: t }
+      );
+    }
+
+    // ====== Assign metrics to user if provided ======
+    if (
+      project_metrics_ids &&
+      Array.isArray(project_metrics_ids) &&
+      project_metrics_ids.length > 0
+    ) {
+      // Prepare metric assignments
+      const metricAssignments = project_metrics_ids.map((metric_id) => ({
+        id: uuidv4(),
+        user_id: user.user_id,
+        project_metric_id: metric_id,
+        value: null, // Default value, can be updated later
+      }));
+
+      // Create metric assignments
+      await ProjectMetricUser.bulkCreate(metricAssignments, { transaction: t });
+    }
 
     await t.commit();
 
@@ -755,7 +822,7 @@ const getInternalUsersAssignedToProject = async (req, res) => {
 };
 
 const getUsersNotAssignedToProject = async (req, res) => {
-  console.log("not external one assigned called");
+  // console.log("not external one assigned called");
   try {
     const { institute_id, project_id } = req.params;
 
@@ -847,7 +914,7 @@ const getInternalUsersNotAssignedToProject = async (req, res) => {
 
     const assignedUserIds = assignments.map((a) => a.user_id);
 
-    console.log("assignedUserIds: ", assignedUserIds);
+    // console.log("assignedUserIds: ", assignedUserIds);
     // 2. Get users where:
     //    institute_id IS NULL
     //    AND user_id NOT IN assignedUserIds
@@ -975,6 +1042,16 @@ const getUserById = async (req, res) => {
           model: HierarchyNode,
           as: "hierarchyNode",
           attributes: ["hierarchy_node_id", "name"],
+        },
+        {
+          model: Role,
+          as: "roles",
+          through: { attributes: [] },
+        },
+        {
+          model: ProjectMetric,
+          as: "metrics",
+          through: { attributes: ["value"] },
         },
       ],
     });

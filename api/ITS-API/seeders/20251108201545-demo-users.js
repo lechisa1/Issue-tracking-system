@@ -12,13 +12,13 @@ module.exports = {
     const [userType] = await queryInterface.sequelize.query(`
       SELECT user_type_id
       FROM user_types
-      WHERE name = 'external_user'
+      WHERE name = 'internal_user'
       LIMIT 1
     `);
 
     if (!userType.length) {
       throw new Error(
-        "User type 'external_user' not found. Seed user_types first."
+        "User type 'internal_user' not found. Seed user_types first."
       );
     }
 
@@ -27,7 +27,7 @@ module.exports = {
     // ================================
     // 3. Common password hash
     // ================================
-    const passwordHash = await bcrypt.hash("Password123!", 10);
+    const passwordHash = await bcrypt.hash("password", 10);
 
     // ================================
     // 4. Insert demo users

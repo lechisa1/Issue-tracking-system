@@ -15,8 +15,22 @@ const { Sequelize } = require("sequelize");
 const createRole = async (req, res) => {
   const t = await Role.sequelize.transaction();
   try {
-    const { name, description, sub_roles, permission_ids } = req.body;
+    const { name, description, sub_roles, role_type, permission_ids } =
+      req.body;
 
+    // ====== Validate role_type ======
+    const allowedRoleTypes = ["internal", "external"];
+    let finalRoleType = "internal"; // default
+    if (role_type) {
+      if (!allowedRoleTypes.includes(role_type)) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Invalid role_type. Allowed values: internal, external",
+        });
+      }
+      finalRoleType = role_type;
+    }
     // ====== Check if role exists ======
     const existing = await Role.findOne({ where: { name }, transaction: t });
     if (existing) {
@@ -33,6 +47,7 @@ const createRole = async (req, res) => {
         role_id: uuidv4(),
         name,
         description,
+        role_type: finalRoleType,
         is_active: true,
         created_at: new Date(),
         updated_at: new Date(),
@@ -217,8 +232,16 @@ const createRole = async (req, res) => {
 // Get all roles with sub-roles and permissions
 const getRoles = async (req, res) => {
   try {
+    const { role_type, is_active } = req.query; // expecting query params
+
+    // Build dynamic where clause
+    const whereClause = {};
+    if (role_type) whereClause.role_type = role_type;
+
+    if (is_active !== undefined) whereClause.is_active = is_active === "true";
+
     const roles = await Role.findAll({
-      where: { is_active: true },
+      where: whereClause,
       include: [
         {
           model: RoleSubRole,
@@ -338,7 +361,8 @@ const updateRole = async (req, res) => {
   const t = await Role.sequelize.transaction();
   try {
     const { id } = req.params;
-    const { name, description, sub_roles, permission_ids } = req.body;
+    const { name, description, sub_roles, permission_ids, role_type } =
+      req.body;
 
     // Find the role
     const role = await Role.findOne({
@@ -371,10 +395,24 @@ const updateRole = async (req, res) => {
     }
 
     //Update role info
+    const allowedRoleTypes = ["internal", "external"];
+    let roleTypeToUpdate = role.role_type; // default keep old
+
+    if (req.body.role_type) {
+      if (!allowedRoleTypes.includes(req.body.role_type)) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Invalid role_type. Allowed values: internal, external",
+        });
+      }
+      roleTypeToUpdate = req.body.role_type;
+    }
     await role.update(
       {
         name: name || role.name,
         description: description || role.description,
+        role_type: roleTypeToUpdate,
         updated_at: new Date(),
       },
       { transaction: t }

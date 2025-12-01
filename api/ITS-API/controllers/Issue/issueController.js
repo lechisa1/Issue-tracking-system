@@ -428,6 +428,114 @@ const getIssueById = async (req, res) => {
   }
 };
 
+const getIssueByTicketingNumber = async (req, res) => {
+  try {
+    const { ticket_number } = req.params;
+
+    const issue = await Issue.findOne({
+      where: { ticket_number },
+      include: [
+        { model: Project, as: "project" },
+        { model: IssueCategory, as: "category" },
+        { model: IssuePriority, as: "priority" },
+        { model: HierarchyNode, as: "hierarchyNode" },
+        { model: User, as: "reporter" },
+        { model: User, as: "assignee" },
+
+        {
+          model: IssueComment,
+          as: "comments",
+          include: [{ model: User, as: "author" }],
+        },
+
+        {
+          model: IssueAttachment,
+          as: "attachments",
+          include: [{ model: Attachment, as: "attachment" }],
+        },
+
+        {
+          model: IssueEscalation,
+          as: "escalations",
+          include: [
+            { model: User, as: "escalator" },
+            {
+              model: HierarchyNode,
+              as: "fromTierNode",
+            },
+            {
+              model: HierarchyNode,
+              as: "toTierNode",
+            },
+            {
+              model: EscalationAttachment,
+              as: "attachments",
+              include: [{ model: Attachment, as: "attachment" }],
+            },
+          ],
+        },
+
+        {
+          model: IssueResolution,
+          as: "resolutions",
+          include: [
+            { model: User, as: "resolver" },
+            {
+              model: ResolutionAttachment,
+              as: "attachments",
+              include: [{ model: Attachment, as: "attachment" }],
+            },
+          ],
+        },
+
+        {
+          model: IssueAssignment,
+          as: "assignments",
+          include: [
+            { model: User, as: "assigner" },
+            { model: User, as: "assignee" },
+            {
+              model: AssignmentAttachment,
+              as: "attachments",
+              include: [{ model: Attachment, as: "attachment" }],
+            },
+          ],
+        },
+
+        {
+          model: IssueHistory,
+          as: "history",
+          include: [
+            { model: User, as: "performed_by" },
+            {
+              model: IssueEscalation,
+              as: "escalation",
+              include: [
+                { model: HierarchyNode, as: "fromTierNode" },
+                { model: HierarchyNode, as: "toTierNode" },
+              ],
+            },
+            { model: IssueResolution, as: "resolution" },
+          ],
+          order: [["created_at", "DESC"]],
+        },
+      ],
+    });
+
+    if (!issue) {
+      return res.status(404).json({ message: "Issue not found" });
+    }
+
+    res.status(200).json(issue);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
 // ================================
 // GET ISSUES BY HIERARCHY NODE ID
 // ================================
@@ -869,7 +977,6 @@ const getIssuesByMultipleHierarchyNodes = async (req, res) => {
     // 4️⃣ GET ESCALATED ISSUES (from IssueTier)
     // ------------------------------------------------------------
 
-    
     // const escalatedIssueTiers = await IssueTier.findAll({
     //   where: {
     //     tier_level: {
@@ -1364,6 +1471,7 @@ module.exports = {
   createIssue,
   getIssues,
   getIssueById,
+  getIssueByTicketingNumber,
   getIssuesByUserId,
   getAssignedIssues,
   getIssuesByHierarchyNodeId,

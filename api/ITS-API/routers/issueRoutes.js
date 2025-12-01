@@ -128,6 +128,10 @@ router.get(
   issueController.getIssueById
 );
 
+// getIssueByTicketingNumber
+
+router.get("/ticket/:ticket_number", issueController.getIssueByTicketingNumber);
+
 /**
  * @swagger
  * /api/issues/{id}:
