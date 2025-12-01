@@ -7,6 +7,7 @@ const {
   SubRole,
   UserType,
   User,
+  UserRoles,
   InstituteProject,
   ProjectMaintenance,
   InternalProjectUserRole,
@@ -411,6 +412,14 @@ const assignUserToProject = async (req, res) => {
   try {
     const { project_id, user_id, hierarchy_node_id } = req.body;
 
+    console.log("📥 Received assignment request:", {
+      project_id,
+      user_id,
+      role_id,
+      sub_role_id,
+      hierarchy_node_id,
+    });
+
     // ====== Validate project ======
     const project = await Project.findByPk(project_id, { transaction: t });
     if (!project) {
@@ -469,14 +478,14 @@ const assignUserToProject = async (req, res) => {
 
     // ====== Prevent duplicate assignment ======
     const existing = await ProjectUserRole.findOne({
-      where: { project_id, user_id },
+      where: { project_id, user_id, role_id },
       transaction: t,
     });
     if (existing) {
       await t.rollback();
       return res.status(400).json({
         success: false,
-        message: "User already assigned to this project.",
+        message: "User already assigned to this project with this role.",
       });
     }
 
@@ -509,6 +518,12 @@ const assignUserToProject = async (req, res) => {
           });
         }
       }
+
+      finalHierarchyId = hierarchy_node_id;
+    } else if (userTypeName === "internal_user") {
+      console.log("🔍 Processing internal user - hierarchy node optional");
+      // Internal users can have hierarchy_node_id but it's not required
+      finalHierarchyId = hierarchy_node_id || null;
     }
 
     // ====== Create project-user-role ======
@@ -559,8 +574,11 @@ const assignUserToProject = async (req, res) => {
     });
   } catch (error) {
     if (!t.finished) await t.rollback();
-    console.error("Error assigning user to project:", error);
-    return res.status(500).json({ success: false, message: error.message });
+    console.error("❌ Error assigning user to project:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 

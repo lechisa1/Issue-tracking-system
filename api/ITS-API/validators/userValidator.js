@@ -18,7 +18,7 @@ const createUserSchema = Joi.object({
     .messages({
       "string.empty": "Phone number is required.",
       "string.pattern.base":
-        "Phone number must be a valid Ethiopian format (e.g., +2519XXXXXXXX or 09XXXXXXXX).",
+        "Phone number must be a valid  format (e.g., +2519XXXXXXXX or 09XXXXXXXX).",
     }),
 
   user_type_id: Joi.string().guid({ version: "uuidv4" }).required().messages({
@@ -76,6 +76,12 @@ const updateUserSchema = Joi.object({
     .messages({
       "string.pattern.base":
         "Phone number must be a valid Ethiopian format (e.g., +2519XXXXXXXX or 09XXXXXXXX).",
+    }),
+  roles: Joi.array()
+    .items(Joi.string().guid({ version: "uuidv4" }))
+    .optional()
+    .messages({
+      "string.guid": "Each role ID must be a valid UUID.",
     }),
   user_type_id: Joi.string().guid({ version: "uuidv4" }).optional(),
   institute_id: Joi.string().guid({ version: "uuidv4" }).allow(null).optional(),

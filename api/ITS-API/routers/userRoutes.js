@@ -10,11 +10,12 @@ const { authenticateToken } = require("../middlewares/authMiddleware");
 const {
   createUser,
   updateUser,
+  findUserByEmail,
   getUsers,
   getUserById,
   deleteUser,
   toggleUserActiveStatus,
-  resetUserPassword,
+
   getUserTypes,
   getUsersByInstituteId,
   getUsersAssignedToNode,
@@ -550,6 +551,6 @@ router.patch("/:id/toggle-status", authenticateToken, toggleUserActiveStatus);
  *       500:
  *         description: Server error
  */
-router.post("/:id/reset-password", authenticateToken, resetUserPassword);
+// router.post("/:id/reset-password", authenticateToken, resetUserPassword);
 
 module.exports = router;

@@ -23,10 +23,53 @@ const jwt = require("jsonwebtoken");
 
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, phoneNumber, password } = req.body;
 
-    const user = await User.findOne({
-      where: { email },
+    console.log("Login attempt:", { email, phoneNumber }); // Debug log
+
+    // Validate that either email or phoneNumber is provided
+    if (!email && !phoneNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide either email or phone number",
+      });
+    }
+
+    if (email && phoneNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide either email or phone number, not both",
+      });
+    }
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: "Password is required",
+      });
+    }
+
+    let user;
+    let queryCondition = {};
+
+    // Find user by email or phone number
+    if (email) {
+      queryCondition = { email };
+    } else if (phoneNumber) {
+      let cleanPhoneNumber = phoneNumber.replace(/\D/g, ""); // remove all non-digits
+
+      // Convert +2519XXXXXXXX to 09XXXXXXXX
+      if (cleanPhoneNumber.startsWith("251")) {
+        cleanPhoneNumber = "0" + cleanPhoneNumber.slice(3);
+      }
+
+      queryCondition = { phone_number: cleanPhoneNumber };
+    }
+
+    console.log("Query condition:", queryCondition); // Debug log
+
+    user = await User.findOne({
+      where: queryCondition,
       include: [
         {
           model: Institute,
@@ -119,15 +162,28 @@ const login = async (req, res) => {
       ],
     });
 
-    if (!user)
-      return res.status(401).json({ message: "Invalid email or password" });
-    if (!user.is_active)
-      return res.status(403).json({ message: "User is inactive" });
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
+
+    if (!user.is_active) {
+      return res.status(403).json({
+        success: false,
+        message: "User is inactive",
+      });
+    }
 
     // Compare password
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch)
-      return res.status(401).json({ message: "Invalid email or password" });
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
 
     // Format user data for token
     const userDataForToken = {
@@ -190,7 +246,11 @@ const login = async (req, res) => {
       { where: { user_id: user.user_id } }
     );
 
+    // Update last login
+    await user.update({ last_login_at: new Date() });
+
     return res.status(200).json({
+      success: true,
       message: "Login successful",
       token,
       user: {
@@ -241,12 +301,19 @@ const login = async (req, res) => {
           is_active: ipr.is_active,
         })),
       },
+      roles,
     });
   } catch (error) {
-    console.error(error);
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: error.message });
+    console.error("Login error:", error);
+
+    // Make sure we haven't already sent a response
+    if (!res.headersSent) {
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
   }
 };
 
