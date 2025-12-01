@@ -15,6 +15,7 @@ const { swaggerUi, swaggerSpec } = require("./swagger");
 
 const userRoute = require("./routers/userRoutes");
 const roleRoute = require("./routers/roleRoutes");
+const projectMetricRoute = require("./routers/projectMetricRoute");
 const rolePermissionRoute = require("./routers/rolePermissionRoutes");
 const userRoleRoute = require("./routers/userRoleRoutes");
 const authRoute = require("./routers/authRoutes");
@@ -159,6 +160,7 @@ app.use("/api/user-roles", userRoleRoute);
 app.use("/api/auth", authRoute);
 
 app.use("/api/projects", require("./routers/projectRoutes"));
+app.use("/api/project-metrics", projectMetricRoute);
 app.use("/api/institutes", instituteRoute);
 app.use("/api/institute-projects", instituteProjectsRoute);
 

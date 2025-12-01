@@ -8,6 +8,13 @@ const createRoleSchema = Joi.object({
   description: Joi.string().trim().required().messages({
     "string.empty": "Role description is required",
   }),
+  role_type: Joi.string()
+    .trim()
+    .optional()
+    .valid("internal", "external")
+    .messages({
+      "any.only": "role_type must be either 'internal' or 'external'",
+    }),
   is_active: Joi.boolean().optional(),
   permission_ids: Joi.alternatives()
     .try(
@@ -87,7 +94,13 @@ const updateRoleSchema = Joi.object({
   name: Joi.string().trim().optional(),
   description: Joi.string().trim().optional(),
   is_active: Joi.boolean().optional(),
-
+  role_type: Joi.string()
+    .trim()
+    .optional()
+    .valid("internal", "external")
+    .messages({
+      "any.only": "role_type must be either 'internal' or 'external'",
+    }),
   // Allow updating permissions at role level
   permission_ids: Joi.array()
     .items(
