@@ -52,8 +52,13 @@ const login = async (req, res) => {
     if (email) {
       queryCondition = { email };
     } else if (phoneNumber) {
-      // Clean phone number (remove non-digit characters)
-      const cleanPhoneNumber = phoneNumber.replace(/\D/g, "");
+      let cleanPhoneNumber = phoneNumber.replace(/\D/g, ""); // remove all non-digits
+
+      // Convert +2519XXXXXXXX to 09XXXXXXXX
+      if (cleanPhoneNumber.startsWith("251")) {
+        cleanPhoneNumber = "0" + cleanPhoneNumber.slice(3);
+      }
+
       queryCondition = { phone_number: cleanPhoneNumber };
     }
 

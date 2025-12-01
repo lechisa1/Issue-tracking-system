@@ -1708,4 +1708,5 @@ module.exports = {
   findUserByEmail,
   confirmPasswordReset,
   validateResetToken,
+  getUserPositions,
 };
