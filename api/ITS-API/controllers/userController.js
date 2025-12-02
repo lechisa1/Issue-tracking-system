@@ -1686,6 +1686,48 @@ const getProfile = async (req, res) => {
     });
   }
 };
+const changePassword = async (req, res) => {
+  const userId = req.user?.user_id;
+  const { currentPassword, newPassword } = req.body;
+  console.log("currentPassword", currentPassword);
+  console.log("currentPassword", newPassword);
+  console.log("currentPassword", userId);
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ success: false, message: "Missing data" });
+  }
+
+  try {
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    // Check current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Current password is incorrect" });
+    }
+
+    // Update password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await user.update({
+      password: hashedPassword,
+      is_first_logged_in: false, // ✅ Mark first login as done
+    });
+
+    return res.json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 
 module.exports = {
   createUser,
@@ -1709,4 +1751,5 @@ module.exports = {
   confirmPasswordReset,
   validateResetToken,
   getUserPositions,
+  changePassword,
 };

@@ -26,6 +26,7 @@ const {
   getProjectSubNodeUsers,
   getInternalUsersAssignedToNode,
   getUserPositions,
+  changePassword,
 } = require("../controllers/userController");
 
 /**
@@ -130,7 +131,7 @@ const {
  *         description: Server error
  */
 router.post("/", validateCreateUser, authenticateToken, createUser);
-
+router.post("/change-password", authenticateToken, changePassword);
 /**
  * @swagger
  * /api/users:
