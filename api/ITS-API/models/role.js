@@ -48,6 +48,11 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: true,
       },
+      role_type: {
+        type: DataTypes.ENUM("internal", "external"),
+        defaultValue: "internal",
+        allowNull: false,
+      },
       is_active: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,

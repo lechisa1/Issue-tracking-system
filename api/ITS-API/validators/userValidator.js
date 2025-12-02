@@ -41,6 +41,20 @@ const createUserSchema = Joi.object({
     .messages({
       "string.guid": "Institute ID must be a valid UUID.",
     }),
+  role_id: Joi.string()
+    .guid({ version: "uuidv4" })
+    .allow(null)
+    .optional()
+    .messages({
+      "string.guid": "Role ID must be a valid UUID.",
+    }),
+  project_metrics_ids: Joi.array()
+    .items(Joi.string().uuid())
+    .optional()
+    .messages({
+      "array.base": "metrics IDs must be an array",
+      "string.guid": "Each metrics ID must be a valid UUID",
+    }),
 
   position: Joi.string().max(100).optional().messages({
     "string.max": "Position cannot exceed 100 characters.",

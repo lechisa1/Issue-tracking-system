@@ -9,9 +9,10 @@ const {
   RoleSubRole,
   RoleSubRolePermission,
   InternalProjectUserRole,
+  ProjectMetricUser,
   Permission,
   InternalNode,
-
+  ProjectMetric,
   Project,
   UserRoles,
   HierarchyNode,
@@ -949,7 +950,7 @@ const getInternalUsersAssignedToProject = async (req, res) => {
 // };
 
 const getUsersNotAssignedToProject = async (req, res) => {
-  console.log("Fetching unassigned users...");
+  // console.log("not external one assigned called");
   try {
     const { institute_id, project_id } = req.params;
 
@@ -1049,7 +1050,7 @@ const getInternalUsersNotAssignedToProject = async (req, res) => {
 
     const assignedUserIds = assignments.map((a) => a.user_id);
 
-    console.log("assignedUserIds: ", assignedUserIds);
+    // console.log("assignedUserIds: ", assignedUserIds);
     // 2. Get users where:
     //    institute_id IS NULL
     //    AND user_id NOT IN assignedUserIds
@@ -1179,16 +1180,14 @@ const getUserById = async (req, res) => {
           attributes: ["hierarchy_node_id", "name"],
         },
         {
-          model: UserRoles,
-          as: "userRoles", // <-- corrected here
-          attributes: ["user_role_id", "role_id", "assigned_by", "assigned_at"],
-          include: [
-            {
-              model: Role,
-              as: "role",
-              attributes: ["role_id", "name", "description"],
-            },
-          ],
+          model: Role,
+          as: "roles",
+          through: { attributes: [] },
+        },
+        {
+          model: ProjectMetric,
+          as: "metrics",
+          through: { attributes: ["value"] },
         },
       ],
     });
@@ -1728,7 +1727,6 @@ const changePassword = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
-
 module.exports = {
   createUser,
   getUsers,

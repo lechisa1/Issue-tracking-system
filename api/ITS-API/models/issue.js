@@ -109,6 +109,11 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: DataTypes.UUIDV4,
       },
+      ticket_number: {
+        type: DataTypes.STRING(20),
+        allowNull: false,
+        unique: true,
+      },
       project_id: {
         type: DataTypes.UUID,
         allowNull: false, // issue must belong to a project now
@@ -173,6 +178,31 @@ module.exports = (sequelize, DataTypes) => {
       updatedAt: "updated_at",
     }
   );
+
+  // Add this after Issue.init
+  Issue.beforeCreate(async (issue, options) => {
+    const year = new Date().getFullYear();
+    const yearShort = String(year).slice(-2); // last two digits, e.g., "25"
+
+    // Find last ticket created this year
+    const lastIssue = await Issue.findOne({
+      where: {
+        ticket_number: { [sequelize.Op.like]: `TICK-${yearShort}-%` },
+      },
+      order: [["created_at", "DESC"]],
+    });
+
+    let nextNumber = 1;
+    if (lastIssue && lastIssue.ticket_number) {
+      const match = lastIssue.ticket_number.match(/-(\d+)$/);
+      if (match) {
+        nextNumber = parseInt(match[1], 10) + 1;
+      }
+    }
+
+    const paddedNumber = String(nextNumber).padStart(2, "0"); // 2 digits
+    issue.ticket_number = `TICK-${yearShort}-${paddedNumber}`;
+  });
 
   return Issue;
 };
