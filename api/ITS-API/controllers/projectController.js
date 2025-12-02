@@ -13,7 +13,7 @@ const {
   InternalProjectUserRole,
   ProjectMetricProject,
   ProjectMetric,
-  UserRoles,
+
   sequelize,
   InternalNode,
 } = require("../models");

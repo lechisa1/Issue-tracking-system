@@ -301,7 +301,6 @@ const login = async (req, res) => {
           is_active: ipr.is_active,
         })),
       },
-      roles,
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -562,5 +561,26 @@ const getCurrentUser = async (req, res) => {
       .json({ message: "Internal server error", error: error.message });
   }
 };
+// First-login password reset
+// exports.firstLoginReset = async (req, res) => {
+//   const { email, newPassword } = req.body;
+//   if (!email || !newPassword)
+//     return res.status(400).json({ success: false, message: "Missing data" });
 
+//   try {
+//     const user = await User.findOne({ where: { email } });
+//     if (!user)
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "User not found" });
+
+//     const hashedPassword = await bcrypt.hash(newPassword, 10);
+//     await user.update({ password: hashedPassword, firstLogin: false });
+
+//     res.json({ success: true, message: "Password updated successfully" });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ success: false, message: "Server error" });
+//   }
+// };
 module.exports = { login, logout, getCurrentUser };

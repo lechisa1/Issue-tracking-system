@@ -90,8 +90,6 @@ const createUser = async (req, res) => {
       user_type_id,
       user_position_id,
       institute_id,
-      role_id,
-      project_metrics_ids,
       phone_number,
       hierarchy_node_id,
     } = req.body;
@@ -190,36 +188,6 @@ const createUser = async (req, res) => {
       }
     }
 
-    // ====== Validate role if provided ======
-    if (role_id) {
-      const role = await Role.findByPk(role_id, { transaction: t });
-      if (!role) {
-        await t.rollback();
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid role ID." });
-      }
-    }
-
-    // ====== Validate metrics if provided ======
-    if (
-      project_metrics_ids &&
-      Array.isArray(project_metrics_ids) &&
-      project_metrics_ids.length > 0
-    ) {
-      const metrics = await ProjectMetric.findAll({
-        where: { project_metric_id: project_metrics_ids },
-        transaction: t,
-      });
-
-      if (metrics.length !== project_metrics_ids.length) {
-        await t.rollback();
-        return res
-          .status(404)
-          .json({ success: false, message: "One or more metrics not found." });
-      }
-    }
-
     // ====== Generate password ======
     // const password = generateRandomPassword();
     const password = "password";
@@ -245,39 +213,6 @@ const createUser = async (req, res) => {
       },
       { transaction: t }
     );
-
-    // ====== Assign role if provided ======
-    if (role_id) {
-      await UserRoles.create(
-        {
-          user_role_id: uuidv4(),
-          user_id: user.user_id,
-          role_id: role_id,
-          assigned_by: req.user?.user_id || null, // Assuming you have auth middleware
-          assigned_at: new Date(),
-          is_active: true,
-        },
-        { transaction: t }
-      );
-    }
-
-    // ====== Assign metrics to user if provided ======
-    if (
-      project_metrics_ids &&
-      Array.isArray(project_metrics_ids) &&
-      project_metrics_ids.length > 0
-    ) {
-      // Prepare metric assignments
-      const metricAssignments = project_metrics_ids.map((metric_id) => ({
-        id: uuidv4(),
-        user_id: user.user_id,
-        project_metric_id: metric_id,
-        value: null, // Default value, can be updated later
-      }));
-
-      // Create metric assignments
-      await ProjectMetricUser.bulkCreate(metricAssignments, { transaction: t });
-    }
 
     await t.commit();
 
@@ -1750,7 +1685,48 @@ const getProfile = async (req, res) => {
     });
   }
 };
+const changePassword = async (req, res) => {
+  const userId = req.user?.user_id;
+  const { currentPassword, newPassword } = req.body;
+  console.log("currentPassword", currentPassword);
+  console.log("currentPassword", newPassword);
+  console.log("currentPassword", userId);
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ success: false, message: "Missing data" });
+  }
 
+  try {
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    // Check current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Current password is incorrect" });
+    }
+
+    // Update password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await user.update({
+      password: hashedPassword,
+      is_first_logged_in: false, // ✅ Mark first login as done
+    });
+
+    return res.json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 module.exports = {
   createUser,
   getUsers,
@@ -1773,4 +1749,5 @@ module.exports = {
   confirmPasswordReset,
   validateResetToken,
   getUserPositions,
+  changePassword,
 };
