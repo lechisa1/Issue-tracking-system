@@ -1,5 +1,5 @@
 const { v4: uuidv4 } = require("uuid");
-const { IssuePriority } = require("../models");
+const { IssuePriority, IssueResponseTime } = require("../models");
 const {
   prioritySchema,
   idParamSchema,
@@ -7,8 +7,46 @@ const {
 const { Op } = require("sequelize");
 
 //======Create Priority==============
+// exports.createPriority = async (req, res) => {
+//   try {
+//     const { error, value } = prioritySchema.validate(req.body, {
+//       abortEarly: false,
+//     });
+//     if (error) {
+//       return res.status(400).json({
+//         message: "Validation failed",
+//         errors: error.details.map((d) => d.message),
+//       });
+//     }
+
+//     // =========Check for duplicate name========
+//     const exists = await IssuePriority.findOne({ where: { name: value.name } });
+//     if (exists) {
+//       return res.status(409).json({ message: "Priority name already exists" });
+//     }
+
+//     const priority = await IssuePriority.create({
+//       priority_id: uuidv4(),
+//       ...value,
+//       created_at: new Date(),
+//       updated_at: new Date(),
+//     });
+
+//     return res.status(201).json({
+//       message: "Priority created successfully",
+//       data: priority,
+//     });
+//   } catch (err) {
+//     return res.status(500).json({
+//       message: "Internal server error while creating priority",
+//       error: err.message,
+//     });
+//   }
+// };
+
 exports.createPriority = async (req, res) => {
   try {
+    // Validate request body
     const { error, value } = prioritySchema.validate(req.body, {
       abortEarly: false,
     });
@@ -19,22 +57,56 @@ exports.createPriority = async (req, res) => {
       });
     }
 
-    // =========Check for duplicate name========
+    // Check for duplicate priority name
     const exists = await IssuePriority.findOne({ where: { name: value.name } });
     if (exists) {
       return res.status(409).json({ message: "Priority name already exists" });
     }
 
+    // Optional: validate response_time_id exists if provided
+    let responseTimeId = null;
+
+    if (value.response_time_id) {
+      const responseTime = await IssueResponseTime.findByPk(
+        value.response_time_id
+      );
+      if (!responseTime) {
+        return res.status(400).json({ message: "Invalid response_time_id" });
+      }
+      responseTimeId = value.response_time_id;
+    } else {
+      return res.status(400).json({ message: "response_time_id is required" });
+    }
+
+    // Create priority
     const priority = await IssuePriority.create({
       priority_id: uuidv4(),
-      ...value,
+      name: value.name,
+      description: value.description,
+      color_value: value.color_value,
+      response_time_id: responseTimeId,
+      is_active: value.is_active !== undefined ? value.is_active : true,
       created_at: new Date(),
       updated_at: new Date(),
     });
 
+    // Fetch priority with response time included
+    const priorityWithResponseTime = await IssuePriority.findByPk(
+      priority.priority_id,
+      {
+        include: [
+          {
+            model: IssueResponseTime,
+            as: "responseTime",
+            attributes: ["duration", "unit"],
+          },
+        ],
+      }
+    );
+
     return res.status(201).json({
       message: "Priority created successfully",
-      data: priority,
+      data: priorityWithResponseTime,
     });
   } catch (err) {
     return res.status(500).json({
@@ -43,12 +115,17 @@ exports.createPriority = async (req, res) => {
     });
   }
 };
-
 // ==========Get All Priorities =========
 exports.getAllPriorities = async (req, res) => {
   try {
     const priorities = await IssuePriority.findAll({
       order: [["created_at", "DESC"]],
+      include: [
+        {
+          model: IssueResponseTime,
+          as: "responseTime",
+        },
+      ],
     });
 
     return res.status(200).json({

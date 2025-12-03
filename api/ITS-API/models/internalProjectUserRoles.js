@@ -28,6 +28,12 @@ module.exports = (sequelize, DataTypes) => {
         as: "internalNode",
       });
 
+      // 🟢 NEW → Required Project Metric
+      this.belongsTo(models.ProjectMetric, {
+        foreignKey: "project_metric_id",
+        as: "projectMetric",
+      });
+
       // Optional: link to institute_project if applicable
       InternalProjectUserRole.hasOne(models.InstituteProject, {
         foreignKey: "project_id",
@@ -53,6 +59,10 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
       },
       role_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+      },
+      project_metric_id: {
         type: DataTypes.UUID,
         allowNull: false,
       },
@@ -83,7 +93,7 @@ module.exports = (sequelize, DataTypes) => {
       indexes: [
         {
           unique: true,
-          fields: ["project_id", "user_id"],
+          fields: ["project_id", "user_id", "project_metric_id"],
         },
       ],
     }

@@ -41,16 +41,18 @@ const createUserSchema = Joi.object({
     .messages({
       "string.guid": "Institute ID must be a valid UUID.",
     }),
-  role_ids: Joi.array() // <-- change here
-    .items(Joi.string().guid({ version: "uuidv4" }))
-    .min(1)
-    .required()
+  role_ids: Joi.array()
+    .items(
+      Joi.string()
+        .guid({ version: "uuidv4" })
+        .messages({ "string.guid": "Each role ID must be a valid UUID." })
+    )
+    .optional()
+    .allow(null)
     .messages({
-      "array.base": "Roles must be an array of UUIDs",
-      "array.min": "At least one role must be selected",
-      "string.guid": "Each role ID must be a valid UUID",
-      "any.required": "Roles are required",
+      "array.base": "Role ID must be an array of UUIDs.",
     }),
+
   project_metrics_ids: Joi.array()
     .items(Joi.string().uuid())
     .optional()
@@ -96,6 +98,13 @@ const updateUserSchema = Joi.object({
     .messages({
       "string.guid": "Each role ID must be a valid UUID.",
     }),
+  project_metrics_ids: Joi.array()
+    .items(Joi.string().uuid())
+    .optional()
+    .messages({
+      "array.base": "metrics IDs must be an array",
+      "string.guid": "Each metrics ID must be a valid UUID",
+    }),
   hierarchy_node_id: Joi.string()
     .guid({ version: "uuidv4" })
     .allow(null)
@@ -116,6 +125,7 @@ exports.validateCreateUser = (req, res, next) => {
 };
 
 exports.validateUpdateUser = (req, res, next) => {
+  console.log("validate update user reached")
   const { error } = updateUserSchema.validate(req.body, { abortEarly: true });
   if (error) {
     return res.status(400).json({

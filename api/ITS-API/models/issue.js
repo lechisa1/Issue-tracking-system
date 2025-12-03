@@ -1,5 +1,6 @@
 "use strict";
-const { Model, Op } = require("sequelize");
+const { Model } = require("sequelize");
+const crypto = require("crypto");
 
 module.exports = (sequelize, DataTypes) => {
   class Issue extends Model {
@@ -91,7 +92,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       ticket_number: {
         type: DataTypes.STRING(20),
-        allowNull: false,
+        allowNull: true,
         unique: true,
       },
       project_id: {
@@ -159,29 +160,35 @@ module.exports = (sequelize, DataTypes) => {
     }
   );
 
-  // ======== FIXED TICKET NUMBER GENERATOR ===========
-  Issue.beforeCreate(async (issue) => {
-    const year = new Date().getFullYear();
-    const yearShort = String(year).slice(-2); // e.g. "25"
+  Issue.beforeCreate(async (issue, options) => {
+    // console.log("=== BEFORE CREATE HOOK ===");
+    // console.log("Issue data:", issue.dataValues);
+    // console.log("Ticket number before:", issue.ticket_number);
 
-    const lastIssue = await Issue.findOne({
-      where: {
-        ticket_number: { [Op.like]: `TICK-${yearShort}-%` },
-      },
-      order: [["created_at", "DESC"]],
-    });
+    if (!issue.ticket_number) {
+      // console.log("Generating ticket number...");
+      const year = new Date().getFullYear().toString().slice(-2);
+      let randomCode = crypto.randomBytes(3).toString("hex").toUpperCase();
+      let ticket = `TICK-${year}-${randomCode}`;
 
-    let nextNumber = 1;
+      // Check duplicates
+      let exists = await Issue.findOne({
+        where: { ticket_number: ticket },
+        transaction: options?.transaction,
+      });
 
-    if (lastIssue?.ticket_number) {
-      const match = lastIssue.ticket_number.match(/-(\d+)$/);
-      if (match) nextNumber = parseInt(match[1], 10) + 1;
+      while (exists) {
+        randomCode = crypto.randomBytes(3).toString("hex").toUpperCase();
+        ticket = `TICK-${year}-${randomCode}`;
+        exists = await Issue.findOne({
+          where: { ticket_number: ticket },
+          transaction: options?.transaction,
+        });
+      }
+
+      // console.log("Generated ticket:", ticket);
+      issue.ticket_number = ticket;
     }
-
-    issue.ticket_number = `TICK-${yearShort}-${String(nextNumber).padStart(
-      2,
-      "0"
-    )}`;
   });
 
   return Issue;

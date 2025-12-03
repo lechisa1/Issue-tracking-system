@@ -582,6 +582,137 @@ const assignUserToProject = async (req, res) => {
   }
 };
 
+// const assignInternalUsersToProject = async (req, res) => {
+//   const t = await sequelize.transaction();
+
+//   try {
+//     const { project_id, user_id, internal_node_id, project_metric_id } =
+//       req.body;
+
+//     // ====== Validate project ======
+//     const project = await Project.findByPk(project_id, { transaction: t });
+//     if (!project) {
+//       await t.rollback();
+//       return res.status(404).json({
+//         success: false,
+//         message: "Project not found.",
+//       });
+//     }
+
+//     // ====== Validate user ======
+//     const user = await User.findByPk(user_id, {
+//       include: [
+//         {
+//           model: Role,
+//           as: "roles",
+//           through: { attributes: [] },
+//         },
+//       ],
+//       transaction: t,
+//     });
+//     if (!user) {
+//       await t.rollback();
+//       return res.status(404).json({
+//         success: false,
+//         message: "User not found.",
+//       });
+//     }
+
+//     // ====== Get user's role from UserRoles table ======
+//     const userRoles = await UserRoles.findAll({
+//       where: {
+//         user_id: user_id,
+//         is_active: true,
+//       },
+//       include: [
+//         {
+//           model: Role,
+//           as: "role",
+//           where: { is_active: true },
+//         },
+//       ],
+//       transaction: t,
+//     });
+
+//     if (!userRoles || userRoles.length === 0) {
+//       await t.rollback();
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "User does not have any assigned roles. Please assign a role to the user first.",
+//       });
+//     }
+
+//     // Always select the first active role (you can modify this logic if needed)
+//     const userRole = userRoles[0];
+//     const role_id = userRole.role_id;
+
+//     // ====== Validate Internal Node (if provided) ======
+//     let finalInternalNodeId = null;
+
+//     if (internal_node_id) {
+//       const internalNode = await InternalNode.findByPk(internal_node_id, {
+//         transaction: t,
+//       });
+//       if (!internalNode) {
+//         await t.rollback();
+//         return res.status(400).json({
+//           success: false,
+//           message: "Internal node not found.",
+//         });
+//       }
+//       finalInternalNodeId = internal_node_id;
+//     }
+
+//     // ====== Prevent duplicate assignment ======
+//     const existing = await InternalProjectUserRole.findOne({
+//       where: { project_id, user_id },
+//       transaction: t,
+//     });
+
+//     if (existing) {
+//       await t.rollback();
+//       return res.status(400).json({
+//         success: false,
+//         message: "User is already assigned to this project.",
+//       });
+//     }
+
+//     // ====== Create internal project-user-role ======
+//     const assignment = await InternalProjectUserRole.create(
+//       {
+//         internal_project_user_role_id: uuidv4(),
+//         project_id,
+//         user_id,
+//         role_id,
+//         internal_node_id: finalInternalNodeId,
+//         is_active: true,
+//         created_at: new Date(),
+//         updated_at: new Date(),
+//       },
+//       { transaction: t }
+//     );
+
+//     await t.commit();
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "Internal user assigned to project successfully.",
+//       data: assignment,
+//     });
+//   } catch (error) {
+//     if (!t.finished) await t.rollback();
+//     console.error("Error assigning internal user to project:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// };
+
+// Update project
+
 const assignInternalUsersToProject = async (req, res) => {
   const t = await sequelize.transaction();
 
@@ -615,6 +746,19 @@ const assignInternalUsersToProject = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "User not found.",
+      });
+    }
+
+    // ====== Validate Project Metric (required) ======
+    const metric = await ProjectMetric.findByPk(project_metric_id, {
+      transaction: t,
+    });
+
+    if (!metric) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Project metric not found.",
       });
     }
 
@@ -664,9 +808,17 @@ const assignInternalUsersToProject = async (req, res) => {
       finalInternalNodeId = internal_node_id;
     }
 
+    if (!internal_node_id) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Internal node ID is required.",
+      });
+    }
+
     // ====== Prevent duplicate assignment ======
     const existing = await InternalProjectUserRole.findOne({
-      where: { project_id, user_id },
+      where: { project_id, user_id, project_metric_id },
       transaction: t,
     });
 
@@ -674,7 +826,8 @@ const assignInternalUsersToProject = async (req, res) => {
       await t.rollback();
       return res.status(400).json({
         success: false,
-        message: "User is already assigned to this project.",
+        message:
+          "User is already assigned to this project with the same metric.",
       });
     }
 
@@ -686,6 +839,7 @@ const assignInternalUsersToProject = async (req, res) => {
         user_id,
         role_id,
         internal_node_id: finalInternalNodeId,
+        project_metric_id,
         is_active: true,
         created_at: new Date(),
         updated_at: new Date(),
@@ -711,7 +865,6 @@ const assignInternalUsersToProject = async (req, res) => {
   }
 };
 
-// Update project
 const updateProject = async (req, res) => {
   try {
     const { id } = req.params;

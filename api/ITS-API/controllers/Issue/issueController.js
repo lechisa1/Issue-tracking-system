@@ -112,6 +112,8 @@ const createIssue = async (req, res) => {
         issue_description: issue_description || null,
         issue_occured_time: issue_occured_time || null,
         status: "pending",
+        // created_at: new Date(),
+        // updated_at: new Date(),
       },
       { transaction: t }
     );

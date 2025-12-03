@@ -15,10 +15,18 @@ exports.prioritySchema = Joi.object({
   color_value: Joi.string().trim().max(100).allow("", null).messages({
     "string.max": "Color value must not exceed 100 characters",
   }),
-
-  response_time: Joi.string().trim().max(100).allow("", null).messages({
-    "string.max": "Response time must not exceed 100 characters",
+  is_active: Joi.boolean().required().messages({
+    "boolean.base": "is_active must be a boolean value",
+    "any.required": "is_active is required",
   }),
+
+  response_time_id: Joi.string()
+    .guid({ version: "uuidv4" })
+    .required()
+    .messages({
+      "string.empty": "Response time ID  is required",
+      "string.guid": "Response time ID must be a valid UUID",
+    }),
 });
 
 // Schema for validating UUID in route params
