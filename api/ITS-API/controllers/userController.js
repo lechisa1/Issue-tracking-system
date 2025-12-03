@@ -302,10 +302,11 @@ const createUser = async (req, res) => {
 
 // =============== Update user ===============
 const updateUser = async (req, res) => {
-  console.log("update user reached")
+  // console.log("update user reached")
+  
   const t = await sequelize.transaction();
   try {
-    const { user_id } = req.params;
+    const { id:user_id } = req.params;
     const {
       full_name,
       email,
@@ -320,6 +321,7 @@ const updateUser = async (req, res) => {
 
     // ====== Find user ======
     const user = await User.findByPk(user_id, { transaction: t });
+    console.log("user: ", user, "user_idL ", user_id, req.params);
     if (!user) {
       await t.rollback();
       return res.status(404).json({
