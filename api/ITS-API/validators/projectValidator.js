@@ -46,6 +46,13 @@ exports.validateAssignUserToProject = (req, res, next) => {
       .guid({ version: "uuidv4" })
       .optional()
       .allow(null),
+    project_metric_id: Joi.string()
+      .guid({ version: "uuidv4" })
+      .required()
+      .messages({
+        "any.required": "Project metric ID is required.",
+        "string.guid": "Project metric ID must be a valid UUIDv4.",
+      }),
   });
 
   const { error } = schema.validate(req.body);

@@ -1,5 +1,6 @@
 "use strict";
 const { Model } = require("sequelize");
+const crypto = require("crypto");
 
 module.exports = (sequelize, DataTypes) => {
   class Issue extends Model {
@@ -111,7 +112,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       ticket_number: {
         type: DataTypes.STRING(20),
-        allowNull: false,
+        allowNull: true,
         unique: true,
       },
       project_id: {
@@ -179,29 +180,35 @@ module.exports = (sequelize, DataTypes) => {
     }
   );
 
-  // Add this after Issue.init
   Issue.beforeCreate(async (issue, options) => {
-    const year = new Date().getFullYear();
-    const yearShort = String(year).slice(-2); // last two digits, e.g., "25"
+    // console.log("=== BEFORE CREATE HOOK ===");
+    // console.log("Issue data:", issue.dataValues);
+    // console.log("Ticket number before:", issue.ticket_number);
 
-    // Find last ticket created this year
-    const lastIssue = await Issue.findOne({
-      where: {
-        ticket_number: { [sequelize.Op.like]: `TICK-${yearShort}-%` },
-      },
-      order: [["created_at", "DESC"]],
-    });
+    if (!issue.ticket_number) {
+      // console.log("Generating ticket number...");
+      const year = new Date().getFullYear().toString().slice(-2);
+      let randomCode = crypto.randomBytes(3).toString("hex").toUpperCase();
+      let ticket = `TICK-${year}-${randomCode}`;
 
-    let nextNumber = 1;
-    if (lastIssue && lastIssue.ticket_number) {
-      const match = lastIssue.ticket_number.match(/-(\d+)$/);
-      if (match) {
-        nextNumber = parseInt(match[1], 10) + 1;
+      // Check duplicates
+      let exists = await Issue.findOne({
+        where: { ticket_number: ticket },
+        transaction: options?.transaction,
+      });
+
+      while (exists) {
+        randomCode = crypto.randomBytes(3).toString("hex").toUpperCase();
+        ticket = `TICK-${year}-${randomCode}`;
+        exists = await Issue.findOne({
+          where: { ticket_number: ticket },
+          transaction: options?.transaction,
+        });
       }
-    }
 
-    const paddedNumber = String(nextNumber).padStart(2, "0"); // 2 digits
-    issue.ticket_number = `TICK-${yearShort}-${paddedNumber}`;
+      // console.log("Generated ticket:", ticket);
+      issue.ticket_number = ticket;
+    }
   });
 
   return Issue;

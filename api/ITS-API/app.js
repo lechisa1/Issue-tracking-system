@@ -22,6 +22,7 @@ const authRoute = require("./routers/authRoutes");
 
 const issueCategories = require("./routers/issueCategoryRoutes");
 const issuePriorities = require("./routers/issuePriorityRoutes");
+const issueResponseTimes = require("./routers/issueResponseTimeRoutes");
 
 const issueRoutes = require("./routers/issueRoutes");
 const issueAssignmentRoutes = require("./routers/issueAssignmentRoutes");
@@ -158,6 +159,7 @@ app.use("/api/hierarchy-node-organizations", hierarchyNodeOrganizationRoute);
 
 app.use("/api/issue-categories", issueCategories);
 app.use("/api/issue-priorities", issuePriorities);
+app.use("/api/issue-response-times", issueResponseTimes);
 app.use("/api/issues", issueRoutes);
 app.use("/api/assignments", issueAssignmentRoutes);
 app.use("/api/issue-escalations", issueEscalationRoutes);

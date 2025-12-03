@@ -467,7 +467,7 @@ router.get("/:id", authenticateToken, getUserById);
  *       500:
  *         description: Server error
  */
-router.put("/:id", authenticateToken, validateUpdateUser, updateUser);
+router.put("/:id", authenticateToken, updateUser);
 
 /**
  * @swagger

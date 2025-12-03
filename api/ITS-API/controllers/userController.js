@@ -90,7 +90,7 @@ const createUser = async (req, res) => {
       user_type_id,
       user_position_id,
       institute_id,
-      role_id,
+      role_ids,
       project_metrics_ids,
       phone_number,
       hierarchy_node_id,
@@ -178,14 +178,19 @@ const createUser = async (req, res) => {
       }
     }
 
-    // ====== Validate role if provided ======
-    if (role_id) {
-      const role = await Role.findByPk(role_id, { transaction: t });
-      if (!role) {
+    // ====== MULTIPLE ROLE VALIDATION ======
+    if (role_ids && Array.isArray(role_ids) && role_ids.length > 0) {
+      const roles = await Role.findAll({
+        where: { role_id: role_ids },
+        transaction: t,
+      });
+
+      if (roles.length !== role_ids.length) {
         await t.rollback();
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid role ID." });
+        return res.status(400).json({
+          success: false,
+          message: "One or more provided role IDs are invalid.",
+        });
       }
     }
 
@@ -234,19 +239,20 @@ const createUser = async (req, res) => {
       { transaction: t }
     );
 
-    // ====== Assign role if provided ======
-    if (role_id) {
-      await UserRoles.create(
-        {
-          user_role_id: uuidv4(),
-          user_id: user.user_id,
-          role_id: role_id,
-          assigned_by: req.user?.user_id || null, // Assuming you have auth middleware
-          assigned_at: new Date(),
-          is_active: true,
-        },
-        { transaction: t }
-      );
+    // =======================================================
+    // 🔵 MULTIPLE ROLE ASSIGNMENT
+    // =======================================================
+    if (role_ids && Array.isArray(role_ids) && role_ids.length > 0) {
+      const roleAssignments = role_ids.map((rid) => ({
+        user_role_id: uuidv4(),
+        user_id: user.user_id,
+        role_id: rid,
+        assigned_by: req.user?.user_id || null,
+        assigned_at: new Date(),
+        is_active: true,
+      }));
+
+      await UserRoles.bulkCreate(roleAssignments, { transaction: t });
     }
 
     // ====== Assign metrics to user if provided ======
@@ -296,6 +302,7 @@ const createUser = async (req, res) => {
 
 // =============== Update user ===============
 const updateUser = async (req, res) => {
+  console.log("update user reached")
   const t = await sequelize.transaction();
   try {
     const { user_id } = req.params;
@@ -307,6 +314,8 @@ const updateUser = async (req, res) => {
       phone_number,
       hierarchy_node_id,
       is_active,
+      role_ids,
+      project_metrics_ids,
     } = req.body;
 
     // ====== Find user ======
@@ -387,6 +396,69 @@ const updateUser = async (req, res) => {
       },
       { transaction: t }
     );
+
+    // ====== Update roles if provided ======
+    if (role_ids && Array.isArray(role_ids)) {
+      // Validate roles exist
+      const roles = await Role.findAll({
+        where: { role_id: role_ids },
+        transaction: t,
+      });
+      if (roles.length !== role_ids.length) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "One or more provided role IDs are invalid.",
+        });
+      }
+
+      // Delete old roles
+      await UserRoles.destroy({
+        where: { user_id },
+        transaction: t,
+      });
+
+      // Assign new roles
+      const roleAssignments = role_ids.map((rid) => ({
+        user_role_id: uuidv4(),
+        user_id,
+        role_id: rid,
+        assigned_by: req.user?.user_id || null,
+        assigned_at: new Date(),
+        is_active: true,
+      }));
+      await UserRoles.bulkCreate(roleAssignments, { transaction: t });
+    }
+
+    // ====== Update project metrics if provided ======
+    if (project_metrics_ids && Array.isArray(project_metrics_ids)) {
+      // Validate metrics exist
+      const metrics = await ProjectMetric.findAll({
+        where: { project_metric_id: project_metrics_ids },
+        transaction: t,
+      });
+      if (metrics.length !== project_metrics_ids.length) {
+        await t.rollback();
+        return res
+          .status(404)
+          .json({ success: false, message: "One or more metrics not found." });
+      }
+
+      // Delete old metric assignments
+      await ProjectMetricUser.destroy({
+        where: { user_id },
+        transaction: t,
+      });
+
+      // Assign new metrics
+      const metricAssignments = project_metrics_ids.map((metric_id) => ({
+        id: uuidv4(),
+        user_id,
+        project_metric_id: metric_id,
+        value: null,
+      }));
+      await ProjectMetricUser.bulkCreate(metricAssignments, { transaction: t });
+    }
 
     await t.commit();
 
@@ -665,6 +737,11 @@ const getInternalUsersAssignedToNode = async (req, res) => {
           attributes: ["role_id", "name"],
         },
         {
+          model: ProjectMetric,
+          as: "projectMetric",
+          attributes: ["project_metric_id", "name", "description"],
+        },
+        {
           model: InternalNode,
           as: "internalNode",
           attributes: ["internal_node_id", "name"],
@@ -800,6 +877,10 @@ const getInternalUsersAssignedToProject = async (req, res) => {
           model: InternalNode,
           as: "internalNode",
           attributes: ["internal_node_id", "name", "level", "parent_id"],
+        },
+        {
+          model: ProjectMetric,
+          as: "projectMetric",
         },
       ],
       order: [["created_at", "DESC"]],
@@ -1052,6 +1133,43 @@ const getUserById = async (req, res) => {
           model: ProjectMetric,
           as: "metrics",
           through: { attributes: ["value"] },
+        },
+        {
+          model: ProjectUserRole,
+          as: "projectRoles",
+          include: [
+            {
+              model: Project,
+              as: "project",
+              attributes: ["project_id", "name", "description"],
+            },
+            {
+              model: HierarchyNode,
+              as: "hierarchyNode",
+              attributes: ["hierarchy_node_id", "name", "description"],
+            },
+          ],
+        },
+        {
+          model: InternalProjectUserRole,
+          as: "internalProjectUserRoles",
+          include: [
+            {
+              model: Project,
+              as: "project",
+              attributes: ["project_id", "name", "description"],
+            },
+            {
+              model: ProjectMetric,
+              as: "projectMetric",
+              attributes: ["project_metric_id", "name", "description"],
+            },
+            {
+              model: InternalNode,
+              as: "internalNode",
+              attributes: ["internal_node_id", "name", "description"],
+            },
+          ],
         },
       ],
     });
