@@ -92,6 +92,7 @@ const createUser = async (req, res) => {
       institute_id,
       phone_number,
       hierarchy_node_id,
+      role_ids,
     } = req.body;
 
     // ====== Check existing email ======
@@ -192,7 +193,7 @@ const createUser = async (req, res) => {
     // const password = generateRandomPassword();
     const password = "password";
     const hashedPassword = await bcrypt.hash(password, 10);
-
+    const otp = Math.floor(100000 + Math.random() * 900000); // 6-digit OTP
     // ====== Create User ======
     const user = await User.create(
       {
@@ -213,7 +214,18 @@ const createUser = async (req, res) => {
       },
       { transaction: t }
     );
+    // ===== Assign Multiple Roles =====
+    if (role_ids && role_ids.length > 0) {
+      const userRolesData = role_ids.map((role_id) => ({
+        user_role_id: uuidv4(),
+        user_id: user.user_id,
+        role_id,
+        assigned_at: new Date(),
+        is_active: true,
+      }));
 
+      await UserRoles.bulkCreate(userRolesData, { transaction: t });
+    }
     await t.commit();
 
     // ====== Send welcome email ======
@@ -228,10 +240,15 @@ const createUser = async (req, res) => {
       Please change your password after first login.
     `
     );
-
+    // ====== Send SMS with OTP ======
+    // const smsService = require("../utils/twilioSmsService");
+    // if (phone_number) {
+    //   await smsService.sendOTP(phone_number, otp);
+    //   console.log("otppppppppppppppppppppppppppppppppppppppp", otp);
+    // }
     return res.status(201).json({
       success: true,
-      message: "User registered globally (no roles assigned yet)",
+      message: "User registered ",
       data: user,
     });
   } catch (error) {
@@ -243,7 +260,7 @@ const createUser = async (req, res) => {
 
 const updateUser = async (req, res) => {
   const t = await sequelize.transaction();
-  console.log("ccccccccccccccccccccccccccccccccccccc");
+
   try {
     const user_id = req.params.id;
 
@@ -255,7 +272,7 @@ const updateUser = async (req, res) => {
       phone_number,
       hierarchy_node_id,
       is_active,
-      roles, // roles for BOTH user types
+      role_ids, // array of role IDs
     } = req.body;
 
     // ======================= FIND USER WITH ASSOCIATIONS ==========================
@@ -275,7 +292,6 @@ const updateUser = async (req, res) => {
       transaction: t,
     });
 
-    console.log("userrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr", user);
     if (!user) {
       await t.rollback();
       return res.status(404).json({
@@ -284,19 +300,9 @@ const updateUser = async (req, res) => {
       });
     }
 
-    console.log("Found user:", user.user_id, user.full_name);
-    console.log("User type:", user.userType?.name);
-    console.log(
-      "Current roles:",
-      user.user_roles?.map((ur) => ur.role_id)
-    );
-
     // ======================= EMAIL UNIQUE =======================
     if (email && email !== user.email) {
-      const exists = await User.findOne({
-        where: { email },
-        transaction: t,
-      });
+      const exists = await User.findOne({ where: { email }, transaction: t });
       if (exists) {
         await t.rollback();
         return res.status(400).json({
@@ -316,7 +322,7 @@ const updateUser = async (req, res) => {
         await t.rollback();
         return res.status(400).json({
           success: false,
-          message: "Phone already exists.",
+          message: "Phone number already exists.",
         });
       }
     }
@@ -338,7 +344,6 @@ const updateUser = async (req, res) => {
       finalUserType = user_type_id;
       finalUserTypeName = type.name;
 
-      // external_user MUST have institute
       if (type.name === "external_user" && !institute_id) {
         await t.rollback();
         return res.status(400).json({
@@ -347,7 +352,6 @@ const updateUser = async (req, res) => {
         });
       }
 
-      // internal_user MUST NOT have institute
       if (type.name === "internal_user" && institute_id) {
         await t.rollback();
         return res.status(400).json({
@@ -399,35 +403,27 @@ const updateUser = async (req, res) => {
       { transaction: t }
     );
 
-    // =================== ROLE HANDLING FOR BOTH USER TYPES ===========================
-    if (Array.isArray(roles)) {
-      console.log("Updating roles:", roles);
-
+    // =================== ROLE HANDLING ===========================
+    if (Array.isArray(role_ids)) {
       // Remove old roles
-      await UserRoles.destroy({
-        where: { user_id },
-        transaction: t,
-      });
+      await UserRoles.destroy({ where: { user_id }, transaction: t });
 
-      // Insert new roles if any are provided
-      if (roles.length > 0) {
-        const roleAssignments = roles.map((roleId) => ({
+      // Insert new roles
+      if (role_ids.length > 0) {
+        const roleAssignments = role_ids.map((roleId) => ({
           user_id,
           role_id: roleId,
           assigned_by: req.user?.user_id || null,
           assigned_at: new Date(),
         }));
-
         await UserRoles.bulkCreate(roleAssignments, { transaction: t });
       }
-
-      console.log(`Updated ${roles.length} roles for user ${user_id}`);
     }
 
     // ======================= COMMIT ==============================
     await t.commit();
 
-    // ======================= FETCH UPDATED USER WITH ASSOCIATIONS ====================
+    // ======================= FETCH UPDATED USER ===================
     const updatedUser = await User.findOne({
       where: { user_id },
       include: [
@@ -443,10 +439,15 @@ const updateUser = async (req, res) => {
       ],
     });
 
+    // Flatten roles for frontend
+    const userJson = updatedUser.toJSON();
+    userJson.roles =
+      userJson.userRoles?.map((ur) => ur.role) || userJson.roles || [];
+
     return res.status(200).json({
       success: true,
       message: "User updated successfully.",
-      data: updatedUser,
+      data: userJson,
     });
   } catch (error) {
     if (!t.finished) await t.rollback();
@@ -950,7 +951,7 @@ const getInternalUsersAssignedToProject = async (req, res) => {
 // };
 
 const getUsersNotAssignedToProject = async (req, res) => {
-  // console.log("not external one assigned called");
+  console.log("Fetching unassigned users...");
   try {
     const { institute_id, project_id } = req.params;
 
@@ -1008,6 +1009,7 @@ const getUsersNotAssignedToProject = async (req, res) => {
       order: [["created_at", "DESC"]],
     });
 
+    console.log("userssssssssssssssss", users);
     // Filter users: keep only users with at least one unassigned role
     const unassignedUsers = users.filter((user) => {
       const assignedRoles = assignedRolesMap[user.user_id] || new Set();

@@ -20,25 +20,17 @@ const {
 } = require("../models");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-
+const { Op } = require("sequelize");
 const login = async (req, res) => {
   try {
     const { email, phoneNumber, password } = req.body;
 
-    console.log("Login attempt:", { email, phoneNumber }); // Debug log
+    console.log("Login attempt:", { email, phoneNumber });
 
-    // Validate that either email or phoneNumber is provided
     if (!email && !phoneNumber) {
       return res.status(400).json({
         success: false,
         message: "Please provide either email or phone number",
-      });
-    }
-
-    if (email && phoneNumber) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide either email or phone number, not both",
       });
     }
 
@@ -49,26 +41,18 @@ const login = async (req, res) => {
       });
     }
 
-    let user;
     let queryCondition = {};
 
-    // Find user by email or phone number
     if (email) {
       queryCondition = { email };
     } else if (phoneNumber) {
-      let cleanPhoneNumber = phoneNumber.replace(/\D/g, ""); // remove all non-digits
-
-      // Convert +2519XXXXXXXX to 09XXXXXXXX
-      if (cleanPhoneNumber.startsWith("251")) {
-        cleanPhoneNumber = "0" + cleanPhoneNumber.slice(3);
-      }
-
-      queryCondition = { phone_number: cleanPhoneNumber };
+      // Use phone exactly as registered
+      queryCondition = { phone_number: phoneNumber };
     }
 
-    console.log("Query condition:", queryCondition); // Debug log
+    console.log("Query condition:", queryCondition);
 
-    user = await User.findOne({
+    const user = await User.findOne({
       where: queryCondition,
       include: [
         {
@@ -102,11 +86,7 @@ const login = async (req, res) => {
           as: "internalNode",
           attributes: ["internal_node_id", "name", "level", "parent_id"],
         },
-        {
-          model: Role,
-          as: "roles",
-          through: { attributes: [] },
-        },
+        { model: Role, as: "roles", through: { attributes: [] } },
         {
           model: ProjectMetric,
           as: "metrics",
@@ -121,11 +101,7 @@ const login = async (req, res) => {
               as: "project",
               attributes: ["project_id", "name", "description"],
             },
-            {
-              model: Role,
-              as: "role",
-              attributes: ["role_id", "name"],
-            },
+            { model: Role, as: "role", attributes: ["role_id", "name"] },
             {
               model: SubRole,
               as: "subRole",
@@ -147,11 +123,7 @@ const login = async (req, res) => {
               as: "project",
               attributes: ["project_id", "name", "description"],
             },
-            {
-              model: Role,
-              as: "role",
-              attributes: ["role_id", "name"],
-            },
+            { model: Role, as: "role", attributes: ["role_id", "name"] },
             {
               model: InternalNode,
               as: "internalNode",
@@ -176,7 +148,6 @@ const login = async (req, res) => {
       });
     }
 
-    // Compare password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({
@@ -185,12 +156,12 @@ const login = async (req, res) => {
       });
     }
 
-    // Format user data for token
+    // Prepare user data for JWT token
     const userDataForToken = {
       user_id: user.user_id,
       email: user.email,
       full_name: user.full_name,
-      user_type: user.userType ? user.userType.name : null,
+      user_type: user.userType?.name || null,
       institute: user.institute
         ? {
             institute_id: user.institute.institute_id,
@@ -217,36 +188,24 @@ const login = async (req, res) => {
             level: user.internalNode.level,
           }
         : null,
-      // Include global roles and permissions
-      roles: user.roles
-        ? user.roles.map((role) => ({
-            role_id: role.role_id,
-            name: role.name,
-          }))
-        : [],
-      // Include metrics
-      metrics: user.metrics
-        ? user.metrics.map((metric) => ({
-            project_metric_id: metric.project_metric_id,
-            name: metric.name,
-            description: metric.description,
-            value: metric.ProjectMetricUser.value,
-          }))
-        : [],
+      roles:
+        user.roles?.map((role) => ({
+          role_id: role.role_id,
+          name: role.name,
+        })) || [],
+      metrics:
+        user.metrics?.map((metric) => ({
+          project_metric_id: metric.project_metric_id,
+          name: metric.name,
+          description: metric.description,
+          value: metric.ProjectMetricUser.value,
+        })) || [],
     };
 
-    // Generate JWT with comprehensive user data
     const token = jwt.sign(userDataForToken, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRATION_TIME || "12h",
     });
 
-    // Update last login
-    await User.update(
-      { last_login_at: new Date() },
-      { where: { user_id: user.user_id } }
-    );
-
-    // Update last login
     await user.update({ last_login_at: new Date() });
 
     return res.status(200).json({
@@ -258,7 +217,6 @@ const login = async (req, res) => {
         phone_number: user.phone_number,
         profile_image: user.profile_image,
         is_first_logged_in: user.is_first_logged_in,
-        // Include project-specific roles
         project_roles: user.projectRoles?.map((pr) => ({
           project_user_role_id: pr.project_user_role_id,
           project: pr.project
@@ -268,9 +226,9 @@ const login = async (req, res) => {
                 description: pr.project.description,
               }
             : null,
-          role: pr.role ? pr.role.name : null,
-          role_id: pr.role ? pr.role.role_id : null,
-          sub_role_id: pr.subRole ? pr.subRole.sub_role_id : null,
+          role: pr.role?.name || null,
+          role_id: pr.role?.role_id || null,
+          sub_role_id: pr.subRole?.sub_role_id || null,
           hierarchy_node: pr.hierarchyNode
             ? {
                 hierarchy_node_id: pr.hierarchyNode.hierarchy_node_id,
@@ -279,7 +237,6 @@ const login = async (req, res) => {
               }
             : null,
         })),
-        // Include internal project roles
         internal_project_roles: user.internalProjectUserRoles?.map((ipr) => ({
           internal_project_user_role_id: ipr.internal_project_user_role_id,
           project: ipr.project
@@ -289,8 +246,8 @@ const login = async (req, res) => {
                 description: ipr.project.description,
               }
             : null,
-          role: ipr.role ? ipr.role.name : null,
-          role_id: ipr.role ? ipr.role.role_id : null,
+          role: ipr.role?.name || null,
+          role_id: ipr.role?.role_id || null,
           internal_node: ipr.internalNode
             ? {
                 internal_node_id: ipr.internalNode.internal_node_id,
@@ -304,15 +261,11 @@ const login = async (req, res) => {
     });
   } catch (error) {
     console.error("Login error:", error);
-
-    // Make sure we haven't already sent a response
-    if (!res.headersSent) {
-      return res.status(500).json({
-        success: false,
-        message: "Internal server error",
-        error: error.message,
-      });
-    }
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };
 

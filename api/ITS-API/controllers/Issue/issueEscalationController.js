@@ -183,7 +183,6 @@ const escalateIssue = async (req, res) => {
 
     // Create notifications for all recipients
 
-    
     for (const recipient_id of recipientIds) {
       console.log(
         `📩 Creating escalation notification for recipient_id=${recipient_id}`
@@ -195,8 +194,18 @@ const escalateIssue = async (req, res) => {
         reference_id: escalation_id,
         type: "issue_escalated",
         title: `Issue escalated: ${issue.title || issue.issue_id}`,
-        body: `Issue escalated from tier ${from_tier} to ${to_tier}. Reason: ${reason}`,
-        payload: { issue_id, escalation_id, from_tier, to_tier },
+        body: `Issue escalated from ${fromTierName} to ${toTierName}. Reason: ${reason}`,
+
+        payload: {
+          issue_id,
+          escalation_id,
+          from_tier_id: from_tier,
+          to_tier_id: to_tier,
+          from_tier_name: fromTierName,
+          to_tier_name: toTierName,
+          reason,
+        },
+
         transaction: t,
       });
     }

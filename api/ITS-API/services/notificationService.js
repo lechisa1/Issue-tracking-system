@@ -7,7 +7,8 @@ const {
   sequelize,
 } = require("../models");
 const { v4: uuidv4 } = require("uuid");
-const sendEmail = require("../utils/sendEmail");
+const { sendEmail } = require("../utils/sendEmail");
+
 const logger = require("../utils/logger");
 
 /**

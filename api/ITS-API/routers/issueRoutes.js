@@ -266,5 +266,6 @@ router.get(
   authenticateToken,
   issueController.getEscalatedIssuesWithNullTier
 );
+router.put("/:issue_id/reopen", authenticateToken, issueController.reopenIssue);
 
 module.exports = router;
