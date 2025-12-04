@@ -303,10 +303,10 @@ const createUser = async (req, res) => {
 // =============== Update user ===============
 const updateUser = async (req, res) => {
   // console.log("update user reached")
-  
+
   const t = await sequelize.transaction();
   try {
-    const { id:user_id } = req.params;
+    const { id: user_id } = req.params;
     const {
       full_name,
       email,
