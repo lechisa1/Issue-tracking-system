@@ -94,7 +94,6 @@ const createUser = async (req, res) => {
       project_metrics_ids,
       phone_number,
       hierarchy_node_id,
-      role_ids,
     } = req.body;
 
     // ====== Check existing email ======
@@ -319,11 +318,11 @@ const createUser = async (req, res) => {
 
 const updateUser = async (req, res) => {
   // console.log("update user reached")
-  
+
   const t = await sequelize.transaction();
 
   try {
-    const { id:user_id } = req.params;
+    const { id: user_id } = req.params;
     const {
       full_name,
       email,
