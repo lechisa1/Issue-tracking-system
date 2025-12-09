@@ -118,8 +118,10 @@ const resolveIssue = async (req, res) => {
         reference_type: "issue",
         reference_id: issue_id,
         type: "issue_resolved",
-        title: `Issue Resolved: ${issue.title}`,
-        body: `${resolver.full_name} resolved your issue.`,
+        title: `Issue Resolved: ${issue.ticket_number}  ,${` by ${reason}`}`,
+        body: `${resolver.full_name} resolved your issue. ${
+          issue.ticket_number
+        }  ,${` by ${reason}`}`,
         payload: { issue_id, project_id: issue.project_id, reason },
         transaction: t,
       });

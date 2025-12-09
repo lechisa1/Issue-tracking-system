@@ -8,6 +8,11 @@ const {
   IssueAction,
   sequelize,
 } = require("../../models");
+const { Op } = require("sequelize");
+const {
+  createNotification,
+  sendEmailForNotification,
+} = require("../../services/notificationService");
 const { v4: uuidv4 } = require("uuid");
 
 // ------------------------------------------------------
@@ -33,7 +38,6 @@ const assignIssue = async (req, res) => {
     if (!assigner)
       return res.status(404).json({ message: "Assigner user not found." });
 
-    // 🔥🔥 4. Check for duplicate assignment
     const existingAssignment = await IssueAssignment.findOne({
       where: { issue_id, assignee_id },
       transaction: t,
@@ -48,7 +52,7 @@ const assignIssue = async (req, res) => {
 
     const assignment_id = uuidv4();
 
-    // 4. Create assignment
+    // 5. Create assignment
     const assignment = await IssueAssignment.create(
       {
         assignment_id,
@@ -64,7 +68,7 @@ const assignIssue = async (req, res) => {
       { transaction: t }
     );
 
-    // 5. Attach files if provided
+    // 6. Attach files if provided
     if (attachment_ids?.length > 0) {
       const attachments = attachment_ids.map((attachment_id) => ({
         assignment_id,
@@ -75,7 +79,7 @@ const assignIssue = async (req, res) => {
       await AssignmentAttachment.bulkCreate(attachments, { transaction: t });
     }
 
-    // 6. Log action
+    // 7. Log action
     await IssueAction.create(
       {
         action_id: uuidv4(),
@@ -90,16 +94,16 @@ const assignIssue = async (req, res) => {
     );
 
     // ==================================
-    // 7. CREATE IssueHistory ENTRY (CORRECTED)
+    // 8. CREATE IssueHistory ENTRY
     // ==================================
     await IssueHistory.create(
       {
         history_id: uuidv4(),
         issue_id,
-        user_id: assigned_by, // Changed from resolved_by to assigned_by
-        action: "assigned", // Using "assigned" action from the comment
-        status_at_time: "pending", // Get current status from the issue
-        assignment_id: assignment_id, // Link to the assignment we just created
+        user_id: assigned_by,
+        action: "assigned",
+        status_at_time: "pending",
+        assignment_id: assignment_id,
         escalation_id: null,
         resolution_id: null,
         notes: `Issue assigned to ${assignee.full_name}. ${
@@ -110,8 +114,7 @@ const assignIssue = async (req, res) => {
       { transaction: t }
     );
 
-    // 8. Update issue status if needed (optional - depends on your business logic)
-    // If you want to change issue status when assigned, uncomment below:
+    // 9. Update issue status if needed
     await issue.update(
       {
         status: "pending",
@@ -120,10 +123,163 @@ const assignIssue = async (req, res) => {
       { transaction: t }
     );
 
-    // COMMIT transaction
-    await t.commit();
+    // ==================================
+    // 10. NOTIFICATION LOGIC (CONFIDENTIAL)
+    // ==================================
+    const recipientsSet = new Set();
 
-    // 9. Fetch full assignment with attachments
+    // A. Always notify the assignee (the user being assigned to the issue)
+    if (assignee_id && assignee_id !== assigned_by) {
+      recipientsSet.add(assignee_id);
+      console.log(
+        `👤 Notifying assignee: ${assignee_id} (${assignee.full_name})`
+      );
+    }
+
+    // D. Notify the previous assignee (if any) for handover context
+    const previousAssignment = await IssueAssignment.findOne({
+      where: {
+        issue_id: issue_id,
+        assignee_id: { [Op.ne]: assignee_id }, // Not the current assignee
+      },
+      order: [["assigned_at", "DESC"]],
+      transaction: t,
+    });
+
+    if (previousAssignment && previousAssignment.assignee_id !== assigned_by) {
+      recipientsSet.add(previousAssignment.assignee_id);
+      console.log(
+        `👤 Notifying previous assignee: ${previousAssignment.assignee_id}`
+      );
+    }
+
+    // Convert to array and remove duplicates
+    const recipientIds = Array.from(recipientsSet).filter(Boolean);
+    console.log(`Final assignment notification recipients:`, recipientIds);
+
+    // Create notifications for all recipients
+    for (const recipient_id of recipientIds) {
+      console.log(
+        `Creating assignment notification for recipient_id=${recipient_id}`
+      );
+
+      await createNotification({
+        recipient_id,
+        user_id: assigned_by,
+        reference_type: "assignment",
+        reference_id: assignment_id,
+        type: "issue_assigned",
+        title: `New Task Assigned: ${`Issue #${issue.ticket_number}`}`,
+        body: `A new task "${
+          issue.ticket_number
+        }" has been assigned to you by ${assigner.full_name}. ${
+          remarks ? `Remarks: ${remarks}` : ""
+        }`,
+        payload: {
+          issue_id,
+          assignment_id,
+          assignee_id,
+          assignee_name: assignee.full_name,
+          assigner_id: assigned_by,
+          assigner_name: assigner.full_name,
+          remarks: remarks || null,
+          project_id: issue.project_id,
+
+          ticket_number: issue.ticket_number,
+        },
+        transaction: t,
+      });
+    }
+
+    // ==================================
+    // 11. COMMIT TRANSACTION
+    // ==================================
+    await t.commit();
+    console.log("🟢 Assignment transaction committed successfully.");
+
+    // ==================================
+    // 12. ASYNC EMAIL SENDING
+    // ==================================
+    (async () => {
+      try {
+        const notifications = await sequelize.models.Notification.findAll({
+          where: {
+            reference_id: assignment_id,
+            type: "issue_assigned",
+          },
+          include: [
+            {
+              model: User,
+              as: "recipient",
+              attributes: ["user_id", "full_name", "email"],
+            },
+          ],
+        });
+
+        console.log(
+          `📧 Processing ${notifications.length} assignment email notifications`
+        );
+
+        const emailPromises = notifications.map(async (notification) => {
+          try {
+            console.log(
+              `📧 Attempting email for notification ${notification.notification_id} to ${notification.recipient?.email}`
+            );
+            const result = await sendEmailForNotification(notification);
+
+            if (result) {
+              console.log(
+                `✅ Email sent successfully for notification ${notification.notification_id}`
+              );
+              return {
+                notification_id: notification.notification_id,
+                status: "success",
+              };
+            } else {
+              console.log(
+                `❌ Email failed for notification ${notification.notification_id}`
+              );
+              return {
+                notification_id: notification.notification_id,
+                status: "failed",
+                error: "sendEmailForNotification returned false",
+              };
+            }
+          } catch (emailError) {
+            console.error(
+              `💥 Email error for notification ${notification.notification_id}:`,
+              emailError.message
+            );
+            return {
+              notification_id: notification.notification_id,
+              status: "error",
+              error: emailError.message,
+            };
+          }
+        });
+
+        const results = await Promise.allSettled(emailPromises);
+
+        // Analyze results
+        const successful = results.filter(
+          (r) => r.status === "fulfilled" && r.value.status === "success"
+        ).length;
+        const failed = results.filter(
+          (r) => r.status === "fulfilled" && r.value.status !== "success"
+        ).length;
+        const rejected = results.filter((r) => r.status === "rejected").length;
+
+        console.log(
+          `📧 Email sending summary: ${successful} successful, ${failed} failed, ${rejected} rejected`
+        );
+      } catch (err) {
+        console.error("💥 Post-commit email processing error:", err);
+      }
+    })();
+
+    // ==================================
+    // 13. RETURN ASSIGNMENT WITH DETAILS
+    // ==================================
     const assignmentWithDetails = await IssueAssignment.findOne({
       where: { assignment_id },
       include: [
@@ -138,7 +294,13 @@ const assignIssue = async (req, res) => {
       ],
     });
 
-    return res.status(201).json(assignmentWithDetails);
+    return res.status(201).json({
+      success: true,
+      message: "Issue assigned successfully",
+      data: assignmentWithDetails,
+      notifications_sent: recipientIds.length,
+      confidential: true, // Indicate this is a confidential assignment
+    });
   } catch (error) {
     await t.rollback();
     console.error("ASSIGNMENT ERROR:", error);
