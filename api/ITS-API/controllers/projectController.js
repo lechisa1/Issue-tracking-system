@@ -415,8 +415,6 @@ const assignUserToProject = async (req, res) => {
     console.log("📥 Received assignment request:", {
       project_id,
       user_id,
-      role_id,
-      sub_role_id,
       hierarchy_node_id,
     });
 

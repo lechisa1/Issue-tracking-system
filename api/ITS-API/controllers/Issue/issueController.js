@@ -195,7 +195,7 @@ const createIssue = async (req, res) => {
         user_id: reported_by,
         reference_type: "issue",
         reference_id: issue_id,
-        type: "issue_created",
+        type: "New issue created",
         title: `New Issue: ${title}`,
         body: `${req.user.name} created a new issue.`,
         payload: { issue_id, project_id },
