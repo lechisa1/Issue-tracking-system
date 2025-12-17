@@ -93,6 +93,8 @@ router.post(
  *         description: List of issues
  */
 router.get("/", validateGetIssuesQuery, issueController.getIssues);
+router.get("/assigned/:user_id", issueController.getAssignedIssues);
+
 router.get(
   "/user/:id",
   validateIssueIdParam,
@@ -125,6 +127,10 @@ router.get(
   validateIssueIdParam,
   issueController.getIssueById
 );
+
+// getIssueByTicketingNumber
+
+router.get("/ticket/:ticket_number", issueController.getIssueByTicketingNumber);
 
 /**
  * @swagger
@@ -260,5 +266,6 @@ router.get(
   authenticateToken,
   issueController.getEscalatedIssuesWithNullTier
 );
+router.put("/:issue_id/reopen", authenticateToken, issueController.reopenIssue);
 
 module.exports = router;

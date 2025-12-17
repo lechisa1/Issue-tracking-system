@@ -26,12 +26,39 @@ const createUserSchema = Joi.object({
     "any.required": "User type ID is required.",
   }),
 
+  user_position_id: Joi.string()
+    .guid({ version: "uuidv4" })
+    .allow(null)
+    .optional()
+    .messages({
+      "string.guid": "Position ID must be a valid UUID.",
+    }),
+
   institute_id: Joi.string()
     .guid({ version: "uuidv4" })
     .allow(null)
     .optional()
     .messages({
       "string.guid": "Institute ID must be a valid UUID.",
+    }),
+  role_ids: Joi.array()
+    .items(
+      Joi.string()
+        .guid({ version: "uuidv4" })
+        .messages({ "string.guid": "Each role ID must be a valid UUID." })
+    )
+    .optional()
+    .allow(null)
+    .messages({
+      "array.base": "Role ID must be an array of UUIDs.",
+    }),
+
+  project_metrics_ids: Joi.array()
+    .items(Joi.string().uuid())
+    .optional()
+    .messages({
+      "array.base": "metrics IDs must be an array",
+      "string.guid": "Each metrics ID must be a valid UUID",
     }),
 
   position: Joi.string().max(100).optional().messages({
@@ -55,6 +82,12 @@ const updateUserSchema = Joi.object({
       "string.pattern.base":
         "Phone number must be a valid Ethiopian format (e.g., +2519XXXXXXXX or 09XXXXXXXX).",
     }),
+  roles: Joi.array()
+    .items(Joi.string().guid({ version: "uuidv4" }))
+    .optional()
+    .messages({
+      "string.guid": "Each role ID must be a valid UUID.",
+    }),
   user_type_id: Joi.string().guid({ version: "uuidv4" }).optional(),
   institute_id: Joi.string().guid({ version: "uuidv4" }).allow(null).optional(),
   position: Joi.string().max(100).optional(),
@@ -64,6 +97,13 @@ const updateUserSchema = Joi.object({
     .optional()
     .messages({
       "string.guid": "Each role ID must be a valid UUID.",
+    }),
+  project_metrics_ids: Joi.array()
+    .items(Joi.string().uuid())
+    .optional()
+    .messages({
+      "array.base": "metrics IDs must be an array",
+      "string.guid": "Each metrics ID must be a valid UUID",
     }),
   hierarchy_node_id: Joi.string()
     .guid({ version: "uuidv4" })
@@ -85,6 +125,7 @@ exports.validateCreateUser = (req, res, next) => {
 };
 
 exports.validateUpdateUser = (req, res, next) => {
+  console.log("validate update user reached")
   const { error } = updateUserSchema.validate(req.body, { abortEarly: true });
   if (error) {
     return res.status(400).json({

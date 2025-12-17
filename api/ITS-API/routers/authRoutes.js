@@ -4,6 +4,7 @@ const authController = require("../controllers/authController");
 const { validateLogin } = require("../validators/authValidator");
 const { authenticateToken } = require("../middlewares/authMiddleware");
 const passwordResetSMSController = require("../controllers/passwordResetSMS");
+const { firstLoginReset } = require("../controllers/authController");
 const {
   resetUserPasswordByEmail,
   validateResetToken,
@@ -69,7 +70,7 @@ router.post("/login", validateLogin, authController.login);
  *         description: Logout successful
  */
 router.post("/logout", authController.logout);
-
+// router.post("/password-reset/first-login", authenticateToken, firstLoginReset);
 /**
  * @swagger
  * /api/auth/me:

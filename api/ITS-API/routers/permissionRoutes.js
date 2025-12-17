@@ -3,14 +3,14 @@ const router = express.Router();
 const permissionController = require("../controllers/permissionController");
 
 router.get("/", permissionController.getPermissions);
-router.patch(
-  "/:permission_id/activate",
+router.put(
+  "/activate/:permission_id",
   permissionController.activatePermission
 );
-router.patch(
-  "/:permission_id/deactivate",
+router.put(
+  "/deactivate/:permission_id",
   permissionController.deactivatePermission
 );
-router.patch("/:permission_id/toggle", permissionController.togglePermission);
+router.put("/toggle/:permission_id", permissionController.togglePermission);
 
 module.exports = router;

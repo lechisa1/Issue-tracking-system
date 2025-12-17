@@ -15,13 +15,14 @@ const { swaggerUi, swaggerSpec } = require("./swagger");
 
 const userRoute = require("./routers/userRoutes");
 const roleRoute = require("./routers/roleRoutes");
+const projectMetricRoute = require("./routers/projectMetricRoute");
 const rolePermissionRoute = require("./routers/rolePermissionRoutes");
 const userRoleRoute = require("./routers/userRoleRoutes");
 const authRoute = require("./routers/authRoutes");
 
 const issueCategories = require("./routers/issueCategoryRoutes");
 const issuePriorities = require("./routers/issuePriorityRoutes");
-const issueFlowRoute = require("./routers/issueFlowRoute");
+const issueResponseTimes = require("./routers/issueResponseTimeRoutes");
 
 const issueRoutes = require("./routers/issueRoutes");
 const issueAssignmentRoutes = require("./routers/issueAssignmentRoutes");
@@ -55,17 +56,33 @@ const appServer = http.createServer(app);
 // app.use(devAuthBypass);
 // app.use(express.json());
 
+// app.use(
+//   express.json({
+//     verify: (req, res, buf) => {
+//       try {
+//         JSON.parse(buf);
+//       } catch (e) {
+//         res.status(400).json({
+//           message:
+//             "Invalid JSON format. Please ensure all property names are double-quoted and JSON is valid.",
+//         });
+//         throw e;
+//       }
+//     },
+//   })
+// );
+
 app.use(
   express.json({
     verify: (req, res, buf) => {
       try {
         JSON.parse(buf);
       } catch (e) {
-        res.status(400).json({
-          message:
-            "Invalid JSON format. Please ensure all property names are double-quoted and JSON is valid.",
-        });
-        throw e;
+        // Don't throw the error after sending response
+        const error = new Error("Invalid JSON payload");
+        error.status = 400;
+        error.expose = true;
+        throw error;
       }
     },
   })
@@ -144,6 +161,7 @@ app.use("/api/user-roles", userRoleRoute);
 app.use("/api/auth", authRoute);
 
 app.use("/api/projects", require("./routers/projectRoutes"));
+app.use("/api/project-metrics", projectMetricRoute);
 app.use("/api/institutes", instituteRoute);
 app.use("/api/institute-projects", instituteProjectsRoute);
 
@@ -153,6 +171,7 @@ app.use("/api/hierarchy-node-organizations", hierarchyNodeOrganizationRoute);
 
 app.use("/api/issue-categories", issueCategories);
 app.use("/api/issue-priorities", issuePriorities);
+app.use("/api/issue-response-times", issueResponseTimes);
 app.use("/api/issues", issueRoutes);
 app.use("/api/assignments", issueAssignmentRoutes);
 app.use("/api/issue-escalations", issueEscalationRoutes);

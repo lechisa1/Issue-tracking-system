@@ -51,6 +51,10 @@ fs.readdirSync(__dirname)
 // Add new models
 db.Institute = require("./institute")(sequelize, Sequelize.DataTypes);
 db.Project = require("./project")(sequelize, Sequelize.DataTypes);
+db.PriorityResponseTime = require("./priorityResponseTime")(
+  sequelize,
+  Sequelize.DataTypes
+);
 db.InstituteProject = require("./instituteProject")(
   sequelize,
   Sequelize.DataTypes

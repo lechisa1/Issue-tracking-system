@@ -14,6 +14,13 @@ const createProjectSchema = Joi.object({
   institute_id: Joi.string().guid({ version: "uuidv4" }).optional().messages({
     "string.guid": "Institute ID must be a valid UUID",
   }),
+  project_metrics_ids: Joi.array()
+    .items(Joi.string().uuid())
+    .optional()
+    .messages({
+      "array.base": "metrics IDs must be an array",
+      "string.guid": "Each metrics ID must be a valid UUID",
+    }),
   maintenance_start: Joi.date().optional().allow(null),
   maintenance_end: Joi.date().optional().allow(null),
 }).custom((value, helpers) => {
@@ -39,6 +46,13 @@ exports.validateAssignUserToProject = (req, res, next) => {
       .guid({ version: "uuidv4" })
       .optional()
       .allow(null),
+    project_metric_id: Joi.string()
+      .guid({ version: "uuidv4" })
+      .required()
+      .messages({
+        "any.required": "Project metric ID is required.",
+        "string.guid": "Project metric ID must be a valid UUIDv4.",
+      }),
   });
 
   const { error } = schema.validate(req.body);

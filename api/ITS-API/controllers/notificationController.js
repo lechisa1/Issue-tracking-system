@@ -54,14 +54,14 @@ const markAllRead = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
-// Get unread count
+// In your notificationController.js
 const getUnreadCount = async (req, res) => {
   try {
     const { user_id } = req.params;
 
     const count = await Notification.count({
       where: {
-        user_id, // Changed from recipient_id to user_id
+        recipient_id: user_id, // Changed from user_id to recipient_id
         is_read: false,
       },
     });

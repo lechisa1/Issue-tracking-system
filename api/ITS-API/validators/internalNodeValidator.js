@@ -15,9 +15,14 @@ const createInternalNodeSchema = Joi.object({
       "string.guid": "Parent ID must be a valid UUID",
     }),
 
-  description: Joi.string().trim().optional().allow(null).messages({
+description: Joi.string()
+  .trim()
+  .allow("", null)
+  .optional()
+  .messages({
     "string.base": "Description must be a string",
   }),
+
 
   is_active: Joi.boolean().optional().messages({
     "boolean.base": "Is active must be a boolean",

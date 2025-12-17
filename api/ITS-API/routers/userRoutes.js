@@ -24,6 +24,9 @@ const {
   getInternalUsersNotAssignedToProject,
   getInternalUsersAssignedToProject,
   getProjectSubNodeUsers,
+  getInternalUsersAssignedToNode,
+  getUserPositions,
+  changePassword,
 } = require("../controllers/userController");
 
 /**
@@ -128,7 +131,7 @@ const {
  *         description: Server error
  */
 router.post("/", validateCreateUser, authenticateToken, createUser);
-
+router.post("/change-password", authenticateToken, changePassword);
 /**
  * @swagger
  * /api/users:
@@ -235,6 +238,8 @@ router.get("/", getUsers);
 
 router.use("/user-types", getUserTypes);
 
+router.use("/user-positions", getUserPositions);
+
 /**
  * @swagger
  * /api/users/institute/{institute_id}:
@@ -298,6 +303,12 @@ router.get(
   "/project/:project_id/node/:hierarchy_node_id",
   authenticateToken,
   getUsersAssignedToNode
+);
+
+router.get(
+  "/project/internal/:project_id/node/:internal_node_id",
+  authenticateToken,
+  getInternalUsersAssignedToNode
 );
 
 /**

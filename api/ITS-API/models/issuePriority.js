@@ -1,7 +1,25 @@
+// models/issuepriority.js
 "use strict";
+const { Model } = require("sequelize");
+
 module.exports = (sequelize, DataTypes) => {
-  const IssuePriority = sequelize.define(
-    "IssuePriority",
+  class IssuePriority extends Model {
+    static associate(models) {
+      // 🔹 Link to IssueResponseTime
+      this.belongsTo(models.IssueResponseTime, {
+        foreignKey: "response_time_id",
+        as: "responseTime",
+      });
+    }
+
+    // 🟢 Example helper method to check if priority jumps to central
+    canJumpToCentral() {
+      // Only active priorities can "jump"
+      return this.is_active === true;
+    }
+  }
+
+  IssuePriority.init(
     {
       priority_id: {
         type: DataTypes.UUID,
@@ -17,6 +35,18 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: true,
       },
+      color_value: {
+        type: DataTypes.STRING(20),
+        allowNull: true,
+      },
+      response_time_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
+      is_active: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
+      },
       created_at: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
@@ -27,8 +57,11 @@ module.exports = (sequelize, DataTypes) => {
       },
     },
     {
+      sequelize,
+      modelName: "IssuePriority",
       tableName: "issue_priorities",
       timestamps: false,
+      underscored: true,
     }
   );
 

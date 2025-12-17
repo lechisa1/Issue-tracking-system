@@ -2,14 +2,17 @@ const {
   User,
   UserType,
   Institute,
+  UserPosition,
   ProjectUserRole,
   Role,
   SubRole,
   RoleSubRole,
   RoleSubRolePermission,
   InternalProjectUserRole,
+  ProjectMetricUser,
   Permission,
   InternalNode,
+  ProjectMetric,
   Project,
   UserRoles,
   HierarchyNode,
@@ -50,6 +53,34 @@ const getUserTypes = async (req, res) => {
     });
   }
 };
+const getUserPositions = async (req, res) => {
+  try {
+    const userPositions = await UserPosition.findAll({
+      attributes: [
+        "user_position_id",
+        "name",
+        "description",
+        "created_at",
+        "updated_at",
+      ],
+      order: [["name", "ASC"]],
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "User positions fetched successfully",
+      data: userPositions,
+    });
+  } catch (error) {
+    console.error("Error fetching user positions:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch user positions",
+      error: error.message,
+    });
+  }
+};
+
 const createUser = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -57,7 +88,10 @@ const createUser = async (req, res) => {
       full_name,
       email,
       user_type_id,
+      user_position_id,
       institute_id,
+      role_ids,
+      project_metrics_ids,
       phone_number,
       hierarchy_node_id,
     } = req.body;
@@ -104,6 +138,13 @@ const createUser = async (req, res) => {
           message: "Institute ID is required for external users.",
         });
       }
+      if (!user_position_id) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Position is required for external users.",
+        });
+      }
 
       // Validate institute existence
       const institute = await Institute.findByPk(institute_id, {
@@ -114,6 +155,16 @@ const createUser = async (req, res) => {
         return res
           .status(400)
           .json({ success: false, message: "Invalid institute ID." });
+      }
+      // Validate institute existence
+      const position = await UserPosition.findByPk(user_position_id, {
+        transaction: t,
+      });
+      if (!position) {
+        await t.rollback();
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid Position ID." });
       }
     } else {
       // internal_user or others must not have institute_id
@@ -139,11 +190,47 @@ const createUser = async (req, res) => {
       }
     }
 
+    // ====== MULTIPLE ROLE VALIDATION ======
+    if (role_ids && Array.isArray(role_ids) && role_ids.length > 0) {
+      const roles = await Role.findAll({
+        where: { role_id: role_ids },
+        transaction: t,
+      });
+
+      if (roles.length !== role_ids.length) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "One or more provided role IDs are invalid.",
+        });
+      }
+    }
+    console.log("here is roles", role_ids);
+
+    // ====== Validate metrics if provided ======
+    if (
+      project_metrics_ids &&
+      Array.isArray(project_metrics_ids) &&
+      project_metrics_ids.length > 0
+    ) {
+      const metrics = await ProjectMetric.findAll({
+        where: { project_metric_id: project_metrics_ids },
+        transaction: t,
+      });
+
+      if (metrics.length !== project_metrics_ids.length) {
+        await t.rollback();
+        return res
+          .status(404)
+          .json({ success: false, message: "One or more metrics not found." });
+      }
+    }
+
     // ====== Generate password ======
     // const password = generateRandomPassword();
     const password = "password";
     const hashedPassword = await bcrypt.hash(password, 10);
-
+    const otp = Math.floor(100000 + Math.random() * 900000); // 6-digit OTP
     // ====== Create User ======
     const user = await User.create(
       {
@@ -154,6 +241,8 @@ const createUser = async (req, res) => {
         phone_number,
         user_type_id,
         institute_id: userType.name === "external_user" ? institute_id : null,
+        user_position_id:
+          userType.name === "external_user" ? user_position_id : null,
         hierarchy_node_id: hierarchy_node_id ?? null,
         is_first_logged_in: true,
         is_active: true,
@@ -163,6 +252,39 @@ const createUser = async (req, res) => {
       { transaction: t }
     );
 
+    // =======================================================
+    // 🔵 MULTIPLE ROLE ASSIGNMENT
+    // =======================================================
+    if (role_ids && Array.isArray(role_ids) && role_ids.length > 0) {
+      const roleAssignments = role_ids.map((rid) => ({
+        user_role_id: uuidv4(),
+        user_id: user.user_id,
+        role_id: rid,
+        assigned_by: req.user?.user_id || null,
+        assigned_at: new Date(),
+        is_active: true,
+      }));
+
+      await UserRoles.bulkCreate(roleAssignments, { transaction: t });
+    }
+
+    // ====== Assign metrics to user if provided ======
+    if (
+      project_metrics_ids &&
+      Array.isArray(project_metrics_ids) &&
+      project_metrics_ids.length > 0
+    ) {
+      // Prepare metric assignments
+      const metricAssignments = project_metrics_ids.map((metric_id) => ({
+        id: uuidv4(),
+        user_id: user.user_id,
+        project_metric_id: metric_id,
+        value: null, // Default value, can be updated later
+      }));
+
+      // Create metric assignments
+      await ProjectMetricUser.bulkCreate(metricAssignments, { transaction: t });
+    }
     await t.commit();
 
     // ====== Send welcome email ======
@@ -177,10 +299,15 @@ const createUser = async (req, res) => {
       Please change your password after first login.
     `
     );
-
+    // ====== Send SMS with OTP ======
+    // const smsService = require("../utils/twilioSmsService");
+    // if (phone_number) {
+    //   await smsService.sendOTP(phone_number, otp);
+    //   console.log("otppppppppppppppppppppppppppppppppppppppp", otp);
+    // }
     return res.status(201).json({
       success: true,
-      message: "User registered globally (no roles assigned yet)",
+      message: "User registered ",
       data: user,
     });
   } catch (error) {
@@ -191,11 +318,12 @@ const createUser = async (req, res) => {
 };
 
 const updateUser = async (req, res) => {
+  // console.log("update user reached")
+
   const t = await sequelize.transaction();
 
   try {
-    const { user_id } = req.params;
-
+    const { id: user_id } = req.params;
     const {
       full_name,
       email,
@@ -204,11 +332,13 @@ const updateUser = async (req, res) => {
       phone_number,
       hierarchy_node_id,
       is_active,
-      roles, // only for INTERNAL users
+      role_ids,
+      project_metrics_ids,
     } = req.body;
 
-    // ======================= FIND USER ==========================
+    // ====== Find user ======
     const user = await User.findByPk(user_id, { transaction: t });
+    console.log("user: ", user, "user_idL ", user_id, req.params);
     if (!user) {
       await t.rollback();
       return res.status(404).json({
@@ -219,10 +349,7 @@ const updateUser = async (req, res) => {
 
     // ======================= EMAIL UNIQUE =======================
     if (email && email !== user.email) {
-      const exists = await User.findOne({
-        where: { email },
-        transaction: t,
-      });
+      const exists = await User.findOne({ where: { email }, transaction: t });
       if (exists) {
         await t.rollback();
         return res.status(400).json({
@@ -242,7 +369,7 @@ const updateUser = async (req, res) => {
         await t.rollback();
         return res.status(400).json({
           success: false,
-          message: "Phone already exists.",
+          message: "Phone number already exists.",
         });
       }
     }
@@ -264,7 +391,6 @@ const updateUser = async (req, res) => {
       finalUserType = user_type_id;
       finalUserTypeName = type.name;
 
-      // external_user MUST have institute
       if (type.name === "external_user" && !institute_id) {
         await t.rollback();
         return res.status(400).json({
@@ -273,7 +399,6 @@ const updateUser = async (req, res) => {
         });
       }
 
-      // internal_user MUST NOT have institute
       if (type.name === "internal_user" && institute_id) {
         await t.rollback();
         return res.status(400).json({
@@ -325,46 +450,96 @@ const updateUser = async (req, res) => {
       { transaction: t }
     );
 
-    // =================== ROLE HANDLING ===========================
-
-    // =================== ROLE HANDLING ===========================
-
-    // INTERNAL USER — update roles only if roles array is provided
-    if (finalUserTypeName === "internal_user" && Array.isArray(roles)) {
-      // Remove old roles
-      await UserRoles.destroy({
-        where: { user_id },
+    // ====== Update roles if provided ======
+    if (role_ids && Array.isArray(role_ids)) {
+      // Validate roles exist
+      const roles = await Role.findAll({
+        where: { role_id: role_ids },
         transaction: t,
       });
-
-      // Insert new roles
-      for (const roleId of roles) {
-        await UserRoles.create(
-          {
-            user_id,
-            role_id: roleId,
-            assigned_by: req.user?.user_id || null,
-          },
-          { transaction: t }
-        );
+      if (roles.length !== role_ids.length) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "One or more provided role IDs are invalid.",
+        });
       }
-    }
 
-    // EXTERNAL USER — must have NO roles
-    if (finalUserTypeName === "external_user") {
+      // Delete old roles
       await UserRoles.destroy({
         where: { user_id },
         transaction: t,
       });
+
+      // Assign new roles
+      const roleAssignments = role_ids.map((rid) => ({
+        user_role_id: uuidv4(),
+        user_id,
+        role_id: rid,
+        assigned_by: req.user?.user_id || null,
+        assigned_at: new Date(),
+        is_active: true,
+      }));
+      await UserRoles.bulkCreate(roleAssignments, { transaction: t });
     }
 
-    // ======================= COMMIT ==============================
+    // ====== Update project metrics if provided ======
+    if (project_metrics_ids && Array.isArray(project_metrics_ids)) {
+      // Validate metrics exist
+      const metrics = await ProjectMetric.findAll({
+        where: { project_metric_id: project_metrics_ids },
+        transaction: t,
+      });
+      if (metrics.length !== project_metrics_ids.length) {
+        await t.rollback();
+        return res
+          .status(404)
+          .json({ success: false, message: "One or more metrics not found." });
+      }
+
+      // Delete old metric assignments
+      await ProjectMetricUser.destroy({
+        where: { user_id },
+        transaction: t,
+      });
+
+      // Assign new metrics
+      const metricAssignments = project_metrics_ids.map((metric_id) => ({
+        id: uuidv4(),
+        user_id,
+        project_metric_id: metric_id,
+        value: null,
+      }));
+      await ProjectMetricUser.bulkCreate(metricAssignments, { transaction: t });
+    }
+
     await t.commit();
+
+    // ======================= FETCH UPDATED USER ===================
+    const updatedUser = await User.findOne({
+      where: { user_id },
+      include: [
+        { model: UserType, as: "userType" },
+        { model: Institute, as: "institute" },
+        { model: Role, as: "roles", through: { attributes: [] } },
+        {
+          model: UserRoles,
+          as: "userRoles",
+          include: [{ model: Role, as: "role" }],
+        },
+        { model: HierarchyNode, as: "hierarchyNode" },
+      ],
+    });
+
+    // Flatten roles for frontend
+    const userJson = updatedUser.toJSON();
+    userJson.roles =
+      userJson.userRoles?.map((ur) => ur.role) || userJson.roles || [];
 
     return res.status(200).json({
       success: true,
       message: "User updated successfully.",
-      data: user,
+      data: userJson,
     });
   } catch (error) {
     if (!t.finished) await t.rollback();
@@ -382,9 +557,12 @@ const getUsers = async (req, res) => {
     const {
       institute_id,
       user_type_id,
+      user_position_id,
       hierarchy_node_id,
       is_active,
-      search, // optional: for name/email search
+      search,
+      page = 1,
+      limit = 10,
     } = req.query;
 
     // ====== Build filters dynamically ======
@@ -392,6 +570,7 @@ const getUsers = async (req, res) => {
 
     if (institute_id) whereClause.institute_id = institute_id;
     if (user_type_id) whereClause.user_type_id = user_type_id;
+    if (user_position_id) whereClause.user_position_id = user_position_id;
     if (hierarchy_node_id) whereClause.hierarchy_node_id = hierarchy_node_id;
     if (is_active !== undefined) whereClause.is_active = is_active === "true";
 
@@ -403,9 +582,15 @@ const getUsers = async (req, res) => {
       ];
     }
 
-    // ====== Fetch users with associations ======
-    const users = await User.findAll({
+    // ====== Pagination ======
+    const { limit: pageLimit, offset } = getPagination(page, limit);
+
+    // ====== Fetch users ======
+    const users = await User.findAndCountAll({
       where: whereClause,
+      limit: pageLimit,
+      offset,
+      distinct: true, // IMPORTANT when using include
       include: [
         {
           model: Institute,
@@ -426,10 +611,19 @@ const getUsers = async (req, res) => {
       order: [["created_at", "DESC"]],
     });
 
+    // ====== Format pagination response ======
+    const pagingData = getPagingData(users, page, pageLimit);
+
     return res.status(200).json({
       success: true,
       message: "Users fetched successfully.",
-      data: users,
+      data: pagingData.results,
+      meta: {
+        total: pagingData.total,
+        page: pagingData.currentPage,
+        limit: pagingData.limit,
+        pageCount: pagingData.totalPages,
+      },
     });
   } catch (error) {
     console.error("Error fetching users:", error);
@@ -594,6 +788,95 @@ const getUsersAssignedToNode = async (req, res) => {
     });
   }
 };
+const getInternalUsersAssignedToNode = async (req, res) => {
+  try {
+    const { project_id, internal_node_id } = req.params;
+
+    // Validate project
+    const project = await Project.findByPk(project_id);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: `Project with id '${project_id}' not found.`,
+      });
+    }
+
+    // Validate hierarchy node
+    const internalNode = await InternalNode.findOne({
+      where: { internal_node_id },
+    });
+
+    if (!internalNode) {
+      return res.status(404).json({
+        success: false,
+        message: `Internal node '${internal_node_id}' not found in project '${project_id}'.`,
+      });
+    }
+
+    // Fetch assignments from junction table
+    const userAssignments = await InternalProjectUserRole.findAll({
+      where: {
+        project_id,
+        internal_node_id,
+      },
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["user_id", "full_name", "email"],
+        },
+        {
+          model: Role,
+          as: "role",
+          attributes: ["role_id", "name"],
+        },
+        {
+          model: ProjectMetric,
+          as: "projectMetric",
+          attributes: ["project_metric_id", "name", "description"],
+        },
+        {
+          model: InternalNode,
+          as: "internalNode",
+          attributes: ["internal_node_id", "name"],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    // Transform and return
+    const users = userAssignments.map((assignment) => ({
+      project_user_role_id: assignment.project_user_role_id,
+      project_id: assignment.project_id,
+      user_id: assignment.user_id,
+      role_id: assignment.role_id,
+      internal_node_id: assignment.internal_node_id,
+
+      user: assignment.user,
+      role: assignment.role,
+      internalNode: assignment.internalNode,
+
+      is_active: assignment.is_active,
+      assigned_at: assignment.created_at,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: "Users assigned to hierarchy node fetched successfully.",
+      project_id,
+      internal_node_id,
+      count: users.length,
+      data: users,
+    });
+  } catch (error) {
+    console.error("Error fetching users assigned to node:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
 const getUsersAssignedToProject = async (req, res) => {
   try {
     const { project_id } = req.params;
@@ -689,6 +972,10 @@ const getInternalUsersAssignedToProject = async (req, res) => {
           as: "internalNode",
           attributes: ["internal_node_id", "name", "level", "parent_id"],
         },
+        {
+          model: ProjectMetric,
+          as: "projectMetric",
+        },
       ],
       order: [["created_at", "DESC"]],
     });
@@ -709,6 +996,78 @@ const getInternalUsersAssignedToProject = async (req, res) => {
   }
 };
 
+// const getUsersNotAssignedToProject = async (req, res) => {
+//   console.log("Fetching unassigned users...");
+//   try {
+//     const { institute_id, project_id } = req.params;
+
+//     if (!institute_id || !project_id) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Institute ID and Project ID are required.",
+//       });
+//     }
+
+//     // 1. Get all assigned users for this project
+//     const assignments = await ProjectUserRole.findAll({
+//       where: { project_id },
+//       attributes: ["user_id"],
+//     });
+
+//     const assignedUserIds = assignments.map((a) => a.user_id);
+//     console.log("Assigned User IDs:", assignedUserIds);
+
+//     // Build where clause
+//     let whereClause = {
+//       institute_id,
+//     };
+
+//     // If users have been assigned → exclude them
+//     // If none assigned → do NOT add Op.notIn (it returns empty result)
+//     if (assignedUserIds.length > 0) {
+//       whereClause.user_id = {
+//         [Op.notIn]: assignedUserIds,
+//       };
+//     }
+
+//     // 2. Fetch users NOT assigned to the project
+//     const users = await User.findAll({
+//       where: whereClause,
+//       include: [
+//         {
+//           model: Institute,
+//           as: "institute",
+//           attributes: ["institute_id", "name"],
+//         },
+//         {
+//           model: UserType,
+//           as: "userType",
+//           attributes: ["user_type_id", "name"],
+//         },
+//         {
+//           model: HierarchyNode,
+//           as: "hierarchyNode",
+//           attributes: ["hierarchy_node_id", "name"],
+//         },
+//       ],
+//       order: [["created_at", "DESC"]],
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Unassigned users fetched successfully.",
+//       data: users,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching users:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch users.",
+//       error: error.message,
+//     });
+//   }
+// };
+
 const getUsersNotAssignedToProject = async (req, res) => {
   console.log("Fetching unassigned users...");
   try {
@@ -721,31 +1080,22 @@ const getUsersNotAssignedToProject = async (req, res) => {
       });
     }
 
-    // 1. Get all assigned users for this project
+    // Get assigned user-role pairs for this project
     const assignments = await ProjectUserRole.findAll({
       where: { project_id },
-      attributes: ["user_id"],
+      attributes: ["user_id", "role_id"],
     });
 
-    const assignedUserIds = assignments.map((a) => a.user_id);
-    console.log("Assigned User IDs:", assignedUserIds);
+    // Create a map to quickly check assigned roles per user
+    const assignedRolesMap = {};
+    assignments.forEach((a) => {
+      if (!assignedRolesMap[a.user_id]) assignedRolesMap[a.user_id] = new Set();
+      assignedRolesMap[a.user_id].add(a.role_id);
+    });
 
-    // Build where clause
-    let whereClause = {
-      institute_id,
-    };
-
-    // If users have been assigned → exclude them
-    // If none assigned → do NOT add Op.notIn (it returns empty result)
-    if (assignedUserIds.length > 0) {
-      whereClause.user_id = {
-        [Op.notIn]: assignedUserIds,
-      };
-    }
-
-    // 2. Fetch users NOT assigned to the project
+    // Fetch all users of the institute with their roles
     const users = await User.findAll({
-      where: whereClause,
+      where: { institute_id },
       include: [
         {
           model: Institute,
@@ -762,14 +1112,33 @@ const getUsersNotAssignedToProject = async (req, res) => {
           as: "hierarchyNode",
           attributes: ["hierarchy_node_id", "name"],
         },
+        {
+          model: UserRoles,
+          as: "userRoles",
+          include: [
+            {
+              model: Role,
+              as: "role",
+              attributes: ["role_id", "name"],
+            },
+          ],
+        },
       ],
       order: [["created_at", "DESC"]],
+    });
+
+    console.log("userssssssssssssssss", users);
+    // Filter users: keep only users with at least one unassigned role
+    const unassignedUsers = users.filter((user) => {
+      const assignedRoles = assignedRolesMap[user.user_id] || new Set();
+      // Check if user has any role not assigned yet
+      return user.userRoles.some((ur) => !assignedRoles.has(ur.role_id));
     });
 
     return res.status(200).json({
       success: true,
       message: "Unassigned users fetched successfully.",
-      data: users,
+      data: unassignedUsers,
     });
   } catch (error) {
     console.error("Error fetching users:", error);
@@ -801,7 +1170,7 @@ const getInternalUsersNotAssignedToProject = async (req, res) => {
 
     const assignedUserIds = assignments.map((a) => a.user_id);
 
-    console.log("assignedUserIds: ", assignedUserIds);
+    // console.log("assignedUserIds: ", assignedUserIds);
     // 2. Get users where:
     //    institute_id IS NULL
     //    AND user_id NOT IN assignedUserIds
@@ -910,9 +1279,6 @@ const getUserById = async (req, res) => {
   try {
     const { id: user_id } = req.params;
 
-    console.log("user_id: ", user_id);
-
-    // ====== Find user with relations ======
     const user = await User.findByPk(user_id, {
       include: [
         {
@@ -930,6 +1296,59 @@ const getUserById = async (req, res) => {
           as: "hierarchyNode",
           attributes: ["hierarchy_node_id", "name"],
         },
+
+        // ✅ THIS IS ENOUGH FOR ROLES
+        {
+          model: Role,
+          as: "roles",
+          attributes: ["role_id", "name", "description", "is_active"],
+          through: { attributes: [] }, // hide pivot table
+        },
+
+        {
+          model: ProjectMetric,
+          as: "metrics",
+          through: { attributes: ["value"] },
+        },
+
+        {
+          model: ProjectUserRole,
+          as: "projectRoles",
+          include: [
+            {
+              model: Project,
+              as: "project",
+              attributes: ["project_id", "name", "description"],
+            },
+            {
+              model: HierarchyNode,
+              as: "hierarchyNode",
+              attributes: ["hierarchy_node_id", "name", "description"],
+            },
+          ],
+        },
+
+        {
+          model: InternalProjectUserRole,
+          as: "internalProjectUserRoles",
+          include: [
+            {
+              model: Project,
+              as: "project",
+              attributes: ["project_id", "name", "description"],
+            },
+            {
+              model: ProjectMetric,
+              as: "projectMetric",
+              attributes: ["project_metric_id", "name", "description"],
+            },
+            {
+              model: InternalNode,
+              as: "internalNode",
+              attributes: ["internal_node_id", "name", "description"],
+            },
+          ],
+        },
       ],
     });
 
@@ -943,7 +1362,7 @@ const getUserById = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "User fetched successfully.",
-      data: user,
+      data: user, // 🔥 roles already included correctly
     });
   } catch (error) {
     console.error("Error fetching user:", error);
@@ -1420,12 +1839,54 @@ const getProfile = async (req, res) => {
     });
   }
 };
+const changePassword = async (req, res) => {
+  const userId = req.user?.user_id;
+  const { currentPassword, newPassword } = req.body;
+  console.log("currentPassword", currentPassword);
+  console.log("currentPassword", newPassword);
+  console.log("currentPassword", userId);
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ success: false, message: "Missing data" });
+  }
 
+  try {
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    // Check current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Current password is incorrect" });
+    }
+
+    // Update password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await user.update({
+      password: hashedPassword,
+      is_first_logged_in: false, // ✅ Mark first login as done
+    });
+
+    return res.json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 module.exports = {
   createUser,
   getUsers,
   getUsersByInstituteId,
   getUsersAssignedToNode,
+  getInternalUsersAssignedToNode,
   getUsersAssignedToProject,
   getInternalUsersAssignedToProject,
   getUsersNotAssignedToProject,
@@ -1441,4 +1902,6 @@ module.exports = {
   findUserByEmail,
   confirmPasswordReset,
   validateResetToken,
+  getUserPositions,
+  changePassword,
 };

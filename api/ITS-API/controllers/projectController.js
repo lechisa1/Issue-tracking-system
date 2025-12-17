@@ -5,10 +5,15 @@ const {
   ProjectUserRole,
   Role,
   SubRole,
+  UserType,
   User,
+  UserRoles,
   InstituteProject,
   ProjectMaintenance,
   InternalProjectUserRole,
+  ProjectMetricProject,
+  ProjectMetric,
+
   sequelize,
   InternalNode,
 } = require("../models");
@@ -24,6 +29,7 @@ const createProject = async (req, res) => {
       institute_id,
       maintenance_start,
       maintenance_end,
+      project_metrics_ids,
     } = req.body;
 
     // Check if project exists
@@ -82,6 +88,34 @@ const createProject = async (req, res) => {
         "institute_project_id institute_project_id institute_project_id",
         institute_project_id
       );
+    }
+
+    // Assign metrics to project if provided
+    if (
+      project_metrics_ids &&
+      Array.isArray(project_metrics_ids) &&
+      project_metrics_ids.length > 0
+    ) {
+      // Check if all metrics exist
+      const metrics = await ProjectMetric.findAll({
+        where: { project_metric_id: project_metrics_ids },
+      });
+
+      if (metrics.length !== project_metrics_ids.length) {
+        return res
+          .status(404)
+          .json({ message: "One or more metrics not found." });
+      }
+
+      // Prepare metric assignments
+      const metricAssignments = project_metrics_ids.map((metric_id) => ({
+        id: uuidv4(),
+        project_id,
+        project_metric_id: metric_id,
+      }));
+
+      // Create metric assignments
+      await ProjectMetricProject.bulkCreate(metricAssignments);
     }
 
     res.status(201).json(project);
@@ -159,6 +193,11 @@ const getProjectById = async (req, res) => {
             "created_at",
             "updated_at",
           ],
+        },
+        {
+          model: ProjectMetric,
+          as: "metrics",
+          attributes: ["project_metric_id", "name", "description", "is_active"],
         },
       ],
     });
@@ -246,11 +285,138 @@ const getProjectByInstituteId = async (req, res) => {
   }
 };
 
+// const assignUserToProject = async (req, res) => {
+//   const t = await sequelize.transaction();
+//   try {
+//     const { project_id, user_id, hierarchy_node_id } = req.body;
+
+//     // ====== Validate project ======
+//     const project = await Project.findByPk(project_id, { transaction: t });
+//     if (!project) {
+//       await t.rollback();
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Project not found." });
+//     }
+
+//     // ====== Validate user ======
+//     const user = await User.findByPk(user_id, {
+//       include: [{ model: Role, as: "roles", through: { attributes: [] } }],
+//       transaction: t,
+//     });
+//     if (!user) {
+//       await t.rollback();
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "User not found." });
+//     }
+
+//     // ====== Get user's role from UserRoles table ======
+//     const userRoles = await UserRoles.findAll({
+//       where: {
+//         user_id: user_id,
+//         is_active: true,
+//       },
+//       include: [
+//         {
+//           model: Role,
+//           as: "role",
+//           where: { is_active: true },
+//         },
+//       ],
+//       transaction: t,
+//     });
+
+//     if (!userRoles || userRoles.length === 0) {
+//       await t.rollback();
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "User does not have any assigned roles. Please assign a role to the user first.",
+//       });
+//     }
+
+//     // Always select the first active role (you can modify this logic if needed)
+//     const userRole = userRoles[0];
+//     const role_id = userRole.role_id;
+
+//     // ====== Prevent duplicate assignment ======
+//     const existing = await ProjectUserRole.findOne({
+//       where: { project_id, user_id },
+//       transaction: t,
+//     });
+//     if (existing) {
+//       await t.rollback();
+//       return res.status(400).json({
+//         success: false,
+//         message: "User already assigned to this project.",
+//       });
+//     }
+
+//     // ====== External user logic ======
+//     if (user.user_type === "external_user") {
+//       if (!hierarchy_node_id) {
+//         await t.rollback();
+//         return res.status(400).json({
+//           success: false,
+//           message: "External users must be assigned a hierarchy node.",
+//         });
+//       }
+
+//       // Validate hierarchy node
+//       const node = await HierarchyNode.findByPk(hierarchy_node_id, {
+//         transaction: t,
+//       });
+//       if (!node || node.project_id !== project_id) {
+//         await t.rollback();
+//         return res.status(400).json({
+//           success: false,
+//           message:
+//             "Hierarchy node not found or does not belong to this project.",
+//         });
+//       }
+//     }
+//     const finalHierarchyId =
+//       user.user_type === "external_user" ? hierarchy_node_id : null;
+//     // ====== Create project-user-role ======
+//     const assignment = await ProjectUserRole.create(
+//       {
+//         project_user_role_id: uuidv4(),
+//         project_id,
+//         user_id,
+//         role_id,
+//         hierarchy_node_id: hierarchy_node_id,
+//         is_active: true,
+//         created_at: new Date(),
+//         updated_at: new Date(),
+//       },
+//       { transaction: t }
+//     );
+
+//     await t.commit();
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "User assigned to project successfully.",
+//       data: assignment,
+//     });
+//   } catch (error) {
+//     if (!t.finished) await t.rollback();
+//     console.error("Error assigning user to project:", error);
+//     return res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+
 const assignUserToProject = async (req, res) => {
   const t = await sequelize.transaction();
   try {
-    const { project_id, user_id, role_id, sub_role_id, hierarchy_node_id } =
-      req.body;
+    const { project_id, user_id, hierarchy_node_id } = req.body;
+
+    console.log("📥 Received assignment request:", {
+      project_id,
+      user_id,
+      hierarchy_node_id,
+    });
 
     // ====== Validate project ======
     const project = await Project.findByPk(project_id, { transaction: t });
@@ -262,7 +428,16 @@ const assignUserToProject = async (req, res) => {
     }
 
     // ====== Validate user ======
-    const user = await User.findByPk(user_id, { transaction: t });
+    const user = await User.findByPk(user_id, {
+      include: [
+        {
+          model: Role,
+          as: "roles",
+          through: { attributes: [] },
+        },
+      ],
+      transaction: t,
+    });
     if (!user) {
       await t.rollback();
       return res
@@ -270,72 +445,92 @@ const assignUserToProject = async (req, res) => {
         .json({ success: false, message: "User not found." });
     }
 
-    // ====== Validate role ======
-    const role = await Role.findByPk(role_id, { transaction: t });
-    if (!role) {
+    // ====== Get user's role from UserRoles table ======
+    const userRoles = await UserRoles.findAll({
+      where: {
+        user_id: user_id,
+        is_active: true,
+      },
+      include: [
+        {
+          model: Role,
+          as: "role",
+          where: { is_active: true },
+        },
+      ],
+      transaction: t,
+    });
+
+    if (!userRoles || userRoles.length === 0) {
       await t.rollback();
-      return res
-        .status(404)
-        .json({ success: false, message: "Invalid role ID." });
+      return res.status(400).json({
+        success: false,
+        message:
+          "User does not have any assigned roles. Please assign a role to the user first.",
+      });
     }
 
-    // ====== Optional sub-role ======
-    if (sub_role_id) {
-      const subRole = await SubRole.findByPk(sub_role_id, { transaction: t });
-      if (!subRole) {
-        await t.rollback();
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid sub-role ID." });
-      }
-    }
+    // Always select the first active role (you can modify this logic if needed)
+    const userRole = userRoles[0];
+    const role_id = userRole.role_id;
 
     // ====== Prevent duplicate assignment ======
     const existing = await ProjectUserRole.findOne({
-      where: { project_id, user_id },
+      where: { project_id, user_id, role_id },
       transaction: t,
     });
     if (existing) {
       await t.rollback();
       return res.status(400).json({
         success: false,
-        message: "User already assigned to this project.",
+        message: "User already assigned to this project with this role.",
       });
     }
 
     // ====== External user logic ======
-    if (user.user_type === "external_user") {
-      if (!hierarchy_node_id) {
-        await t.rollback();
-        return res.status(400).json({
-          success: false,
-          message: "External users must be assigned a hierarchy node.",
-        });
-      }
-
-      // Validate hierarchy node
-      const node = await HierarchyNode.findByPk(hierarchy_node_id, {
+    if (user.user_type_id) {
+      // Get user type name to check if external user
+      const userType = await UserType.findByPk(user.user_type_id, {
         transaction: t,
       });
-      if (!node || node.project_id !== project_id) {
-        await t.rollback();
-        return res.status(400).json({
-          success: false,
-          message:
-            "Hierarchy node not found or does not belong to this project.",
+
+      if (userType && userType.name === "external_user") {
+        if (!hierarchy_node_id) {
+          await t.rollback();
+          return res.status(400).json({
+            success: false,
+            message: "External users must be assigned a hierarchy node.",
+          });
+        }
+
+        // Validate hierarchy node
+        const node = await HierarchyNode.findByPk(hierarchy_node_id, {
+          transaction: t,
         });
+        if (!node || node.project_id !== project_id) {
+          await t.rollback();
+          return res.status(400).json({
+            success: false,
+            message:
+              "Hierarchy node not found or does not belong to this project.",
+          });
+        }
       }
+
+      finalHierarchyId = hierarchy_node_id;
+    } else if (userTypeName === "internal_user") {
+      console.log("🔍 Processing internal user - hierarchy node optional");
+      // Internal users can have hierarchy_node_id but it's not required
+      finalHierarchyId = hierarchy_node_id || null;
     }
-    const finalHierarchyId =
-      user.user_type === "external_user" ? hierarchy_node_id : null;
+
     // ====== Create project-user-role ======
     const assignment = await ProjectUserRole.create(
       {
         project_user_role_id: uuidv4(),
         project_id,
         user_id,
-        role_id,
-        sub_role_id: sub_role_id ?? null,
+        role_id, // Automatically taken from user's roles
         hierarchy_node_id: hierarchy_node_id,
         is_active: true,
         created_at: new Date(),
@@ -346,23 +541,182 @@ const assignUserToProject = async (req, res) => {
 
     await t.commit();
 
+    // Fetch complete assignment with role details
+    const completeAssignment = await ProjectUserRole.findByPk(
+      assignment.project_user_role_id,
+      {
+        include: [
+          {
+            model: Role,
+            as: "role",
+            attributes: ["role_id", "name"],
+          },
+          {
+            model: Project,
+            as: "project",
+            attributes: ["project_id", "name"],
+          },
+          {
+            model: User,
+            as: "user",
+            attributes: ["user_id", "full_name", "email"],
+          },
+        ],
+      }
+    );
+
     return res.status(201).json({
       success: true,
       message: "User assigned to project successfully.",
-      data: assignment,
+      data: completeAssignment,
     });
   } catch (error) {
     if (!t.finished) await t.rollback();
-    console.error("Error assigning user to project:", error);
-    return res.status(500).json({ success: false, message: error.message });
+    console.error("❌ Error assigning user to project:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
+
+// const assignInternalUsersToProject = async (req, res) => {
+//   const t = await sequelize.transaction();
+
+//   try {
+//     const { project_id, user_id, internal_node_id, project_metric_id } =
+//       req.body;
+
+//     // ====== Validate project ======
+//     const project = await Project.findByPk(project_id, { transaction: t });
+//     if (!project) {
+//       await t.rollback();
+//       return res.status(404).json({
+//         success: false,
+//         message: "Project not found.",
+//       });
+//     }
+
+//     // ====== Validate user ======
+//     const user = await User.findByPk(user_id, {
+//       include: [
+//         {
+//           model: Role,
+//           as: "roles",
+//           through: { attributes: [] },
+//         },
+//       ],
+//       transaction: t,
+//     });
+//     if (!user) {
+//       await t.rollback();
+//       return res.status(404).json({
+//         success: false,
+//         message: "User not found.",
+//       });
+//     }
+
+//     // ====== Get user's role from UserRoles table ======
+//     const userRoles = await UserRoles.findAll({
+//       where: {
+//         user_id: user_id,
+//         is_active: true,
+//       },
+//       include: [
+//         {
+//           model: Role,
+//           as: "role",
+//           where: { is_active: true },
+//         },
+//       ],
+//       transaction: t,
+//     });
+
+//     if (!userRoles || userRoles.length === 0) {
+//       await t.rollback();
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "User does not have any assigned roles. Please assign a role to the user first.",
+//       });
+//     }
+
+//     // Always select the first active role (you can modify this logic if needed)
+//     const userRole = userRoles[0];
+//     const role_id = userRole.role_id;
+
+//     // ====== Validate Internal Node (if provided) ======
+//     let finalInternalNodeId = null;
+
+//     if (internal_node_id) {
+//       const internalNode = await InternalNode.findByPk(internal_node_id, {
+//         transaction: t,
+//       });
+//       if (!internalNode) {
+//         await t.rollback();
+//         return res.status(400).json({
+//           success: false,
+//           message: "Internal node not found.",
+//         });
+//       }
+//       finalInternalNodeId = internal_node_id;
+//     }
+
+//     // ====== Prevent duplicate assignment ======
+//     const existing = await InternalProjectUserRole.findOne({
+//       where: { project_id, user_id },
+//       transaction: t,
+//     });
+
+//     if (existing) {
+//       await t.rollback();
+//       return res.status(400).json({
+//         success: false,
+//         message: "User is already assigned to this project.",
+//       });
+//     }
+
+//     // ====== Create internal project-user-role ======
+//     const assignment = await InternalProjectUserRole.create(
+//       {
+//         internal_project_user_role_id: uuidv4(),
+//         project_id,
+//         user_id,
+//         role_id,
+//         internal_node_id: finalInternalNodeId,
+//         is_active: true,
+//         created_at: new Date(),
+//         updated_at: new Date(),
+//       },
+//       { transaction: t }
+//     );
+
+//     await t.commit();
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "Internal user assigned to project successfully.",
+//       data: assignment,
+//     });
+//   } catch (error) {
+//     if (!t.finished) await t.rollback();
+//     console.error("Error assigning internal user to project:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// };
+
+// Update project
 
 const assignInternalUsersToProject = async (req, res) => {
   const t = await sequelize.transaction();
 
   try {
-    const { project_id, user_id, role_id, internal_node_id } = req.body;
+    const { project_id, user_id, internal_node_id, project_metric_id } =
+      req.body;
 
     // ====== Validate project ======
     const project = await Project.findByPk(project_id, { transaction: t });
@@ -375,7 +729,16 @@ const assignInternalUsersToProject = async (req, res) => {
     }
 
     // ====== Validate user ======
-    const user = await User.findByPk(user_id, { transaction: t });
+    const user = await User.findByPk(user_id, {
+      include: [
+        {
+          model: Role,
+          as: "roles",
+          through: { attributes: [] },
+        },
+      ],
+      transaction: t,
+    });
     if (!user) {
       await t.rollback();
       return res.status(404).json({
@@ -384,15 +747,47 @@ const assignInternalUsersToProject = async (req, res) => {
       });
     }
 
-    // ====== Validate role ======
-    const role = await Role.findByPk(role_id, { transaction: t });
-    if (!role) {
+    // ====== Validate Project Metric (required) ======
+    const metric = await ProjectMetric.findByPk(project_metric_id, {
+      transaction: t,
+    });
+
+    if (!metric) {
       await t.rollback();
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
-        message: "Invalid role ID.",
+        message: "Project metric not found.",
       });
     }
+
+    // ====== Get user's role from UserRoles table ======
+    const userRoles = await UserRoles.findAll({
+      where: {
+        user_id: user_id,
+        is_active: true,
+      },
+      include: [
+        {
+          model: Role,
+          as: "role",
+          where: { is_active: true },
+        },
+      ],
+      transaction: t,
+    });
+
+    if (!userRoles || userRoles.length === 0) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message:
+          "User does not have any assigned roles. Please assign a role to the user first.",
+      });
+    }
+
+    // Always select the first active role (you can modify this logic if needed)
+    const userRole = userRoles[0];
+    const role_id = userRole.role_id;
 
     // ====== Validate Internal Node (if provided) ======
     let finalInternalNodeId = null;
@@ -411,9 +806,17 @@ const assignInternalUsersToProject = async (req, res) => {
       finalInternalNodeId = internal_node_id;
     }
 
+    if (!internal_node_id) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Internal node ID is required.",
+      });
+    }
+
     // ====== Prevent duplicate assignment ======
     const existing = await InternalProjectUserRole.findOne({
-      where: { project_id, user_id },
+      where: { project_id, user_id, project_metric_id },
       transaction: t,
     });
 
@@ -421,7 +824,8 @@ const assignInternalUsersToProject = async (req, res) => {
       await t.rollback();
       return res.status(400).json({
         success: false,
-        message: "User is already assigned to this project.",
+        message:
+          "User is already assigned to this project with the same metric.",
       });
     }
 
@@ -433,6 +837,7 @@ const assignInternalUsersToProject = async (req, res) => {
         user_id,
         role_id,
         internal_node_id: finalInternalNodeId,
+        project_metric_id,
         is_active: true,
         created_at: new Date(),
         updated_at: new Date(),
@@ -458,7 +863,6 @@ const assignInternalUsersToProject = async (req, res) => {
   }
 };
 
-// Update project
 const updateProject = async (req, res) => {
   try {
     const { id } = req.params;

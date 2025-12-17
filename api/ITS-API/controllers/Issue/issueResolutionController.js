@@ -11,7 +11,12 @@ const {
 } = require("../../models");
 
 const { v4: uuidv4 } = require("uuid");
-
+const {
+  createNotification,
+  sendEmailForNotification,
+  getUsersForHierarchyNode,
+  getUsersWithSameParentHierarchy,
+} = require("../../services/notificationService");
 // ------------------------------------------------------
 //  RESOLVE ISSUE
 // ------------------------------------------------------
@@ -21,18 +26,18 @@ const resolveIssue = async (req, res) => {
   try {
     const { issue_id, reason, resolved_by, attachment_ids } = req.body;
 
-    // 1. Validate Issue
+    // 1️⃣ Validate Issue
     const issue = await Issue.findByPk(issue_id);
     if (!issue) return res.status(404).json({ message: "Issue not found." });
 
-    // 2. Validate User
+    // 2️⃣ Validate User
     const resolver = await User.findByPk(resolved_by);
     if (!resolver)
       return res.status(404).json({ message: "User (resolved_by) not found." });
 
     const resolution_id = uuidv4();
 
-    // 3. Create resolution
+    // 3️⃣ Create resolution
     await IssueResolution.create(
       {
         resolution_id,
@@ -44,53 +49,37 @@ const resolveIssue = async (req, res) => {
       { transaction: t }
     );
 
-    // 4. Attach files
+    // 4️⃣ Attach files
     if (attachment_ids?.length > 0) {
       const links = attachment_ids.map((attachment_id) => ({
         resolution_id,
         attachment_id,
         created_at: new Date(),
       }));
-
       await ResolutionAttachment.bulkCreate(links, { transaction: t });
     }
 
-    // 5. Update issue status to resolved
+    // 5️⃣ Update issue status to resolved
     await Issue.update(
-      {
-        status: "resolved",
-        updated_at: new Date(),
-        resolved_at: new Date(),
-      },
-      {
-        where: { issue_id },
-        transaction: t,
-      }
+      { status: "resolved", updated_at: new Date(), resolved_at: new Date() },
+      { where: { issue_id }, transaction: t }
     );
 
-    // 6. Update current tier status
+    // 6️⃣ Update current tier status
     const currentTier = await IssueTier.findOne({
-      where: {
-        issue_id,
-      },
+      where: { issue_id },
       order: [["assigned_at", "DESC"]],
       transaction: t,
     });
 
     if (currentTier) {
       await IssueTier.update(
-        {
-          status: "resolved",
-          updated_at: new Date(),
-        },
-        {
-          where: { issue_tier_id: currentTier.issue_tier_id },
-          transaction: t,
-        }
+        { status: "resolved", updated_at: new Date() },
+        { where: { issue_tier_id: currentTier.issue_tier_id }, transaction: t }
       );
     }
 
-    // 7. Log Action
+    // 7️⃣ Log Action
     await IssueAction.create(
       {
         action_id: uuidv4(),
@@ -103,9 +92,7 @@ const resolveIssue = async (req, res) => {
       { transaction: t }
     );
 
-    // ==================================
-    // 8. CREATE IssueHistory ENTRY (NEW)
-    // ==================================
+    // 8️⃣ Issue History
     await IssueHistory.create(
       {
         history_id: uuidv4(),
@@ -120,6 +107,37 @@ const resolveIssue = async (req, res) => {
       },
       { transaction: t }
     );
+
+    // 9️⃣ Notify requester (database + email)
+    const requester = await User.findByPk(issue.reported_by);
+
+    if (requester && requester.user_id !== resolved_by) {
+      await createNotification({
+        recipient_id: requester.user_id,
+        user_id: resolved_by,
+        reference_type: "issue",
+        reference_id: issue_id,
+        type: "issue_resolved",
+        title: `Issue Resolved: ${issue.ticket_number}  ,${` by ${reason}`}`,
+        body: `${resolver.full_name} resolved your issue. ${
+          issue.ticket_number
+        }  ,${` by ${reason}`}`,
+        payload: { issue_id, project_id: issue.project_id, reason },
+        transaction: t,
+      });
+
+      // Send email asynchronously
+      setTimeout(async () => {
+        try {
+          const notif = await sequelize.models.Notification.findOne({
+            where: { reference_id: issue_id, type: "issue_resolved" },
+          });
+          if (notif) await sendEmailForNotification(notif);
+        } catch (err) {
+          console.error("Email send error:", err);
+        }
+      }, 10);
+    }
 
     // COMMIT ALL
     await t.commit();

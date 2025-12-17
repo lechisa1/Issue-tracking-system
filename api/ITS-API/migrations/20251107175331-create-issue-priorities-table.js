@@ -18,6 +18,14 @@ module.exports = {
         type: Sequelize.TEXT,
         allowNull: true,
       },
+      color_value: {
+        type: Sequelize.TEXT, // HEX color support
+        allowNull: true,
+      },
+      response_time: {
+        type: Sequelize.TEXT, // supports 3h, 1day, 2week, etc
+        allowNull: true,
+      },
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,

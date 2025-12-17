@@ -9,10 +9,11 @@ const { v4: uuidv4 } = require("uuid");
 // Create Internal Node
 const createInternalNode = async (req, res) => {
   try {
-    const { parent_id, name, description, is_active } = req.body;
+    const { parent_id, name, is_active } = req.body;
 
     // Duplicate name check (global unique)
-    const existing = await InternalNode.findOne({ where: { name } });
+const existing = await InternalNode.findOne({ where: { name } });
+
     if (existing) {
       return res.status(400).json({
         message: `Internal node with name '${name}' already exists.`,
@@ -32,7 +33,7 @@ const createInternalNode = async (req, res) => {
       internal_node_id: uuidv4(),
       parent_id,
       name,
-      description,
+
       level,
       is_active,
     });

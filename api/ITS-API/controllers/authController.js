@@ -13,28 +13,24 @@ const {
   InternalProjectUserRole,
   InternalNode,
   Permission,
+  UserPosition,
+  ProjectMetric,
+  ProjectMetricUser,
+  UserRoles,
 } = require("../models");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-
+const { Op } = require("sequelize");
 const login = async (req, res) => {
   try {
     const { email, phoneNumber, password } = req.body;
 
-    console.log("Login attempt:", { email, phoneNumber }); // Debug log
+    console.log("Login attempt:", { email, phoneNumber });
 
-    // Validate that either email or phoneNumber is provided
     if (!email && !phoneNumber) {
       return res.status(400).json({
         success: false,
         message: "Please provide either email or phone number",
-      });
-    }
-
-    if (email && phoneNumber) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide either email or phone number, not both",
       });
     }
 
@@ -45,21 +41,18 @@ const login = async (req, res) => {
       });
     }
 
-    let user;
     let queryCondition = {};
 
-    // Find user by email or phone number
     if (email) {
       queryCondition = { email };
     } else if (phoneNumber) {
-      // Clean phone number (remove non-digit characters)
-      const cleanPhoneNumber = phoneNumber.replace(/\D/g, "");
-      queryCondition = { phone_number: cleanPhoneNumber };
+      // Use phone exactly as registered
+      queryCondition = { phone_number: phoneNumber };
     }
 
-    console.log("Query condition:", queryCondition); // Debug log
+    console.log("Query condition:", queryCondition);
 
-    user = await User.findOne({
+    const user = await User.findOne({
       where: queryCondition,
       include: [
         {
@@ -71,6 +64,72 @@ const login = async (req, res) => {
           model: UserType,
           as: "userType",
           attributes: ["user_type_id", "name"],
+        },
+        {
+          model: UserPosition,
+          as: "userPosition",
+          attributes: ["user_position_id", "name"],
+        },
+        {
+          model: HierarchyNode,
+          as: "hierarchyNode",
+          attributes: [
+            "hierarchy_node_id",
+            "name",
+            "level",
+            "parent_id",
+            "description",
+          ],
+        },
+        {
+          model: InternalNode,
+          as: "internalNode",
+          attributes: ["internal_node_id", "name", "level", "parent_id"],
+        },
+        { model: Role, as: "roles", through: { attributes: [] } },
+        {
+          model: ProjectMetric,
+          as: "metrics",
+          through: { attributes: ["value"] },
+        },
+        {
+          model: ProjectUserRole,
+          as: "projectRoles",
+          include: [
+            {
+              model: Project,
+              as: "project",
+              attributes: ["project_id", "name", "description"],
+            },
+            { model: Role, as: "role", attributes: ["role_id", "name"] },
+            {
+              model: SubRole,
+              as: "subRole",
+              attributes: ["sub_role_id", "name"],
+            },
+            {
+              model: HierarchyNode,
+              as: "hierarchyNode",
+              attributes: ["hierarchy_node_id", "name", "level", "parent_id"],
+            },
+          ],
+        },
+        {
+          model: InternalProjectUserRole,
+          as: "internalProjectUserRoles",
+          include: [
+            {
+              model: Project,
+              as: "project",
+              attributes: ["project_id", "name", "description"],
+            },
+            { model: Role, as: "role", attributes: ["role_id", "name"] },
+            {
+              model: InternalNode,
+              as: "internalNode",
+              attributes: ["internal_node_id", "name", "level", "parent_id"],
+            },
+          ],
         },
       ],
     });
@@ -89,7 +148,6 @@ const login = async (req, res) => {
       });
     }
 
-    // Compare password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({
@@ -98,79 +156,56 @@ const login = async (req, res) => {
       });
     }
 
-    // Generate JWT
-    const token = jwt.sign(
-      {
-        user_id: user.user_id,
-        email: user.email,
-        phone_number: user.phone_number,
-        user_type: user.userType ? user.userType.name : null,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRATION_TIME || "12h" }
-    );
-
-    // Fetch active roles, subroles, and permissions
-    const projectRoles = await ProjectUserRole.findAll({
-      where: { user_id: user.user_id, is_active: true },
-      include: [
-        {
-          model: Role,
-          as: "role",
-          where: { is_active: true },
-          include: [
-            {
-              model: RoleSubRole,
-              as: "roleSubRoles",
-              where: { is_active: true },
-              required: false,
-              include: [
-                {
-                  model: SubRole,
-                  as: "subRole",
-                  where: { is_active: true },
-                  required: false,
-                },
-                {
-                  model: RoleSubRolePermission,
-                  as: "permissions",
-                  include: [
-                    {
-                      model: Permission,
-                      as: "permission",
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-        {
-          model: SubRole,
-          as: "subRole",
-          where: { is_active: true },
-          required: false,
-        },
-      ],
-    });
-
-    // Format roles & permissions
-    const roles = projectRoles.map((pr) => ({
-      project_user_role_id: pr.project_user_role_id,
-      role: pr.role
+    // Prepare user data for JWT token
+    const userDataForToken = {
+      user_id: user.user_id,
+      email: user.email,
+      full_name: user.full_name,
+      user_type: user.userType?.name || null,
+      institute: user.institute
         ? {
-            role_id: pr.role.role_id,
-            name: pr.role.name,
-            subRoles: pr.role.roleSubRoles.map((rs) => ({
-              subRole: rs.subRole,
-              permissions: rs.permissions.map((p) => p.permission),
-            })),
+            institute_id: user.institute.institute_id,
+            name: user.institute.name,
           }
         : null,
-      subRole: pr.subRole,
-    }));
+      user_position: user.userPosition
+        ? {
+            user_position_id: user.userPosition.user_position_id,
+            name: user.userPosition.name,
+          }
+        : null,
+      hierarchy_node: user.hierarchyNode
+        ? {
+            hierarchy_node_id: user.hierarchyNode.hierarchy_node_id,
+            name: user.hierarchyNode.name,
+            level: user.hierarchyNode.level,
+          }
+        : null,
+      internal_node: user.internalNode
+        ? {
+            internal_node_id: user.internalNode.internal_node_id,
+            name: user.internalNode.name,
+            level: user.internalNode.level,
+          }
+        : null,
+      roles:
+        user.roles?.map((role) => ({
+          role_id: role.role_id,
+          name: role.name,
+        })) || [],
+      metrics:
+        user.metrics?.map((metric) => ({
+          project_metric_id: metric.project_metric_id,
+          name: metric.name,
+          description: metric.description,
+          value: metric.ProjectMetricUser.value,
+        })) || [],
+    };
 
-    // Update last login
+    const token = jwt.sign(userDataForToken, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRATION_TIME || "12h",
+    });
+
     await user.update({ last_login_at: new Date() });
 
     return res.status(200).json({
@@ -178,33 +213,59 @@ const login = async (req, res) => {
       message: "Login successful",
       token,
       user: {
-        user_id: user.user_id,
-        full_name: user.full_name,
-        email: user.email,
+        ...userDataForToken,
         phone_number: user.phone_number,
-        position: user.position,
         profile_image: user.profile_image,
-        user_type: user.userType ? user.userType.name : null,
-        institute: user.institute
-          ? {
-              institute_id: user.institute.institute_id,
-              name: user.institute.name,
-            }
-          : null,
+        is_first_logged_in: user.is_first_logged_in,
+        project_roles: user.projectRoles?.map((pr) => ({
+          project_user_role_id: pr.project_user_role_id,
+          project: pr.project
+            ? {
+                project_id: pr.project.project_id,
+                name: pr.project.name,
+                description: pr.project.description,
+              }
+            : null,
+          role: pr.role?.name || null,
+          role_id: pr.role?.role_id || null,
+          sub_role_id: pr.subRole?.sub_role_id || null,
+          hierarchy_node: pr.hierarchyNode
+            ? {
+                hierarchy_node_id: pr.hierarchyNode.hierarchy_node_id,
+                name: pr.hierarchyNode.name,
+                level: pr.hierarchyNode.level,
+              }
+            : null,
+        })),
+        internal_project_roles: user.internalProjectUserRoles?.map((ipr) => ({
+          internal_project_user_role_id: ipr.internal_project_user_role_id,
+          project: ipr.project
+            ? {
+                project_id: ipr.project.project_id,
+                name: ipr.project.name,
+                description: ipr.project.description,
+              }
+            : null,
+          role: ipr.role?.name || null,
+          role_id: ipr.role?.role_id || null,
+          internal_node: ipr.internalNode
+            ? {
+                internal_node_id: ipr.internalNode.internal_node_id,
+                name: ipr.internalNode.name,
+                level: ipr.internalNode.level,
+              }
+            : null,
+          is_active: ipr.is_active,
+        })),
       },
-      roles,
     });
   } catch (error) {
     console.error("Login error:", error);
-
-    // Make sure we haven't already sent a response
-    if (!res.headersSent) {
-      return res.status(500).json({
-        success: false,
-        message: "Internal server error",
-        error: error.message,
-      });
-    }
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };
 
@@ -231,7 +292,6 @@ const getCurrentUser = async (req, res) => {
 
     const user = await User.findOne({
       where: { user_id: decoded.user_id },
-
       include: [
         {
           model: Institute,
@@ -243,8 +303,37 @@ const getCurrentUser = async (req, res) => {
           as: "userType",
           attributes: ["user_type_id", "name"],
         },
-
-        // 🟢 Include user project roles
+        {
+          model: UserPosition,
+          as: "userPosition",
+          attributes: ["user_position_id", "name"],
+        },
+        {
+          model: HierarchyNode,
+          as: "hierarchyNode",
+          attributes: [
+            "hierarchy_node_id",
+            "name",
+            "level",
+            "parent_id",
+            "description",
+          ],
+        },
+        {
+          model: InternalNode,
+          as: "internalNode",
+          attributes: ["internal_node_id", "name", "level", "parent_id"],
+        },
+        {
+          model: Role,
+          as: "roles",
+        },
+        {
+          model: ProjectMetric,
+          as: "metrics",
+          through: { attributes: ["value"] },
+        },
+        // Project roles
         {
           model: ProjectUserRole,
           as: "projectRoles",
@@ -260,20 +349,9 @@ const getCurrentUser = async (req, res) => {
               attributes: ["role_id", "name"],
             },
             {
-              model: SubRole,
-              as: "subRole",
-              attributes: ["sub_role_id", "name"],
-            },
-            {
               model: HierarchyNode,
               as: "hierarchyNode",
-              attributes: [
-                "hierarchy_node_id",
-                "name",
-                "level",
-                "parent_id",
-                "description",
-              ],
+              attributes: ["hierarchy_node_id", "name", "level", "parent_id"],
             },
             {
               model: InstituteProject,
@@ -282,7 +360,7 @@ const getCurrentUser = async (req, res) => {
             },
           ],
         },
-        // Internal Project Roles
+        // Internal project roles
         {
           model: InternalProjectUserRole,
           as: "internalProjectUserRoles",
@@ -296,13 +374,11 @@ const getCurrentUser = async (req, res) => {
               model: Role,
               as: "role",
               attributes: ["role_id", "name"],
-              required: false,
             },
             {
               model: InternalNode,
               as: "internalNode",
               attributes: ["internal_node_id", "name", "level", "parent_id"],
-              required: false,
             },
           ],
         },
@@ -319,6 +395,7 @@ const getCurrentUser = async (req, res) => {
         phone_number: user.phone_number,
         position: user.position,
         profile_image: user.profile_image,
+        is_first_logged_in: user.is_first_logged_in,
 
         user_type: user.userType ? user.userType.name : null,
 
@@ -329,7 +406,52 @@ const getCurrentUser = async (req, res) => {
             }
           : null,
 
-        // 🟢 Return project roles, formatted nicely for frontend
+        user_position: user.userPosition
+          ? {
+              user_position_id: user.userPosition.user_position_id,
+              name: user.userPosition.name,
+            }
+          : null,
+
+        hierarchy_node: user.hierarchyNode
+          ? {
+              hierarchy_node_id: user.hierarchyNode.hierarchy_node_id,
+              name: user.hierarchyNode.name,
+              level: user.hierarchyNode.level,
+              parent_id: user.hierarchyNode.parent_id,
+              description: user.hierarchyNode.description,
+            }
+          : null,
+
+        internal_node: user.internalNode
+          ? {
+              internal_node_id: user.internalNode.internal_node_id,
+              name: user.internalNode.name,
+              level: user.internalNode.level,
+              parent_id: user.internalNode.parent_id,
+            }
+          : null,
+
+        // Global roles with permissions
+        roles: user.roles
+          ? user.roles.map((role) => ({
+              role_id: role.role_id,
+              name: role.name,
+            }))
+          : [],
+
+        // User metrics
+        metrics: user.metrics
+          ? user.metrics.map((metric) => ({
+              project_metric_id: metric.project_metric_id,
+              name: metric.name,
+              description: metric.description,
+              weight: metric.weight,
+              value: metric.ProjectMetricUser.value,
+            }))
+          : [],
+
+        // Project roles
         project_roles: user.projectRoles?.map((pr) => ({
           project_user_role_id: pr.project_user_role_id,
           project: pr.project
@@ -343,33 +465,45 @@ const getCurrentUser = async (req, res) => {
           role_id: pr.role ? pr.role.role_id : null,
           sub_role: pr.subRole ? pr.subRole.name : null,
           sub_role_id: pr.subRole ? pr.subRole.sub_role_id : null,
-
           hierarchy_node: pr.hierarchyNode
             ? {
                 hierarchy_node_id: pr.hierarchyNode.hierarchy_node_id,
                 name: pr.hierarchyNode.name,
                 level: pr.hierarchyNode.level,
                 parent_id: pr.hierarchyNode.parent_id,
-                description: pr.hierarchyNode.description,
               }
             : null,
-
           institute_project: pr.instituteProject
             ? {
                 institute_project_id: pr.instituteProject.institute_project_id,
                 institute_id: pr.instituteProject.institute_id,
               }
             : null,
+        })),
 
-          // Internal node mapping for user
-          internal_node: user.internalNode
+        // Internal project roles
+        internal_project_roles: user.internalProjectUserRoles?.map((ipr) => ({
+          internal_project_user_role_id: ipr.internal_project_user_role_id,
+          project: ipr.project
             ? {
-                internal_node_id: user.internalNode.internal_node_id,
-                name: user.internalNode.name,
-                level: user.internalNode.level,
-                parent_id: user.internalNode.parent_id,
+                project_id: ipr.project.project_id,
+                name: ipr.project.name,
+                description: ipr.project.description,
               }
             : null,
+          role: ipr.role ? ipr.role.name : null,
+          role_id: ipr.role ? ipr.role.role_id : null,
+          internal_node: ipr.internalNode
+            ? {
+                internal_node_id: ipr.internalNode.internal_node_id,
+                name: ipr.internalNode.name,
+                level: ipr.internalNode.level,
+                parent_id: ipr.internalNode.parent_id,
+              }
+            : null,
+          is_active: ipr.is_active,
+          created_at: ipr.created_at,
+          updated_at: ipr.updated_at,
         })),
       },
     });
@@ -380,5 +514,26 @@ const getCurrentUser = async (req, res) => {
       .json({ message: "Internal server error", error: error.message });
   }
 };
+// First-login password reset
+// exports.firstLoginReset = async (req, res) => {
+//   const { email, newPassword } = req.body;
+//   if (!email || !newPassword)
+//     return res.status(400).json({ success: false, message: "Missing data" });
 
+//   try {
+//     const user = await User.findOne({ where: { email } });
+//     if (!user)
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "User not found" });
+
+//     const hashedPassword = await bcrypt.hash(newPassword, 10);
+//     await user.update({ password: hashedPassword, firstLogin: false });
+
+//     res.json({ success: true, message: "Password updated successfully" });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ success: false, message: "Server error" });
+//   }
+// };
 module.exports = { login, logout, getCurrentUser };
