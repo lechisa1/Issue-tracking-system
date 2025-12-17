@@ -173,7 +173,7 @@ const assignIssue = async (req, res) => {
         body: `A new task "${
           issue.ticket_number
         }" has been assigned to you by ${assigner.full_name}. ${
-          remarks ? `Remarks: ${remarks}` : ""
+          remarks ? `Remarks: ${remarks}` : "Let Me know if you have questions."
         }`,
         payload: {
           issue_id,

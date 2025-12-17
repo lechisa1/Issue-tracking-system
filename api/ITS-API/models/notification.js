@@ -16,6 +16,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.UUID,
         allowNull: true,
       },
+      // issue_id: {
+      //   type: DataTypes.UUID,
+      //   allowNull: true,
+      // },
       reference_type: {
         type: DataTypes.STRING,
         allowNull: true,
@@ -76,6 +80,10 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: "user_id",
       as: "actor",
     });
+    // Notification.belongsTo(models.Issue, {
+    //   foreignKey: "issue_id",
+    //   as: "issue",
+    // });
   };
 
   return Notification;

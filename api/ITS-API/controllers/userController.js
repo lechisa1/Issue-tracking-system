@@ -205,6 +205,7 @@ const createUser = async (req, res) => {
         });
       }
     }
+    console.log("here is roles", role_ids);
 
     // ====== Validate metrics if provided ======
     if (
@@ -559,7 +560,9 @@ const getUsers = async (req, res) => {
       user_position_id,
       hierarchy_node_id,
       is_active,
-      search, // optional: for name/email search
+      search,
+      page = 1,
+      limit = 10,
     } = req.query;
 
     // ====== Build filters dynamically ======
@@ -579,9 +582,15 @@ const getUsers = async (req, res) => {
       ];
     }
 
-    // ====== Fetch users with associations ======
-    const users = await User.findAll({
+    // ====== Pagination ======
+    const { limit: pageLimit, offset } = getPagination(page, limit);
+
+    // ====== Fetch users ======
+    const users = await User.findAndCountAll({
       where: whereClause,
+      limit: pageLimit,
+      offset,
+      distinct: true, // IMPORTANT when using include
       include: [
         {
           model: Institute,
@@ -602,10 +611,19 @@ const getUsers = async (req, res) => {
       order: [["created_at", "DESC"]],
     });
 
+    // ====== Format pagination response ======
+    const pagingData = getPagingData(users, page, pageLimit);
+
     return res.status(200).json({
       success: true,
       message: "Users fetched successfully.",
-      data: users,
+      data: pagingData.results,
+      meta: {
+        total: pagingData.total,
+        page: pagingData.currentPage,
+        limit: pagingData.limit,
+        pageCount: pagingData.totalPages,
+      },
     });
   } catch (error) {
     console.error("Error fetching users:", error);
@@ -1261,9 +1279,6 @@ const getUserById = async (req, res) => {
   try {
     const { id: user_id } = req.params;
 
-    console.log("user_id: ", user_id);
-
-    // ====== Find user with relations ======
     const user = await User.findByPk(user_id, {
       include: [
         {
@@ -1281,16 +1296,21 @@ const getUserById = async (req, res) => {
           as: "hierarchyNode",
           attributes: ["hierarchy_node_id", "name"],
         },
+
+        // ✅ THIS IS ENOUGH FOR ROLES
         {
           model: Role,
           as: "roles",
-          through: { attributes: [] },
+          attributes: ["role_id", "name", "description", "is_active"],
+          through: { attributes: [] }, // hide pivot table
         },
+
         {
           model: ProjectMetric,
           as: "metrics",
           through: { attributes: ["value"] },
         },
+
         {
           model: ProjectUserRole,
           as: "projectRoles",
@@ -1307,6 +1327,7 @@ const getUserById = async (req, res) => {
             },
           ],
         },
+
         {
           model: InternalProjectUserRole,
           as: "internalProjectUserRoles",
@@ -1338,16 +1359,10 @@ const getUserById = async (req, res) => {
       });
     }
 
-    // Transform the data to include roles in a more accessible format
-    const userData = user.toJSON();
-
-    // Extract roles from userRoles association
-    userData.roles = userData.userRoles?.map((userRole) => userRole.role) || [];
-
     return res.status(200).json({
       success: true,
       message: "User fetched successfully.",
-      data: userData,
+      data: user, // 🔥 roles already included correctly
     });
   } catch (error) {
     console.error("Error fetching user:", error);

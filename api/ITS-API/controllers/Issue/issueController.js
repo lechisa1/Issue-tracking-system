@@ -197,18 +197,17 @@ const createIssue = async (req, res) => {
         reference_id: issue_id,
         type: "New issue created",
         title: `New Issue: ${title}`,
-        body: `${req.user.name} created a new issue.`,
+        body: `${req.user.full_name} created a new issue.`,
         payload: { issue_id, project_id },
         transaction: t,
       });
     }
 
-    // -----------------------------
+    console.log("✅ Reported by:", reported_by);
     // 8. COMMIT
     // -----------------------------
     await t.commit();
 
-    // -----------------------------
     // 9. EMAIL SEND (NON-BLOCKING)
     // -----------------------------
     setTimeout(async () => {
