@@ -203,7 +203,7 @@ const login = async (req, res) => {
     };
 
     const token = jwt.sign(userDataForToken, process.env.JWT_SECRET, {
-      expiresIn: process.env.JWT_EXPIRATION_TIME || "12h",
+      expiresIn: process.env.JWT_EXPIRATION_TIME || "2m",
     });
 
     await user.update({ last_login_at: new Date() });
