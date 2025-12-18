@@ -1,10 +1,11 @@
 const { v4: uuidv4 } = require("uuid");
-const { IssuePriority, IssueResponseTime } = require("../models");
+const { IssuePriority } = require("../models");
+
+const { Op } = require("sequelize");
 const {
   prioritySchema,
   idParamSchema,
 } = require("../validators/issuePriorityValidator");
-const { Op } = require("sequelize");
 
 //======Create Priority==============
 // exports.createPriority = async (req, res) => {
@@ -63,50 +64,22 @@ exports.createPriority = async (req, res) => {
       return res.status(409).json({ message: "Priority name already exists" });
     }
 
-    // Optional: validate response_time_id exists if provided
-    let responseTimeId = null;
-
-    if (value.response_time_id) {
-      const responseTime = await IssueResponseTime.findByPk(
-        value.response_time_id
-      );
-      if (!responseTime) {
-        return res.status(400).json({ message: "Invalid response_time_id" });
-      }
-      responseTimeId = value.response_time_id;
-    } else {
-      return res.status(400).json({ message: "response_time_id is required" });
-    }
-
     // Create priority
     const priority = await IssuePriority.create({
       priority_id: uuidv4(),
       name: value.name,
       description: value.description,
       color_value: value.color_value,
-      response_time_id: responseTimeId,
+      response_duration: value.response_duration,
+      response_unit: value.response_unit,
       is_active: value.is_active !== undefined ? value.is_active : true,
       created_at: new Date(),
       updated_at: new Date(),
     });
 
-    // Fetch priority with response time included
-    const priorityWithResponseTime = await IssuePriority.findByPk(
-      priority.priority_id,
-      {
-        include: [
-          {
-            model: IssueResponseTime,
-            as: "responseTime",
-            attributes: ["duration", "unit"],
-          },
-        ],
-      }
-    );
-
     return res.status(201).json({
       message: "Priority created successfully",
-      data: priorityWithResponseTime,
+      data: priority,
     });
   } catch (err) {
     return res.status(500).json({
@@ -120,12 +93,6 @@ exports.getAllPriorities = async (req, res) => {
   try {
     const priorities = await IssuePriority.findAll({
       order: [["created_at", "DESC"]],
-      include: [
-        {
-          model: IssueResponseTime,
-          as: "responseTime",
-        },
-      ],
     });
 
     return res.status(200).json({
@@ -220,6 +187,8 @@ exports.updatePriority = async (req, res) => {
       description: value.description,
       color_value: value.color_value,
       response_time: value.response_time,
+      response_duration: value.response_duration,
+      response_unit: value.response_unit,
       updated_at: new Date(),
     });
 

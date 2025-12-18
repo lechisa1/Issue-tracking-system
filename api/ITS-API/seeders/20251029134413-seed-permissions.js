@@ -6,12 +6,19 @@ module.exports = {
     const now = new Date();
 
     const permissions = [
+      // Dashboard Access
+      { resource: "dashboard", action: "view" },
+
       // User Management
       { resource: "users", action: "create" },
       { resource: "users", action: "read" },
       { resource: "users", action: "update" },
       { resource: "users", action: "delete" },
       { resource: "users", action: "assign_role" },
+
+      // Permission Management
+      { resource: "permissions", action: "read" },
+      { resource: "permissions", action: "update" },
 
       // Role Management
       { resource: "roles", action: "create" },
@@ -61,6 +68,18 @@ module.exports = {
       { resource: "issue_categories", action: "read" },
       { resource: "issue_categories", action: "update" },
       { resource: "issue_categories", action: "delete" },
+
+      // Issue Flow Management
+      { resource: "issue_flows", action: "create" },
+      { resource: "issue_flows", action: "read" },
+      { resource: "issue_flows", action: "update" },
+      { resource: "issue_flows", action: "delete" },
+
+      // Humnan Resource Management
+      { resource: "human_resources", action: "create" },
+      { resource: "human_resources", action: "read" },
+      { resource: "human_resources", action: "update" },
+      { resource: "human_resources", action: "delete" },
     ];
 
     for (const perm of permissions) {

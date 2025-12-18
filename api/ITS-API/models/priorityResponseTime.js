@@ -4,13 +4,13 @@ const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
   class IssueResponseTime extends Model {
-    static associate(models) {
-      // 🟢 Link to IssuePriority
-      this.hasMany(models.IssuePriority, {
-        foreignKey: "response_time_id",
-        as: "priorities",
-      });
-    }
+    // static associate(models) {
+    //   // 🟢 Link to IssuePriority
+    //   this.hasMany(models.IssuePriority, {
+    //     foreignKey: "response_time_id",
+    //     as: "priorities",
+    //   });
+    // }
   }
 
   IssueResponseTime.init(

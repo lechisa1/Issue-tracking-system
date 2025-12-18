@@ -75,7 +75,7 @@ const escalateIssue = async (req, res) => {
         tier_level: to_tier,
         handler_id: null,
         assigned_at: new Date(),
-        status: "escalated",
+        status: "pending",
         remarks: `Escalated from ${from_tier}`,
       },
       { transaction: t }
@@ -102,7 +102,7 @@ const escalateIssue = async (req, res) => {
         history_id: uuidv4(),
         issue_id: issue_id,
         user_id: escalated_by,
-        action: "escalated",
+        action: "pending",
         status_at_time: issue.status, // Issue status doesn't change here
         escalation_id: escalation_id,
         resolution_id: null,
@@ -115,7 +115,7 @@ const escalateIssue = async (req, res) => {
     // 9 update issue status
     // Update issue status to 'in_progress'
     const oldStatus = issue.status;
-    issue.status = "escalated"; // <--- status update
+    issue.status = "pending"; // <--- status update
     await issue.save({ transaction: t });
 
     // COMMIT ALL

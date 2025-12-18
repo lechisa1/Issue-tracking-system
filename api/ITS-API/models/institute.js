@@ -11,6 +11,17 @@ module.exports = (sequelize, DataTypes) => {
         otherKey: "project_id",
         as: "projects",
       });
+      // One-to-Many relationship with InstituteAttachment
+      this.hasMany(models.InstituteAttachment, {
+        foreignKey: "institute_id",
+        as: "attachments",
+      });
+    }
+    // Virtual getter for logo
+    getLogo() {
+      const attachments = this.attachments || [];
+      const logo = attachments.find((att) => att.file_type === "logo");
+      return logo ? logo.file_name : null;
     }
   }
 
@@ -23,10 +34,30 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
       },
       name: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.JSON,
         allowNull: false,
-        unique: true,
+        comment: "Localized names JSON: { en: 'Name', am: 'እትም', fr: 'Nom' }",
+        unique: false,
+        get() {
+          const raw = this.getDataValue("name");
+          return raw;
+        },
+        set(value) {
+          if (typeof value === "string") {
+            this.setDataValue("name", { en: value });
+          } else if (typeof value === "object" && value !== null) {
+            // unwrap nested 'en'
+            let nameValue = value;
+            while (nameValue.en && typeof nameValue.en === "object") {
+              nameValue = nameValue.en;
+            }
+            this.setDataValue("name", { en: nameValue.en || nameValue });
+          } else {
+            this.setDataValue("name", value);
+          }
+        },
       },
+
       description: {
         type: DataTypes.TEXT,
         allowNull: true,
@@ -34,6 +65,16 @@ module.exports = (sequelize, DataTypes) => {
       is_active: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
+      },
+      // Virtual field to expose logo URL or file_name
+      logo: {
+        type: DataTypes.VIRTUAL,
+        get() {
+          return this.getLogo();
+        },
+        set(value) {
+          throw new Error("Do not try to set the `logo` value directly.");
+        },
       },
     },
     {

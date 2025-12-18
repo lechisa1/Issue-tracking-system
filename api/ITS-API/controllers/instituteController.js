@@ -1,13 +1,22 @@
-const { Institute, Project } = require("../models");
+const { Institute, Project, InstituteAttachment } = require("../models");
 const { v4: uuidv4 } = require("uuid");
 
 // Create a new institute
 const createInstitute = async (req, res) => {
   try {
-    const { name, description, is_active } = req.body;
+    let { name, description, is_active, attachments } = req.body;
+
+    // Normalize name to JSON
+    if (typeof name === "string") {
+      name = { en: name };
+    } else if (typeof name !== "object" || name === null) {
+      return res.status(400).json({ message: "Invalid name format" });
+    }
 
     // Check if institute exists
-    const existingInstitute = await Institute.findOne({ where: { name } });
+    const existingInstitute = await Institute.findOne({
+      where: { name: { en: name.en } },
+    });
     if (existingInstitute)
       return res
         .status(400)
@@ -23,7 +32,24 @@ const createInstitute = async (req, res) => {
       is_active,
     });
 
-    res.status(201).json(institute);
+    // If attachments are provided, create InstituteAttachment records
+    if (Array.isArray(attachments) && attachments.length > 0) {
+      const attachmentRecords = attachments.map((att) => ({
+        institute_attachment_id: uuidv4(),
+        institute_id,
+        attachment_id: att.attachment_id,
+        type: att.type || "other", // default to 'other' if not provided
+      }));
+
+      await InstituteAttachment.bulkCreate(attachmentRecords);
+    }
+
+    // Fetch the created institute along with attachments
+    const createdInstitute = await Institute.findByPk(institute_id, {
+      include: [{ model: InstituteAttachment, as: "attachments" }],
+    });
+
+    res.status(201).json(createdInstitute);
   } catch (error) {
     console.error(error);
     res
@@ -73,6 +99,16 @@ const getInstituteById = async (req, res) => {
           as: "projects",
           through: { attributes: ["is_active"] },
         },
+        {
+          model: InstituteAttachment,
+          as: "attachments",
+          attributes: [
+            "institute_attachment_id",
+            "attachment_id",
+            "type",
+            "created_at",
+          ],
+        },
       ],
     });
     if (!institute)
@@ -90,18 +126,53 @@ const getInstituteById = async (req, res) => {
 const updateInstitute = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, is_active } = req.body;
+    let { name, description, is_active, attachments } = req.body;
 
     const institute = await Institute.findByPk(id);
     if (!institute)
       return res.status(404).json({ message: "Institute not found" });
 
-    institute.name = name || institute.name;
+    // Normalize name to JSON if provided
+    if (name) {
+      if (typeof name === "string") {
+        name = { en: name };
+      } else if (typeof name !== "object" || name === null) {
+        return res.status(400).json({ message: "Invalid name format" });
+      }
+
+      institute.name = name;
+    }
     institute.description = description || institute.description;
     if (is_active !== undefined) institute.is_active = is_active;
 
     await institute.save();
-    res.status(200).json(institute);
+
+    // Handle attachments if provided
+    if (Array.isArray(attachments)) {
+      for (const att of attachments) {
+        if (att.type === "logo") {
+          // Remove any existing logo
+          await InstituteAttachment.destroy({
+            where: { institute_id: id, type: "logo" },
+          });
+        }
+
+        // Create the new attachment
+        await InstituteAttachment.create({
+          institute_attachment_id: uuidv4(),
+          institute_id: id,
+          attachment_id: att.attachment_id,
+          type: att.type || "other",
+        });
+      }
+    }
+
+    // Fetch updated institute with attachments
+    const updatedInstitute = await Institute.findByPk(id, {
+      include: [{ model: InstituteAttachment, as: "attachments" }],
+    });
+
+    res.status(200).json(updatedInstitute);
   } catch (error) {
     console.error(error);
     res

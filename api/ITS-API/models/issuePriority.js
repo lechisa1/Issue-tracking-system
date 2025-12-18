@@ -4,14 +4,6 @@ const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
   class IssuePriority extends Model {
-    static associate(models) {
-      // 🔹 Link to IssueResponseTime
-      this.belongsTo(models.IssueResponseTime, {
-        foreignKey: "response_time_id",
-        as: "responseTime",
-      });
-    }
-
     // 🟢 Example helper method to check if priority jumps to central
     canJumpToCentral() {
       // Only active priorities can "jump"
@@ -39,9 +31,17 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(20),
         allowNull: true,
       },
-      response_time_id: {
-        type: DataTypes.UUID,
-        allowNull: true,
+      // 🔥 MERGED RESPONSE TIME FIELDS
+      response_duration: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        comment: "Numeric value of response time (example: 24)",
+      },
+      response_unit: {
+        type: DataTypes.ENUM("hour", "day", "month"),
+        allowNull: false,
+        defaultValue: "hour",
+        comment: "Unit for response time",
       },
       is_active: {
         type: DataTypes.BOOLEAN,
