@@ -1333,7 +1333,7 @@ const reopenIssue = async (req, res) => {
         reference_id: issue_id,
         type: "issue_reopened",
         title: `Issue Reopened: ${title}`,
-        body: `${req.user.name} reopened the issue.`,
+        body: `${req.user.full_name} reopened the issue.`,
         payload: { issue_id, project_id },
         transaction: t,
       });
