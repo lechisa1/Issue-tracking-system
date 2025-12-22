@@ -202,16 +202,28 @@ const login = async (req, res) => {
         })) || [],
     };
 
-    const token = jwt.sign(userDataForToken, process.env.JWT_SECRET, {
-      expiresIn: process.env.JWT_EXPIRATION_TIME || "2m",
+    const accessToken = jwt.sign(userDataForToken, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRATION_TIME || "1h",
     });
 
+    const refreshToken = jwt.sign(
+      { user_id: user.user_id },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: process.env.JWT_REFRESH_EXPIRATION || "7d" }
+    );
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
     await user.update({ last_login_at: new Date() });
 
     return res.status(200).json({
       success: true,
       message: "Login successful",
-      token,
+      token: accessToken,
       user: {
         ...userDataForToken,
         phone_number: user.phone_number,
@@ -514,26 +526,26 @@ const getCurrentUser = async (req, res) => {
       .json({ message: "Internal server error", error: error.message });
   }
 };
-// First-login password reset
-// exports.firstLoginReset = async (req, res) => {
-//   const { email, newPassword } = req.body;
-//   if (!email || !newPassword)
-//     return res.status(400).json({ success: false, message: "Missing data" });
+const refreshToken = (req, res) => {
+  const token = req.cookies.refreshToken;
 
-//   try {
-//     const user = await User.findOne({ where: { email } });
-//     if (!user)
-//       return res
-//         .status(404)
-//         .json({ success: false, message: "User not found" });
+  if (!token) {
+    return res.status(401).json({ message: "No refresh token" });
+  }
 
-//     const hashedPassword = await bcrypt.hash(newPassword, 10);
-//     await user.update({ password: hashedPassword, firstLogin: false });
+  jwt.verify(token, process.env.JWT_REFRESH_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ message: "Invalid refresh token" });
+    }
 
-//     res.json({ success: true, message: "Password updated successfully" });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ success: false, message: "Server error" });
-//   }
-// };
-module.exports = { login, logout, getCurrentUser };
+    const newAccessToken = jwt.sign(
+      { user_id: decoded.user_id },
+      process.env.JWT_SECRET,
+      { expiresIn: "2m" }
+    );
+
+    res.json({ accessToken: newAccessToken });
+  });
+};
+
+module.exports = { login, logout, getCurrentUser, refreshToken };

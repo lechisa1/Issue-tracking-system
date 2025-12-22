@@ -6,7 +6,7 @@ const http = require("http");
 const { Server } = require("socket.io");
 const path = require("path");
 const bodyParser = require("body-parser");
-
+const cookieParser = require("cookie-parser");
 dotenv.config();
 
 const { swaggerUi, swaggerSpec } = require("./swagger");
@@ -71,7 +71,7 @@ const appServer = http.createServer(app);
 //     },
 //   })
 // );
-
+app.use(cookieParser());
 app.use(
   express.json({
     verify: (req, res, buf) => {

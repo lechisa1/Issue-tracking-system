@@ -14,6 +14,8 @@ router.post(
   "/password-reset/sms/request",
   passwordResetSMSController.requestReset
 );
+router.post("/auth/refresh", authController.refreshToken);
+
 router.post("/password-reset/sms/verify", passwordResetSMSController.verifyOTP);
 router.post(
   "/password-reset/sms/reset",
