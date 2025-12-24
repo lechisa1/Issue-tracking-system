@@ -65,9 +65,34 @@ exports.validateAssignUserToProject = (req, res, next) => {
 };
 // Schema for updating a project
 const updateProjectSchema = Joi.object({
-  name: Joi.string().trim().max(255).optional(),
-  description: Joi.string().trim().optional(),
+  name: Joi.string().trim().max(255).optional().messages({
+    "string.max": "Project name must be at most 255 characters",
+  }),
+  description: Joi.string().trim().optional().messages({
+    "string.base": "Description must be a string",
+  }),
   is_active: Joi.boolean().optional(),
+  project_metrics_ids: Joi.array()
+    .items(Joi.string().uuid())
+    .optional()
+    .messages({
+      "array.base": "metrics IDs must be an array",
+      "string.guid": "Each metrics ID must be a valid UUID",
+    }),
+  maintenance_start: Joi.date().optional().allow(null),
+  maintenance_end: Joi.date().optional().allow(null),
+}).custom((value, helpers) => {
+  const { maintenance_start, maintenance_end } = value;
+  if (
+    maintenance_start &&
+    maintenance_end &&
+    maintenance_start > maintenance_end
+  ) {
+    return helpers.message(
+      "Maintenance start must be before or equal to maintenance end"
+    );
+  }
+  return value;
 });
 
 // Schema for project ID param
