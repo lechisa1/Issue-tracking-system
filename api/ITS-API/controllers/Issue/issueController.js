@@ -69,6 +69,42 @@ const createIssue = async (req, res) => {
         message: "title and project_id are required",
       });
     }
+    // -----------------------------
+    // 1.0 VALIDATE ACTIVE USER
+    // -----------------------------
+    const activeUser = await User.findOne({
+      where: {
+        user_id: reported_by,
+        is_active: true,
+      },
+      transaction: t,
+    });
+
+    if (!activeUser) {
+      await t.rollback();
+      return res.status(403).json({
+        message: "Inactive or disabled users cannot create issues",
+      });
+    }
+
+    // -----------------------------
+    // 1.1 VALIDATE ACTIVE PROJECT
+    // -----------------------------
+    const project = await Project.findOne({
+      where: {
+        project_id,
+        is_active: true, // ✅ only active projects
+      },
+      transaction: t,
+    });
+
+    if (!project) {
+      await t.rollback();
+      return res.status(400).json({
+        message:
+          "Issue cannot be created for an inactive or non-existent project",
+      });
+    }
 
     // -----------------------------
     // 2. GENERATE UNIQUE TICKET NUMBER
@@ -712,126 +748,111 @@ const getIssuesByMultipleHierarchyNodes = async (req, res) => {
       });
     }
 
-    // 1️⃣ Requested hierarchy nodes
-    const hierarchyNodes = await HierarchyNode.findAll({
-      where: { hierarchy_node_id: validPairs.map((p) => p.hierarchy_node_id) },
-    });
-    const requestedNodeIds = hierarchyNodes.map((n) => n.hierarchy_node_id);
+    const requestedNodeIds = validPairs.map((p) => p.hierarchy_node_id);
+    const projectIds = validPairs.map((p) => p.project_id);
 
-    // 2️⃣ Parent nodes
-    const parentNodeIds = hierarchyNodes
-      .map((n) => n.parent_id)
-      .filter(Boolean);
-
-    // 3️⃣ Child nodes of requested nodes
+    // 1️⃣ Find all CHILD nodes of requested nodes
     const childNodes = await HierarchyNode.findAll({
       where: { parent_id: { [Op.in]: requestedNodeIds } },
     });
     const childNodeIds = childNodes.map((n) => n.hierarchy_node_id);
 
-    // 4️⃣ Combine nodes for direct issues (requested + parents + children)
-    const nodesToInclude = Array.from(
-      new Set([...requestedNodeIds, ...parentNodeIds, ...childNodeIds])
-    );
-
-    // 5️⃣ Direct issues
-    const directIssues = await Issue.findAll({
-      where: {
-        project_id: validPairs.map((p) => p.project_id),
-        hierarchy_node_id: { [Op.in]: nodesToInclude },
-        reported_by: { [Op.ne]: user_id },
-      },
-      include: [
-        { model: Project, as: "project" },
-        { model: IssueCategory, as: "category" },
-        { model: IssuePriority, as: "priority" },
-        { model: HierarchyNode, as: "hierarchyNode" },
-        { model: User, as: "reporter" },
-        { model: User, as: "assignee" },
-        {
-          model: IssueComment,
-          as: "comments",
-          include: [{ model: User, as: "author" }],
-        },
-        {
-          model: IssueAttachment,
-          as: "attachments",
-          include: [{ model: Attachment, as: "attachment" }],
-        },
-      ],
-      order: [["created_at", "DESC"]],
+    // 2️⃣ Find all SIBLING nodes (same parent)
+    const siblingNodeIds = [];
+    const hierarchyNodes = await HierarchyNode.findAll({
+      where: { hierarchy_node_id: { [Op.in]: requestedNodeIds } },
     });
 
-    // 6️⃣ Escalated issues ONLY from child → requested
-    const escalatedIssuesEscalation = await IssueEscalation.findAll({
-      where: {
-        to_tier: { [Op.in]: requestedNodeIds },
-        from_tier: { [Op.in]: childNodeIds },
-      },
-      include: [
-        {
-          model: Issue,
-          as: "issue",
-          where: { reported_by: { [Op.ne]: user_id } },
-          include: [
-            { model: Project, as: "project" },
-            { model: IssueCategory, as: "category" },
-            { model: IssuePriority, as: "priority" },
-            { model: HierarchyNode, as: "hierarchyNode" },
-            { model: User, as: "reporter" },
-            { model: User, as: "assignee" },
-            {
-              model: IssueComment,
-              as: "comments",
-              include: [{ model: User, as: "author" }],
-            },
-            {
-              model: IssueAttachment,
-              as: "attachments",
-              include: [{ model: Attachment, as: "attachment" }],
-            },
-          ],
-        },
-      ],
-    });
+    for (const node of hierarchyNodes) {
+      if (node.parent_id) {
+        const siblings = await HierarchyNode.findAll({
+          where: {
+            parent_id: node.parent_id,
+            hierarchy_node_id: { [Op.ne]: node.hierarchy_node_id },
+          },
+        });
+        siblings.forEach((s) => siblingNodeIds.push(s.hierarchy_node_id));
+      }
+    }
 
-    const escalatedIssues = escalatedIssuesEscalation.map((t) => t.issue);
+    // 3️⃣ User can see issues from: Children + Siblings
+    const visibleNodeIds = [...childNodeIds, ...siblingNodeIds];
+    const uniqueVisibleNodes = [...new Set(visibleNodeIds)];
 
-    // 7️⃣ Reopened issues from child → requested
-    const reopenedIssues = await Issue.findAll({
-      where: {
-        status: "reopened",
-        hierarchy_node_id: { [Op.in]: childNodeIds },
-        project_id: validPairs.map((p) => p.project_id),
-        reported_by: { [Op.ne]: user_id },
-      },
-      include: [
-        { model: Project, as: "project" },
-        { model: IssueCategory, as: "category" },
-        { model: IssuePriority, as: "priority" },
-        { model: HierarchyNode, as: "hierarchyNode" },
-        { model: User, as: "reporter" },
-        { model: User, as: "assignee" },
-        {
-          model: IssueComment,
-          as: "comments",
-          include: [{ model: User, as: "author" }],
-        },
-        {
-          model: IssueAttachment,
-          as: "attachments",
-          include: [{ model: Attachment, as: "attachment" }],
-        },
-      ],
-    });
+    let allIssues = [];
 
-    // 8️⃣ Merge direct + escalated + reopened and remove duplicates
+    // 4️⃣ Fetch issues from visible nodes
+    if (uniqueVisibleNodes.length > 0) {
+      const directIssues = await Issue.findAll({
+        where: {
+          project_id: projectIds,
+          hierarchy_node_id: { [Op.in]: uniqueVisibleNodes },
+          reported_by: { [Op.ne]: user_id },
+        },
+        include: getIssueIncludes(),
+      });
+      allIssues = [...directIssues];
+    }
+
+    // 5️⃣ Fetch escalated issues (child → current user)
+    if (childNodeIds.length > 0) {
+      const escalatedIssuesData = await IssueEscalation.findAll({
+        where: {
+          to_tier: { [Op.in]: requestedNodeIds },
+          from_tier: { [Op.in]: childNodeIds },
+        },
+        include: [
+          {
+            model: Issue,
+            as: "issue",
+            where: { reported_by: { [Op.ne]: user_id } },
+            include: getIssueIncludes(),
+          },
+        ],
+      });
+
+      const escalatedIssues = escalatedIssuesData.map((t) => t.issue);
+      allIssues = [...allIssues, ...escalatedIssues];
+    }
+
+    // 6️⃣ Fetch reopened issues from children
+    if (childNodeIds.length > 0) {
+      const reopenedIssues = await Issue.findAll({
+        where: {
+          status: "reopened",
+          hierarchy_node_id: { [Op.in]: childNodeIds },
+          project_id: projectIds,
+          reported_by: { [Op.ne]: user_id },
+        },
+        include: getIssueIncludes(),
+      });
+      allIssues = [...allIssues, ...reopenedIssues];
+    }
+
+    // 7️⃣ Remove duplicates
     const issuesMap = new Map();
-    directIssues.forEach((issue) => issuesMap.set(issue.issue_id, issue));
-    escalatedIssues.forEach((issue) => issuesMap.set(issue.issue_id, issue));
-    reopenedIssues.forEach((issue) => issuesMap.set(issue.issue_id, issue));
+    allIssues.forEach((issue) => issuesMap.set(issue.issue_id, issue));
+    let finalIssues = Array.from(issuesMap.values());
 
-    const finalIssues = Array.from(issuesMap.values());
+    // 8️⃣ Sort by priority: Critical → High → Medium → Low
+    const priorityOrder = {
+      critical: 1,
+      high: 2,
+      medium: 3,
+      low: 4,
+    };
+
+    finalIssues.sort((a, b) => {
+      const aPriority = a.priority?.name?.toLowerCase() || "low";
+      const bPriority = b.priority?.name?.toLowerCase() || "low";
+
+      if (priorityOrder[aPriority] !== priorityOrder[bPriority]) {
+        return priorityOrder[aPriority] - priorityOrder[bPriority];
+      }
+
+      // If same priority, sort by created_at descending
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
 
     res.status(200).json({
       success: true,
@@ -847,51 +868,182 @@ const getIssuesByMultipleHierarchyNodes = async (req, res) => {
   }
 };
 
+// Helper function for issue includes
+function getIssueIncludes() {
+  return [
+    { model: Project, as: "project" },
+    { model: IssueCategory, as: "category" },
+    { model: IssuePriority, as: "priority" },
+    { model: HierarchyNode, as: "hierarchyNode" },
+    { model: User, as: "reporter" },
+    { model: User, as: "assignee" },
+    {
+      model: IssueComment,
+      as: "comments",
+      include: [{ model: User, as: "author" }],
+    },
+    {
+      model: IssueAttachment,
+      as: "attachments",
+      include: [{ model: Attachment, as: "attachment" }],
+    },
+  ];
+}
+
 // ======================================================
 // GET ISSUES THAT WERE ESCALATED AND to_tier IS NULL
 // ======================================================
 
+// const getEscalatedIssuesWithNullTier = async (req, res) => {
+//   try {
+//     // 1️⃣ Find issue escalations where to_tier IS NULL
+//     const escalatedNullTier = await IssueEscalation.findAll({
+//       where: { to_tier: null },
+//       include: [
+//         {
+//           model: Issue,
+//           as: "issue",
+//           include: [
+//             { model: Project, as: "project" },
+//             { model: IssueCategory, as: "category" },
+//             { model: IssuePriority, as: "priority" },
+//             { model: HierarchyNode, as: "hierarchyNode" },
+//             { model: User, as: "reporter" },
+//             { model: User, as: "assignee" },
+//             {
+//               model: IssueComment,
+//               as: "comments",
+//               include: [{ model: User, as: "author" }],
+//             },
+//             {
+//               model: IssueAttachment,
+//               as: "attachments",
+//               include: [{ model: Attachment, as: "attachment" }],
+//             },
+//           ],
+//         },
+//       ],
+//     });
+
+//     // 2️⃣ Extract actual issues
+//     const issues = escalatedNullTier.map((record) => record.issue);
+
+//     res.status(200).json({
+//       success: true,
+//       count: issues.length,
+//       issues,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching escalated issues with null tier:", error);
+//     res.status(500).json({
+//       message: "Internal server error",
+//       error: error.message,
+//     });
+//   }
+// };
+
 const getEscalatedIssuesWithNullTier = async (req, res) => {
   try {
-    // 1️⃣ Find issue escalations where to_tier IS NULL
-    const escalatedNullTier = await IssueEscalation.findAll({
-      where: { to_tier: null },
+    // 1️⃣ Parent/top-level issues
+    const parentIssues = await Issue.findAll({
+      where: { "$hierarchyNode.parent_id$": null },
       include: [
+        { model: HierarchyNode, as: "hierarchyNode", required: true },
+        { model: Project, as: "project" },
+        { model: IssueCategory, as: "category" },
+        { model: IssuePriority, as: "priority" },
+        { model: User, as: "reporter" },
+        { model: User, as: "assignee" },
         {
-          model: Issue,
-          as: "issue",
-          include: [
-            { model: Project, as: "project" },
-            { model: IssueCategory, as: "category" },
-            { model: IssuePriority, as: "priority" },
-            { model: HierarchyNode, as: "hierarchyNode" },
-            { model: User, as: "reporter" },
-            { model: User, as: "assignee" },
-            {
-              model: IssueComment,
-              as: "comments",
-              include: [{ model: User, as: "author" }],
-            },
-            {
-              model: IssueAttachment,
-              as: "attachments",
-              include: [{ model: Attachment, as: "attachment" }],
-            },
-          ],
+          model: IssueComment,
+          as: "comments",
+          include: [{ model: User, as: "author" }],
+        },
+        {
+          model: IssueAttachment,
+          as: "attachments",
+          include: [{ model: Attachment, as: "attachment" }],
         },
       ],
+      order: [["created_at", "DESC"]],
+      distinct: true,
+      subQuery: false,
     });
 
-    // 2️⃣ Extract actual issues
-    const issues = escalatedNullTier.map((record) => record.issue);
+    const parentIssuesWithStatus = parentIssues.map((issue) => ({
+      ...issue.toJSON(),
+      status: "pending",
+    }));
+
+    // 2️⃣ Escalated issues with null to_tier
+    const escalatedIssues = await Issue.findAll({
+      where: { "$hierarchyNode.parent_id$": { [Op.ne]: null } },
+      include: [
+        { model: HierarchyNode, as: "hierarchyNode", required: true },
+        {
+          model: IssueEscalation,
+          as: "escalations",
+          required: true,
+          where: { to_tier: null },
+        },
+        { model: Project, as: "project" },
+        { model: IssueCategory, as: "category" },
+        { model: IssuePriority, as: "priority" },
+        { model: User, as: "reporter" },
+        { model: User, as: "assignee" },
+        {
+          model: IssueComment,
+          as: "comments",
+          include: [{ model: User, as: "author" }],
+        },
+        {
+          model: IssueAttachment,
+          as: "attachments",
+          include: [{ model: Attachment, as: "attachment" }],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+      distinct: true,
+      subQuery: false,
+    });
+
+    const escalatedIssuesWithStatus = escalatedIssues.map((issue) => ({
+      ...issue.toJSON(),
+      status: "escalated",
+    }));
+
+    // Combine arrays
+    let allIssues = [...parentIssuesWithStatus, ...escalatedIssuesWithStatus];
+
+    // Define priority mapping
+    const priorityOrder = {
+      critical: 1,
+      high: 2,
+      medium: 3,
+      low: 4,
+    };
+
+    // Sort by priority first, then by created_at descending
+    allIssues.sort((a, b) => {
+      const aPriority = a.priority?.name?.toLowerCase() || "low";
+      const bPriority = b.priority?.name?.toLowerCase() || "low";
+
+      // Compare priority
+      if (priorityOrder[aPriority] !== priorityOrder[bPriority]) {
+        return priorityOrder[aPriority] - priorityOrder[bPriority];
+      }
+
+      // If same priority, sort by created_at descending
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
 
     res.status(200).json({
       success: true,
-      count: issues.length,
-      issues,
+      count: allIssues.length,
+      issues: allIssues,
     });
   } catch (error) {
-    console.error("Error fetching escalated issues with null tier:", error);
+    console.error("Error fetching issues:", error);
     res.status(500).json({
       message: "Internal server error",
       error: error.message,
@@ -1254,6 +1406,20 @@ const reopenIssue = async (req, res) => {
     if (!issue) {
       await t.rollback();
       return res.status(404).json({ success: false, error: "Issue not found" });
+    }
+    if (issue.reported_by !== user_id) {
+      await t.rollback();
+      return res.status(403).json({
+        success: false,
+        error: "Only the issue creator can reopen this issue",
+      });
+    }
+    if (issue.status !== "closed") {
+      await t.rollback();
+      return res.status(403).json({
+        success: false,
+        error: "Only closed issues can be reopened",
+      });
     }
 
     const { project_id, title, hierarchy_node_id, assigned_to, reported_by } =

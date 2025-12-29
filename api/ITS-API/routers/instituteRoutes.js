@@ -87,6 +87,11 @@ router.post(
  *         description: Internal server error
  */
 router.get("/", authenticateToken, instituteController.getInstitutes);
+router.patch(
+  "/:id/restore",
+  authenticateToken,
+  instituteController.restoreInstitute
+);
 
 /**
  * @swagger

@@ -113,7 +113,7 @@ const { authenticateToken } = require("../middlewares/authMiddleware");
  *       500:
  *         description: Internal Server Error
  */
-router.post("/", validateAssignIssue, controller.assignIssue);
+router.post("/", validateAssignIssue, authenticateToken, controller.assignIssue);
 /**
  * @swagger
  * /api/assignments/issue/{issue_id}/assignee/{assignee_id}:
@@ -187,7 +187,23 @@ router.delete(
   validateRemoveAssignment,
   controller.removeAssignment
 );
+router.post(
+  "/:assignment_id/accept",
+  authenticateToken,
+  controller.acceptAssignment
+);
 
+router.post(
+  "/:assignment_id/resolve",
+  authenticateToken,
+  controller.resolveAssignment
+);
+
+router.post(
+  "/:assignment_id/confirm",
+  authenticateToken,
+  controller.confirmAssignmentResolution
+);
 /**
  * @swagger
  * /api/issue-assignments/issue/{issue_id}:
@@ -329,5 +345,5 @@ router.get(
  *         description: Internal Server Error
  */
 router.get("/user/:user_id", validateUserId, controller.getAssignmentsByUserId);
-
+router.patch("/transfer", authenticateToken, controller.transferAssignment);
 module.exports = router;

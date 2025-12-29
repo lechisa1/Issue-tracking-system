@@ -4,6 +4,7 @@ const controller = require("../controllers/Issue/issueResolutionController");
 const {
   validateResolveIssue,
 } = require("../validators/issueResolutionValidator");
+const { authenticateToken } = require("../middlewares/authMiddleware");
 
 /**
  * @swagger
@@ -87,7 +88,12 @@ const {
  *       500:
  *         description: Internal Server Error
  */
-router.post("/", validateResolveIssue, controller.resolveIssue);
+router.post(
+  "/",
+  validateResolveIssue,
+  authenticateToken,
+  controller.resolveIssue
+);
 
 /**
  * @swagger
@@ -110,7 +116,11 @@ router.post("/", validateResolveIssue, controller.resolveIssue);
  *       500:
  *         description: Internal Error
  */
-router.get("/issue/:issue_id", controller.getResolutionsByIssueId);
+router.get(
+  "/issue/:issue_id",
+  authenticateToken,
+  controller.getResolutionsByIssueId
+);
 
 /**
  * @swagger
@@ -133,7 +143,11 @@ router.get("/issue/:issue_id", controller.getResolutionsByIssueId);
  *       500:
  *         description: Internal Error
  */
-router.get("/id/:resolution_id", controller.getResolutionById);
+router.get(
+  "/id/:resolution_id",
+  authenticateToken,
+  controller.getResolutionById
+);
 
 /**
  * @swagger
@@ -156,7 +170,11 @@ router.get("/id/:resolution_id", controller.getResolutionById);
  *       500:
  *         description: Internal Error
  */
-router.get("/latest/:issue_id", controller.getLatestResolutionByIssueId);
+router.get(
+  "/latest/:issue_id",
+  authenticateToken,
+  controller.getLatestResolutionByIssueId
+);
 
 /**
  * @swagger
@@ -179,6 +197,10 @@ router.get("/latest/:issue_id", controller.getLatestResolutionByIssueId);
  *       500:
  *         description: Internal Error
  */
-router.delete("/id/:resolution_id", controller.deleteResolution);
+router.delete(
+  "/id/:resolution_id",
+  authenticateToken,
+  controller.deleteResolution
+);
 
 module.exports = router;

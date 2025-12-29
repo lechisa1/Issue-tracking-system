@@ -8,6 +8,7 @@ const {
   InstituteProject,
   Role,
   SubRole,
+  RolePermission,
   RoleSubRole,
   RoleSubRolePermission,
   InternalProjectUserRole,
@@ -53,12 +54,17 @@ const login = async (req, res) => {
     console.log("Query condition:", queryCondition);
 
     const user = await User.findOne({
-      where: queryCondition,
+      where: {
+        ...queryCondition,
+        is_active: true, // 🔒 only active users
+      },
       include: [
         {
           model: Institute,
           as: "institute",
           attributes: ["institute_id", "name"],
+          where: { is_active: true },
+          required: false,
         },
         {
           model: UserType,
@@ -86,7 +92,19 @@ const login = async (req, res) => {
           as: "internalNode",
           attributes: ["internal_node_id", "name", "level", "parent_id"],
         },
-        { model: Role, as: "roles", through: { attributes: [] } },
+        {
+          model: Role,
+          as: "roles",
+          include: [
+            {
+              model: RolePermission,
+              as: "rolePermissions",
+              where: { is_active: true },
+              required: false,
+              include: [{ model: Permission, as: "permission" }],
+            },
+          ],
+        },
         {
           model: ProjectMetric,
           as: "metrics",
@@ -95,11 +113,15 @@ const login = async (req, res) => {
         {
           model: ProjectUserRole,
           as: "projectRoles",
+          where: { is_active: true },
+          required: false,
           include: [
             {
               model: Project,
               as: "project",
               attributes: ["project_id", "name", "description"],
+              where: { is_active: true },
+              required: false,
             },
             { model: Role, as: "role", attributes: ["role_id", "name"] },
             {
@@ -117,11 +139,15 @@ const login = async (req, res) => {
         {
           model: InternalProjectUserRole,
           as: "internalProjectUserRoles",
+          where: { is_active: true },
+          required: false,
           include: [
             {
               model: Project,
               as: "project",
               attributes: ["project_id", "name", "description"],
+              where: { is_active: true },
+              required: false,
             },
             { model: Role, as: "role", attributes: ["role_id", "name"] },
             {
@@ -133,7 +159,12 @@ const login = async (req, res) => {
         },
       ],
     });
-
+    if (!user.is_active) {
+      return res.status(403).json({
+        success: false,
+        message: "User is inactive",
+      });
+    }
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -147,7 +178,21 @@ const login = async (req, res) => {
         message: "User is inactive",
       });
     }
+    // Global roles
+    const globalRoles = user.roles?.map((r) => r.name) || [];
+    console.log("Global Roles:", globalRoles);
 
+    const permissions =
+      user.roles?.flatMap(
+        (r) =>
+          r.rolePermissions?.map((rp) => ({
+            resource: rp.permission.resource,
+            action: rp.permission.action,
+          })) || []
+      ) || [];
+
+    console.log("FULL USER OBJECT:", user);
+    console.log("Permissions:", permissions);
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({
@@ -226,6 +271,7 @@ const login = async (req, res) => {
       token: accessToken,
       user: {
         ...userDataForToken,
+        permissions,
         phone_number: user.phone_number,
         profile_image: user.profile_image,
         is_first_logged_in: user.is_first_logged_in,

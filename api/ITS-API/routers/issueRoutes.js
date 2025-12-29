@@ -93,7 +93,11 @@ router.post(
  *         description: List of issues
  */
 router.get("/", validateGetIssuesQuery, issueController.getIssues);
-router.get("/assigned/:user_id", issueController.getAssignedIssues);
+router.get(
+  "/assigned/:user_id",
+  authenticateToken,
+  issueController.getAssignedIssues
+);
 
 router.get(
   "/user/:id",
@@ -225,15 +229,22 @@ router.put(
 router.get(
   "/issues/hierarchy/:hierarchy_node_id/project/:project_id",
   validateHierarchyNodeIdParam,
+  authenticateToken,
   issueController.getIssuesByHierarchyNodeId
 );
 // Change from query to URL parameter
 router.get(
   "/issues-by-pairs/:pairs/user/:user_id",
+  authenticateToken,
   issueController.getIssuesByMultipleHierarchyNodes
 );
 
-router.delete("/:id", validateIssueIdParam, issueController.deleteIssue);
+router.delete(
+  "/:id",
+  authenticateToken,
+  validateIssueIdParam,
+  issueController.deleteIssue
+);
 
 /**
  * @swagger

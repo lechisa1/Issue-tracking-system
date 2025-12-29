@@ -24,8 +24,9 @@ const resolveIssue = async (req, res) => {
   const t = await sequelize.transaction();
 
   try {
-    const { issue_id, reason, resolved_by, attachment_ids } = req.body;
-
+    const { issue_id, reason, attachment_ids } = req.body;
+    const resolved_by = req.user.user_id;
+    const resolver_id = req.user.user_id;
     // 1️⃣ Validate Issue
     const issue = await Issue.findByPk(issue_id);
     if (!issue) return res.status(404).json({ message: "Issue not found." });
@@ -34,7 +35,26 @@ const resolveIssue = async (req, res) => {
     const resolver = await User.findByPk(resolved_by);
     if (!resolver)
       return res.status(404).json({ message: "User (resolved_by) not found." });
+    if (issue.status === "reopened") {
+      const lastResolution = await IssueResolution.findOne({
+        where: { issue_id },
+      });
 
+      if (!lastResolution) {
+        return res.status(400).json({
+          success: false,
+          error: "No previous resolution found for this issue",
+        });
+      }
+
+      if (lastResolution.resolved_by !== resolver_id) {
+        return res.status(403).json({
+          success: false,
+          error:
+            "Only the user who resolved this issue last can resolve it after reopening",
+        });
+      }
+    }
     const resolution_id = uuidv4();
 
     // 3️⃣ Create resolution
@@ -43,7 +63,7 @@ const resolveIssue = async (req, res) => {
         resolution_id,
         issue_id,
         reason,
-        resolved_by,
+        resolved_by: resolver_id,
         resolved_at: new Date(),
       },
       { transaction: t }

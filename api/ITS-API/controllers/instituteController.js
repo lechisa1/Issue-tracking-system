@@ -114,17 +114,38 @@ const updateInstitute = async (req, res) => {
 const deleteInstitute = async (req, res) => {
   try {
     const { id } = req.params;
+
+    const institute = await Institute.findOne({
+      where: { institute_id: id, is_active: true },
+    });
+
+    if (!institute)
+      return res.status(404).json({ message: "Institute not found" });
+
+    await institute.update({ is_active: false });
+
+    res.status(200).json({ message: "Institute deleted successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+const restoreInstitute = async (req, res) => {
+  try {
+    const { id } = req.params;
+
     const institute = await Institute.findByPk(id);
     if (!institute)
       return res.status(404).json({ message: "Institute not found" });
 
-    await institute.destroy();
-    res.status(200).json({ message: "Institute deleted successfully" });
+    await institute.update({ is_active: true });
+
+    res.status(200).json({ message: "Institute restored successfully" });
   } catch (error) {
-    console.error(error);
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -134,4 +155,5 @@ module.exports = {
   getInstituteById,
   updateInstitute,
   deleteInstitute,
+  restoreInstitute,
 };

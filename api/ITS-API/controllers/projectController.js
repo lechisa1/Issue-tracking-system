@@ -419,7 +419,13 @@ const assignUserToProject = async (req, res) => {
     });
 
     // ====== Validate project ======
-    const project = await Project.findByPk(project_id, { transaction: t });
+    const project = await Project.findOne({
+      where: {
+        project_id,
+        is_active: true, // ✅ only active projects
+      },
+      transaction: t,
+    });
     if (!project) {
       await t.rollback();
       return res
@@ -428,21 +434,29 @@ const assignUserToProject = async (req, res) => {
     }
 
     // ====== Validate user ======
-    const user = await User.findByPk(user_id, {
+    const user = await User.findOne({
+      where: {
+        user_id,
+        is_active: true, // ✅ only active users
+      },
       include: [
         {
           model: Role,
           as: "roles",
           through: { attributes: [] },
+          where: { is_active: true },
+          required: false,
         },
       ],
       transaction: t,
     });
+
     if (!user) {
       await t.rollback();
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found." });
+      return res.status(404).json({
+        success: false,
+        message: "Active user not found.",
+      });
     }
 
     // ====== Get user's role from UserRoles table ======
@@ -719,7 +733,13 @@ const assignInternalUsersToProject = async (req, res) => {
       req.body;
 
     // ====== Validate project ======
-    const project = await Project.findByPk(project_id, { transaction: t });
+    const project = await Project.findOne({
+      where: {
+        project_id,
+        is_active: true, // ✅ only active projects
+      },
+      transaction: t,
+    });
     if (!project) {
       await t.rollback();
       return res.status(404).json({
@@ -728,22 +748,28 @@ const assignInternalUsersToProject = async (req, res) => {
       });
     }
 
-    // ====== Validate user ======
-    const user = await User.findByPk(user_id, {
+    const user = await User.findOne({
+      where: {
+        user_id,
+        is_active: true, // ✅ only active users
+      },
       include: [
         {
           model: Role,
           as: "roles",
           through: { attributes: [] },
+          where: { is_active: true },
+          required: false,
         },
       ],
       transaction: t,
     });
+
     if (!user) {
       await t.rollback();
       return res.status(404).json({
         success: false,
-        message: "User not found.",
+        message: "Active user not found.",
       });
     }
 
@@ -938,18 +964,28 @@ const updateProjectMaintenance = async (req, res) => {
 const deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
-    const project = await Project.findByPk(id);
+
+    const project = await Project.findOne({
+      where: {
+        project_id: id, // ⚠️ use correct PK
+        is_active: true,
+      },
+    });
+
     if (!project) return res.status(404).json({ message: "Project not found" });
 
-    await project.destroy();
+    await project.update({ is_active: false });
+
     res.status(200).json({ message: "Project deleted successfully" });
   } catch (error) {
     console.error(error);
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: error.message });
+    res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };
+
 const removeUserFromProject = async (req, res) => {
   try {
     const { project_id, user_id } = req.body;
@@ -988,15 +1024,22 @@ const getProjectsAssignedToUser = async (req, res) => {
     }
 
     const assignments = await ProjectUserRole.findAll({
-      where: { user_id, is_active: true },
+      where: {
+        user_id,
+        is_active: true, // active assignment
+      },
       include: [
         {
           model: Project,
           as: "project",
+          where: { is_active: true }, // ✅ ONLY active projects
+          required: true, // 🚫 remove rows if project is inactive
           include: [
             {
               model: InstituteProject,
               as: "instituteProjects",
+              where: { is_active: true },
+              required: false,
             },
           ],
         },
@@ -1015,18 +1058,6 @@ const getProjectsAssignedToUser = async (req, res) => {
           as: "hierarchyNode",
           attributes: ["hierarchy_node_id", "name"],
         },
-        // Maintenance
-        // {
-        //   model: ProjectMaintenance,
-        //   as: "maintenances", // Make sure your Project model has hasMany(ProjectMaintenance, { as: "maintenances" })
-        //   attributes: [
-        //     "maintenance_id",
-        //     "start_date",
-        //     "end_date",
-        //     "created_at",
-        //     "updated_at",
-        //   ],
-        // },
       ],
       order: [["created_at", "DESC"]],
     });

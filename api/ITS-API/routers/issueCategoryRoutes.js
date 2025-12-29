@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const controller = require("../controllers/issueCategoryController");
+const { authenticateToken } = require("../middlewares/authMiddleware");
 /**
  * @swagger
  * tags:

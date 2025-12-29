@@ -6,6 +6,8 @@ const {
   IssueHistory,
   Attachment,
   IssueAction,
+  IssueStatusHistory,
+  IssueResolution,
   sequelize,
 } = require("../../models");
 const { Op } = require("sequelize");
@@ -711,6 +713,514 @@ const updateAssignmentStatus = async (req, res) => {
   }
 };
 
+const acceptAssignment = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { assignment_id } = req.body;
+    const accepted_by = req.user?.user_id;
+
+    // 1. Get assignment
+    const assignment = await IssueAssignment.findOne({
+      where: {
+        assignment_id,
+        assignee_id: accepted_by,
+        assignment_status: "pending", // Can only accept if pending
+      },
+      include: [
+        { model: Issue, as: "issue" },
+        { model: User, as: "assigner" },
+      ],
+      transaction: t,
+    });
+
+    if (!assignment) {
+      await t.rollback();
+      return res.status(404).json({
+        message: "Assignment not found, already accepted, or unauthorized.",
+      });
+    }
+
+    // 2. Update assignment status
+    await assignment.update(
+      {
+        assignment_status: "accepted",
+      },
+      { transaction: t }
+    );
+
+    // 3. Create history
+    await IssueHistory.create(
+      {
+        history_id: uuidv4(),
+        issue_id: assignment.issue_id,
+        user_id: accepted_by,
+        action: "accepted_assignment",
+        status_at_time: assignment.issue.status,
+        assignment_id,
+        notes: `${assignment.role_type} assignment accepted by ${req.user.full_name}`,
+      },
+      { transaction: t }
+    );
+
+    // 4. Notify assigner
+    await createNotification({
+      recipient_id: assignment.assigned_by,
+      user_id: accepted_by,
+      reference_type: "assignment",
+      reference_id: assignment_id,
+      type: "assignment_accepted",
+      title: `Assignment Accepted: ${assignment.issue.ticket_number}`,
+      body: `${req.user.full_name} has accepted the ${assignment.role_type} assignment.`,
+      payload: {
+        issue_id: assignment.issue_id,
+        assignment_id,
+        role_type: assignment.role_type,
+        assignee_id: assignment.assignee_id,
+        ticket_number: assignment.issue.ticket_number,
+      },
+      transaction: t,
+    });
+
+    await t.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Assignment accepted successfully",
+      data: assignment,
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error("ACCEPTANCE ERROR:", error);
+    return res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+};
+
+const resolveAssignment = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { assignment_id, resolution_remarks, attachment_ids } = req.body;
+    const resolved_by = req.user?.user_id;
+
+    // 1. Get assignment
+    const assignment = await IssueAssignment.findOne({
+      where: {
+        assignment_id,
+        assignee_id: resolved_by,
+        assignment_status: "accepted", // Can only resolve if in progress
+      },
+      include: [
+        { model: Issue, as: "issue" },
+        { model: User, as: "assigner" },
+      ],
+      transaction: t,
+    });
+
+    if (!assignment) {
+      await t.rollback();
+      return res.status(404).json({
+        message: "Assignment not found, not in progress, or unauthorized.",
+      });
+    }
+
+    // 2. Update assignment status
+    await assignment.update(
+      {
+        assignment_status: "resolved",
+
+        resolution_remarks: resolution_remarks || null,
+      },
+      { transaction: t }
+    );
+
+    // 3. Add resolution attachments if any
+    if (attachment_ids?.length > 0) {
+      const attachments = attachment_ids.map((attachment_id) => ({
+        assignment_id,
+        attachment_id,
+        attachment_type: "resolution",
+        created_at: new Date(),
+      }));
+      await AssignmentAttachment.bulkCreate(attachments, { transaction: t });
+    }
+
+    // 4. Create history
+    await IssueHistory.create(
+      {
+        history_id: uuidv4(),
+        issue_id: assignment.issue_id,
+        user_id: resolved_by,
+        action: "resolved_assignment",
+        status_at_time: assignment.issue.status,
+        assignment_id,
+        notes: `${assignment.role_type} part resolved by ${
+          req.user.full_name
+        }. ${resolution_remarks ? `Remarks: ${resolution_remarks}` : ""}`,
+      },
+      { transaction: t }
+    );
+
+    // 5. Notify assigner
+    await createNotification({
+      recipient_id: assignment.assigned_by,
+      user_id: resolved_by,
+      reference_type: "assignment",
+      reference_id: assignment_id,
+      type: "assignment_resolved",
+      title: `Assignment Resolved: ${assignment.issue.ticket_number}`,
+      body: `${req.user.full_name} has resolved their ${assignment.role_type} part. Please review and confirm.`,
+      payload: {
+        issue_id: assignment.issue_id,
+        assignment_id,
+        role_type: assignment.role_type,
+        assignee_id: assignment.assignee_id,
+        ticket_number: assignment.issue.ticket_number,
+        resolution_remarks,
+      },
+      transaction: t,
+    });
+
+    await t.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Assignment resolved successfully",
+      data: assignment,
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error("RESOLUTION ERROR:", error);
+    return res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+};
+const confirmAssignmentResolution = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { assignment_id, confirmation_remarks } = req.body;
+    const confirmed_by = req.user?.user_id;
+
+    // 1. Get assignment
+    const assignment = await IssueAssignment.findOne({
+      where: {
+        assignment_id,
+        assigned_by: confirmed_by, // Only original assigner can confirm
+        assignment_status: "resolved", // Can only confirm if resolved
+      },
+      include: [
+        { model: Issue, as: "issue" },
+        { model: User, as: "assignee" },
+      ],
+      transaction: t,
+    });
+
+    if (!assignment) {
+      await t.rollback();
+      return res.status(404).json({
+        message:
+          "Assignment not found, not resolved yet, or unauthorized to confirm.",
+      });
+    }
+
+    // 2. Update assignment status to confirmed
+    await assignment.update(
+      {
+        assignment_status: "confirmed",
+        confirmed_at: new Date(),
+        confirmation_remarks: confirmation_remarks || null,
+      },
+      { transaction: t }
+    );
+
+    // 3. Create confirmation history
+    await IssueHistory.create(
+      {
+        history_id: uuidv4(),
+        issue_id: assignment.issue_id,
+        user_id: confirmed_by,
+        action: "confirmed_resolution",
+        status_at_time: assignment.issue.status,
+        assignment_id,
+        notes: `${assignment.role_type} resolution confirmed by ${
+          req.user.full_name
+        }. ${confirmation_remarks ? `Remarks: ${confirmation_remarks}` : ""}`,
+      },
+      { transaction: t }
+    );
+
+    // 4. Notify assignee
+    await createNotification({
+      recipient_id: assignment.assignee_id,
+      user_id: confirmed_by,
+      reference_type: "assignment",
+      reference_id: assignment_id,
+      type: "resolution_confirmed",
+      title: `Resolution Confirmed: ${assignment.issue.ticket_number}`,
+      body: `Your ${assignment.role_type} resolution has been confirmed by ${req.user.full_name}.`,
+      payload: {
+        issue_id: assignment.issue_id,
+        assignment_id,
+        role_type: assignment.role_type,
+        ticket_number: assignment.issue.ticket_number,
+        confirmation_remarks,
+      },
+      transaction: t,
+    });
+
+    // 5. Check if ALL assignments are confirmed
+    const allAssignments = await IssueAssignment.findAll({
+      where: {
+        issue_id: assignment.issue_id,
+        assignment_status: { [Op.ne]: "pending" }, // Exclude pending assignments
+      },
+      transaction: t,
+    });
+
+    const activeAssignments = allAssignments.filter((a) =>
+      ["accepted", "resolved", "confirmed"].includes(a.assignment_status)
+    );
+
+    const allConfirmed =
+      activeAssignments.length > 0 &&
+      activeAssignments.every((a) => a.assignment_status === "confirmed");
+
+    // 6. Update issue status based on confirmation status
+    if (allConfirmed) {
+      // All assignments are confirmed → Issue is fully resolved
+      await assignment.issue.update(
+        {
+          status: "resolved",
+
+          updated_at: new Date(),
+        },
+        { transaction: t }
+      );
+
+      // Create resolution entry
+      await IssueResolution.create(
+        {
+          resolution_id: uuidv4(),
+          issue_id: assignment.issue_id,
+          resolved_by: confirmed_by,
+          resolution_type: "assigned_development",
+          notes: "All assigned development parts completed and confirmed",
+        },
+        { transaction: t }
+      );
+
+      // Create status history
+      await IssueStatusHistory.create(
+        {
+          status_history_id: uuidv4(),
+          issue_id: assignment.issue_id,
+          from_status: assignment.issue.status,
+          to_status: "resolved",
+          changed_by: confirmed_by,
+          reason: "All assigned parts confirmed",
+        },
+        { transaction: t }
+      );
+
+      // Notify all involved users
+      const involvedUsers = [
+        assignment.issue.reported_by,
+        ...activeAssignments.map((a) => a.assignee_id),
+        ...activeAssignments.map((a) => a.assigned_by),
+      ].filter((value, index, self) => self.indexOf(value) === index);
+
+      for (const userId of involvedUsers) {
+        if (userId !== confirmed_by) {
+          await createNotification({
+            recipient_id: userId,
+            user_id: confirmed_by,
+            reference_type: "issue",
+            reference_id: assignment.issue_id,
+            type: "issue_resolved",
+            title: `Issue Resolved: ${assignment.issue.ticket_number}`,
+            body: `Issue ${assignment.issue.ticket_number} has been resolved as all assigned parts are confirmed.`,
+            payload: {
+              issue_id: assignment.issue_id,
+              ticket_number: assignment.issue.ticket_number,
+            },
+            transaction: t,
+          });
+        }
+      }
+    } else {
+      // Some assignments still pending → Update issue status accordingly
+      const hasInProgress = activeAssignments.some(
+        (a) => a.assignment_status === "in_progress"
+      );
+      const hasResolved = activeAssignments.some(
+        (a) => a.assignment_status === "resolved"
+      );
+
+      let newIssueStatus = assignment.issue.status;
+
+      if (hasInProgress) {
+        newIssueStatus = "in_progress";
+      } else if (hasResolved && !hasInProgress) {
+        newIssueStatus = "pending_review"; // Custom status for partial completion
+      }
+
+      if (newIssueStatus !== assignment.issue.status) {
+        await assignment.issue.update(
+          {
+            status: newIssueStatus,
+            updated_at: new Date(),
+          },
+          { transaction: t }
+        );
+
+        await IssueStatusHistory.create(
+          {
+            status_history_id: uuidv4(),
+            issue_id: assignment.issue_id,
+            from_status: assignment.issue.status,
+            to_status: newIssueStatus,
+            changed_by: confirmed_by,
+            reason: `Partial assignment confirmed. Status: ${assignment.role_type} confirmed`,
+          },
+          { transaction: t }
+        );
+      }
+    }
+
+    await t.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: `${assignment.role_type} resolution confirmed successfully`,
+      data: {
+        assignment,
+        issue_status: assignment.issue.status,
+        all_assignments_confirmed: allConfirmed,
+        confirmation_summary: {
+          total_active_assignments: activeAssignments.length,
+          confirmed: activeAssignments.filter(
+            (a) => a.assignment_status === "confirmed"
+          ).length,
+          resolved: activeAssignments.filter(
+            (a) => a.assignment_status === "resolved"
+          ).length,
+          in_progress: activeAssignments.filter(
+            (a) => a.assignment_status === "in_progress"
+          ).length,
+          accepted: activeAssignments.filter(
+            (a) => a.assignment_status === "accepted"
+          ).length,
+        },
+      },
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error("CONFIRMATION ERROR:", error);
+    return res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+};
+const transferAssignment = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { assignment_id, new_assignee_id, notes } = req.body;
+    const user_id = req.user.user_id; // logged-in user
+
+    // 1️⃣ Fetch current assignment
+    const assignment = await IssueAssignment.findByPk(assignment_id, {
+      transaction: t,
+    });
+    if (!assignment)
+      return res.status(404).json({ message: "Assignment not found" });
+
+    // 2️⃣ Check if logged-in user is current assignee
+    if (assignment.assignee_id !== user_id) {
+      return res.status(403).json({
+        message: "Only the current assignee can transfer this assignment",
+      });
+    }
+
+    // 3️⃣ Validate new assignee
+    const newAssignee = await User.findByPk(new_assignee_id, {
+      transaction: t,
+    });
+    if (!newAssignee)
+      return res.status(404).json({ message: "New assignee not found" });
+
+    // 4️⃣ Update assignment
+    const oldAssigneeId = assignment.assignee_id;
+    await assignment.update(
+      {
+        assignee_id: new_assignee_id,
+        updated_at: new Date(),
+        remarks: notes || `Transferred from user ${oldAssigneeId}`,
+      },
+      { transaction: t }
+    );
+
+    // 5️⃣ Create IssueHistory entry
+    await IssueHistory.create(
+      {
+        history_id: uuidv4(),
+        issue_id: assignment.issue_id,
+        user_id: user_id,
+        action: "transfer",
+        status_at_time: assignment.status,
+        assignment_id: assignment.assignment_id,
+        notes: notes || `Assignment transferred to ${newAssignee.full_name}`,
+      },
+      { transaction: t }
+    );
+
+    // 6️⃣ Notify new assignee
+    await createNotification({
+      recipient_id: new_assignee_id,
+      user_id,
+      reference_type: "assignment",
+      reference_id: assignment.assignment_id,
+      type: "assignment_transferred",
+      title: `Assignment Transferred: Issue #${assignment.issue.ticket_number}`,
+      body: `${req.user.full_name} transferred this assignment to you.`,
+      payload: {
+        issue_id: assignment.issue_id,
+        assignment_id: assignment.assignment_id,
+        old_assignee_id: oldAssigneeId,
+        new_assignee_id,
+      },
+      transaction: t,
+    });
+
+    // 7️⃣ Commit
+    await t.commit();
+
+    // 8️⃣ Return updated assignment
+    const updatedAssignment = await IssueAssignment.findByPk(assignment_id, {
+      include: [
+        { model: Issue, as: "issue" },
+        { model: User, as: "assignee" },
+        { model: User, as: "assigner" },
+        {
+          model: AssignmentAttachment,
+          as: "attachments",
+          include: [{ model: Attachment, as: "attachment" }],
+        },
+      ],
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Assignment transferred successfully",
+      data: updatedAssignment,
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error("TRANSFER ERROR:", error);
+    return res.status(500).json({ message: "Internal server error", error });
+  }
+};
+
 module.exports = {
   assignIssue,
   removeAssignment,
@@ -720,4 +1230,9 @@ module.exports = {
   getLatestAssignmentByIssueId,
   getAssignmentsByUserId,
   updateAssignmentStatus,
+  acceptAssignment,
+
+  resolveAssignment,
+  confirmAssignmentResolution,
+  transferAssignment,
 };
